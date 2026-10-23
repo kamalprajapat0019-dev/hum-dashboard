@@ -1,8 +1,13 @@
 import { useState, useRef, useEffect } from 'react';
-import { useLocation } from 'react-router-dom';
-import { Bell, Search, Menu, ChevronDown, Settings, User, LogOut, HelpCircle, Calendar } from 'lucide-react';
-import { useAuth, ROLE_LABELS, ROLE_COLORS } from '../../context/AuthContext';
-import { NOTIFICATIONS } from '../../data/mockData';
+import { useLocation, useNavigate } from 'react-router-dom';
+import { Bell, Search, Menu, ChevronDown, Settings, User, LogOut, HelpCircle, Calendar, ArrowUpRight } from 'lucide-react';
+import { useAuth, ROLE_LABELS, ROLE_COLORS, ROLES } from '../../context/AuthContext';
+import {
+  getAllNotifications,
+  getUnreadCount,
+  markAsRead,
+  subscribeNotifications
+} from '../../services/notificationService';
 import ExamCalendarModal from '../common/ExamCalendarModal';
 
 const ROUTE_LABELS = {
@@ -11,28 +16,62 @@ const ROUTE_LABELS = {
   '/admin/projects':     ['Client & Project Management'],
   '/admin/centres':      ['Centre Master'],
   '/admin/audit':        ['Audit & Compliance'],
+  '/admin/notifications':['Notifications & Alert Center'],
   '/admin/reports':      ['MIS / Reports'],
   '/pm':                 ['My Projects'],
   '/pm/allocation':      ['Allocation Management'],
+  '/pm/notifications':   ['Notifications & Alert Center'],
   '/auditor':            ['My Audits'],
   '/auditor/audits':     ['Audit Assignments'],
   '/auditor/mock':       ['Mock Status'],
+  '/auditor/notifications':['Notifications & Alert Center'],
   '/ops':                ['Operations Board'],
   '/ops/booking':        ['Booking & Centres'],
   '/ops/documents':      ['Document Checklist'],
+  '/ops/notifications':  ['Notifications & Alert Center'],
   '/finance':            ['Finance Overview'],
   '/finance/invoices':   ['Invoice Management'],
   '/centre':             ['Centre Dashboard'],
   '/centre/documents':   ['Document Checklist'],
 };
 
-function NotificationPanel({ onClose }) {
-  const unread = NOTIFICATIONS.filter(n => !n.read).length;
+function NotificationPanel({ onClose, user }) {
+  const navigate = useNavigate();
+  const [items, setItems] = useState(() => getAllNotifications(user?.role));
 
-  const typeColor = (type) => {
-    if (type === 'critical') return '#dc2626';
-    if (type === 'high')     return '#d97706';
+  useEffect(() => {
+    return subscribeNotifications(() => {
+      setItems(getAllNotifications(user?.role));
+    });
+  }, [user?.role]);
+
+  const unread = items.filter(n => !n.read).length;
+
+  const typeColor = (priority) => {
+    if (priority === 'critical') return '#dc2626';
+    if (priority === 'high')     return '#d97706';
     return '#0ea5e9';
+  };
+
+  const getNotifRoute = () => {
+    const role = user?.role || ROLES.ADMIN;
+    if (role === ROLES.PM) return '/pm/notifications';
+    if (role === ROLES.AUDITOR) return '/auditor/notifications';
+    if (role === ROLES.OPERATIONS) return '/ops/notifications';
+    return '/admin/notifications';
+  };
+
+  const handleItemClick = (notif) => {
+    markAsRead(notif.id);
+    onClose();
+    if (notif.deepLink) {
+      navigate(notif.deepLink);
+    }
+  };
+
+  const handleViewAll = () => {
+    onClose();
+    navigate(getNotifRoute());
   };
 
   return (
@@ -47,22 +86,39 @@ function NotificationPanel({ onClose }) {
         </div>
       </div>
       <div style={{ maxHeight: 380, overflowY: 'auto' }}>
-        {NOTIFICATIONS.map(n => (
-          <div key={n.id} className={`notif-item ${!n.read ? 'unread' : ''}`}>
-            <div className="notif-item__dot" style={{ background: typeColor(n.type) }} />
-            <div className="notif-item__body">
-              <div className="notif-item__title">{n.title}</div>
-              <div className="notif-item__desc">{n.desc}</div>
-              <div className="notif-item__time">
-                <span className="badge badge-neutral" style={{ fontSize: '0.625rem' }}>{n.module}</span>
-                {' · '}{n.time}
+        {items.length === 0 ? (
+          <div style={{ padding: '24px 16px', textAlign: 'center', color: 'var(--text-muted)', fontSize: '0.8125rem' }}>
+            No notifications available
+          </div>
+        ) : (
+          items.slice(0, 6).map(n => (
+            <div
+              key={n.id}
+              className={`notif-item ${!n.read ? 'unread' : ''}`}
+              style={{ cursor: 'pointer' }}
+              onClick={() => handleItemClick(n)}
+            >
+              <div className="notif-item__dot" style={{ background: typeColor(n.priority) }} />
+              <div className="notif-item__body">
+                <div className="notif-item__title" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                  <span>{n.title}</span>
+                  <ArrowUpRight size={12} style={{ color: 'var(--text-muted)', opacity: 0.7 }} />
+                </div>
+                <div className="notif-item__desc">{n.desc}</div>
+                <div className="notif-item__time">
+                  <span className="badge badge-neutral" style={{ fontSize: '0.625rem' }}>{n.module}</span>
+                  {' · '}
+                  <span>{n.projectName}</span>
+                </div>
               </div>
             </div>
-          </div>
-        ))}
+          ))
+        )}
       </div>
       <div className="card-footer" style={{ textAlign: 'center' }}>
-        <button className="btn btn-ghost btn-sm" style={{ width: '100%' }}>View all notifications</button>
+        <button className="btn btn-ghost btn-sm" style={{ width: '100%' }} onClick={handleViewAll}>
+          View all notifications →
+        </button>
       </div>
     </div>
   );
@@ -92,9 +148,17 @@ export default function Header({ onMobileMenuToggle }) {
     return () => document.removeEventListener('mousedown', handleClick);
   }, []);
 
+  const [unreadCount, setUnreadCount] = useState(() => getUnreadCount(user?.role));
+
+  useEffect(() => {
+    setUnreadCount(getUnreadCount(user?.role));
+    return subscribeNotifications(() => {
+      setUnreadCount(getUnreadCount(user?.role));
+    });
+  }, [user?.role]);
+
   // Breadcrumb
   const crumbs = ROUTE_LABELS[location.pathname] || [location.pathname.split('/').filter(Boolean).join(' / ')];
-  const unreadCount = NOTIFICATIONS.filter(n => !n.read).length;
   const roleColor = user ? ROLE_COLORS[user.role] : '#1e40af';
 
   return (
@@ -173,7 +237,7 @@ export default function Header({ onMobileMenuToggle }) {
               <span className="header__notif-badge" aria-hidden="true">{unreadCount}</span>
             )}
           </button>
-          {notifOpen && <NotificationPanel onClose={() => setNotifOpen(false)} />}
+          {notifOpen && <NotificationPanel onClose={() => setNotifOpen(false)} user={user} />}
         </div>
 
         {/* Profile menu */}

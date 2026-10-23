@@ -45,6 +45,9 @@ import CostSheetPage             from './pages/finance/CostSheetPage';
 import InvoiceManagementPage    from './pages/finance/InvoiceManagementPage';
 import PaymentReconciliationPage from './pages/finance/PaymentReconciliationPage';
 
+// Phase 7 Module (Notification System)
+import NotificationCenterPage    from './pages/NotificationCenterPage';
+
 // ── App Shell ─────────────────────────────────────────────────────────────────
 function AppShell({ children }) {
   const [mobileNavOpen, setMobileNavOpen] = useState(false);
@@ -133,7 +136,7 @@ function AppRoutes() {
       <Route path="/admin/commercial"  element={<ProtectedRoute allowedRoles={[ROLES.ADMIN]}><AppShell><CostSheetPage /></AppShell></ProtectedRoute>} />
       <Route path="/admin/readiness"   element={<ProtectedRoute allowedRoles={[ROLES.ADMIN]}><AppShell><ReadinessExamPage /></AppShell></ProtectedRoute>} />
       <Route path="/admin/incidents"   element={<ProtectedRoute allowedRoles={[ROLES.ADMIN]}><AppShell><IncidentManagementPage /></AppShell></ProtectedRoute>} />
-      <Route path="/admin/notifications" element={<ProtectedRoute allowedRoles={[ROLES.ADMIN]}><AppShell><ComingSoon title="Internal Notification Centre" /></AppShell></ProtectedRoute>} />
+      <Route path="/admin/notifications" element={<ProtectedRoute allowedRoles={[ROLES.ADMIN]}><AppShell><NotificationCenterPage /></AppShell></ProtectedRoute>} />
       <Route path="/admin/reports"     element={<ProtectedRoute allowedRoles={[ROLES.ADMIN]}><AppShell><ComingSoon title="MIS / Reports" /></AppShell></ProtectedRoute>} />
       <Route path="/admin/config"      element={<ProtectedRoute allowedRoles={[ROLES.ADMIN]}><AppShell><ConfigPage /></AppShell></ProtectedRoute>} />
 
@@ -152,7 +155,7 @@ function AppRoutes() {
       <Route path="/pm/commercial"    element={<ProtectedRoute allowedRoles={[ROLES.PM, ROLES.ADMIN]}><AppShell><CostSheetPage /></AppShell></ProtectedRoute>} />
       <Route path="/pm/readiness"     element={<ProtectedRoute allowedRoles={[ROLES.PM, ROLES.ADMIN]}><AppShell><ReadinessExamPage /></AppShell></ProtectedRoute>} />
       <Route path="/pm/incidents"     element={<ProtectedRoute allowedRoles={[ROLES.PM, ROLES.ADMIN]}><AppShell><IncidentManagementPage /></AppShell></ProtectedRoute>} />
-      <Route path="/pm/notifications" element={<ProtectedRoute allowedRoles={[ROLES.PM, ROLES.ADMIN]}><AppShell><ComingSoon title="Notifications" /></AppShell></ProtectedRoute>} />
+      <Route path="/pm/notifications" element={<ProtectedRoute allowedRoles={[ROLES.PM, ROLES.ADMIN]}><AppShell><NotificationCenterPage /></AppShell></ProtectedRoute>} />
       <Route path="/pm/invoice"       element={<ProtectedRoute allowedRoles={[ROLES.PM, ROLES.ADMIN]}><AppShell><InvoiceManagementPage /></AppShell></ProtectedRoute>} />
       <Route path="/pm/reports"       element={<ProtectedRoute allowedRoles={[ROLES.PM, ROLES.ADMIN]}><AppShell><ComingSoon title="Project MIS" /></AppShell></ProtectedRoute>} />
 
@@ -166,7 +169,7 @@ function AppRoutes() {
       <Route path="/auditor/scan"          element={<ProtectedRoute allowedRoles={[ROLES.AUDITOR, ROLES.ADMIN]}><AppShell><TechnicalScanPage /></AppShell></ProtectedRoute>} />
       <Route path="/auditor/mock"          element={<ProtectedRoute allowedRoles={[ROLES.AUDITOR, ROLES.ADMIN]}><AppShell><MockStatusPage /></AppShell></ProtectedRoute>} />
       <Route path="/auditor/findings"      element={<ProtectedRoute allowedRoles={[ROLES.AUDITOR, ROLES.ADMIN]}><AppShell><FindingsEvidencePage /></AppShell></ProtectedRoute>} />
-      <Route path="/auditor/notifications" element={<ProtectedRoute allowedRoles={[ROLES.AUDITOR, ROLES.ADMIN]}><AppShell><ComingSoon title="Notifications" /></AppShell></ProtectedRoute>} />
+      <Route path="/auditor/notifications" element={<ProtectedRoute allowedRoles={[ROLES.AUDITOR, ROLES.ADMIN]}><AppShell><NotificationCenterPage /></AppShell></ProtectedRoute>} />
 
       {/* ── OPERATIONS ── */}
       <Route path="/ops" element={
@@ -181,7 +184,7 @@ function AppRoutes() {
       <Route path="/ops/readiness"     element={<ProtectedRoute allowedRoles={[ROLES.OPERATIONS, ROLES.ADMIN]}><AppShell><ReadinessExamPage /></AppShell></ProtectedRoute>} />
       <Route path="/ops/incidents"     element={<ProtectedRoute allowedRoles={[ROLES.OPERATIONS, ROLES.ADMIN]}><AppShell><IncidentManagementPage /></AppShell></ProtectedRoute>} />
       <Route path="/ops/inventory"     element={<ProtectedRoute allowedRoles={[ROLES.OPERATIONS, ROLES.ADMIN]}><AppShell><InventoryPage /></AppShell></ProtectedRoute>} />
-      <Route path="/ops/notifications" element={<ProtectedRoute allowedRoles={[ROLES.OPERATIONS, ROLES.ADMIN]}><AppShell><ComingSoon title="Notifications" /></AppShell></ProtectedRoute>} />
+      <Route path="/ops/notifications" element={<ProtectedRoute allowedRoles={[ROLES.OPERATIONS, ROLES.ADMIN]}><AppShell><NotificationCenterPage /></AppShell></ProtectedRoute>} />
 
       {/* ── FINANCE ── */}
       <Route path="/finance" element={

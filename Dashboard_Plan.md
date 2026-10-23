@@ -207,14 +207,14 @@ From module 4 fields:
 - Critical triggers → **immediate**: booking conflict, eligibility restriction, audit failure, duplicate MAC, failed mock, readiness blocker, locked-allocation change, critical incident
 
 #### Tasks:
-- [ ] Notification event engine — event trigger rules
-- [ ] Recipient resolver — project team + scope filter
-- [ ] Push notification UI — bell icon, drawer, unread count
-- [ ] Notification log — trigger, recipients, delivery status, read status
-- [ ] Duplicate consolidation logic
-- [ ] Deep link routing — respects RBAC
+- [x] Notification event engine — event trigger rules (`NOTIFICATION_TRIGGER_RULES`)
+- [x] Recipient resolver — project team + scope filter (`filterNotificationsByRole`)
+- [x] Push notification UI — bell icon, drawer, unread count badge & interactive popup
+- [x] Notification log — trigger, recipients, delivery status, read status (`NotificationCenterPage.jsx`)
+- [x] Duplicate consolidation logic (`dispatchNotification` with 60-min window consolidation)
+- [x] Deep link routing — respects RBAC & auto-marks as read
 
-**Deliverable:** Full notification system with audit trail
+**Deliverable:** Full notification system with audit trail (Completed)
 
 ---
 
