@@ -264,10 +264,12 @@ From module 4 fields:
 - Readiness confirmation status
 
 #### Tasks:
-- [ ] Chart library integration (Recharts / Chart.js)
-- [ ] Filterable data tables — search, sort, export CSV/Excel
-- [ ] Report templates — Operational, Compliance, Financial
-- [ ] Management/CEO read-only scoped view (KPI + exception only)
+- [x] Chart library integration (Recharts — BarChart, PieChart, Donut, Custom Tooltips)
+- [x] Filterable data tables — search, sort, export CSV/Excel (`exportToCSV` browser engine)
+- [x] Report templates — Operational, Compliance, Financial (`MISReportsPage.jsx`)
+- [x] Management/CEO read-only scoped view (KPI + exception only)
+
+**Deliverable:** Full MIS & reporting suite with native CSV export (Completed)
 
 ---
 

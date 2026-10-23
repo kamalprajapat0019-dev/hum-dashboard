@@ -48,6 +48,9 @@ import PaymentReconciliationPage from './pages/finance/PaymentReconciliationPage
 // Phase 7 Module (Notification System)
 import NotificationCenterPage    from './pages/NotificationCenterPage';
 
+// Phase 8 Module (MIS & Reporting)
+import MISReportsPage            from './pages/admin/MISReportsPage';
+
 // ── App Shell ─────────────────────────────────────────────────────────────────
 function AppShell({ children }) {
   const [mobileNavOpen, setMobileNavOpen] = useState(false);
@@ -137,7 +140,7 @@ function AppRoutes() {
       <Route path="/admin/readiness"   element={<ProtectedRoute allowedRoles={[ROLES.ADMIN]}><AppShell><ReadinessExamPage /></AppShell></ProtectedRoute>} />
       <Route path="/admin/incidents"   element={<ProtectedRoute allowedRoles={[ROLES.ADMIN]}><AppShell><IncidentManagementPage /></AppShell></ProtectedRoute>} />
       <Route path="/admin/notifications" element={<ProtectedRoute allowedRoles={[ROLES.ADMIN]}><AppShell><NotificationCenterPage /></AppShell></ProtectedRoute>} />
-      <Route path="/admin/reports"     element={<ProtectedRoute allowedRoles={[ROLES.ADMIN]}><AppShell><ComingSoon title="MIS / Reports" /></AppShell></ProtectedRoute>} />
+      <Route path="/admin/reports"     element={<ProtectedRoute allowedRoles={[ROLES.ADMIN]}><AppShell><MISReportsPage /></AppShell></ProtectedRoute>} />
       <Route path="/admin/config"      element={<ProtectedRoute allowedRoles={[ROLES.ADMIN]}><AppShell><ConfigPage /></AppShell></ProtectedRoute>} />
 
       {/* ── PROJECT MANAGER ── */}
@@ -157,7 +160,7 @@ function AppRoutes() {
       <Route path="/pm/incidents"     element={<ProtectedRoute allowedRoles={[ROLES.PM, ROLES.ADMIN]}><AppShell><IncidentManagementPage /></AppShell></ProtectedRoute>} />
       <Route path="/pm/notifications" element={<ProtectedRoute allowedRoles={[ROLES.PM, ROLES.ADMIN]}><AppShell><NotificationCenterPage /></AppShell></ProtectedRoute>} />
       <Route path="/pm/invoice"       element={<ProtectedRoute allowedRoles={[ROLES.PM, ROLES.ADMIN]}><AppShell><InvoiceManagementPage /></AppShell></ProtectedRoute>} />
-      <Route path="/pm/reports"       element={<ProtectedRoute allowedRoles={[ROLES.PM, ROLES.ADMIN]}><AppShell><ComingSoon title="Project MIS" /></AppShell></ProtectedRoute>} />
+      <Route path="/pm/reports"       element={<ProtectedRoute allowedRoles={[ROLES.PM, ROLES.ADMIN]}><AppShell><MISReportsPage /></AppShell></ProtectedRoute>} />
 
       {/* ── AUDITOR ── */}
       <Route path="/auditor" element={
