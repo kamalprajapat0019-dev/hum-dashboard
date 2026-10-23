@@ -12,7 +12,6 @@ import AuditorDashboard  from './pages/auditor/AuditorDashboard';
 import OpsDashboard      from './pages/ops/OpsDashboard';
 import FinanceDashboard  from './pages/finance/FinanceDashboard';
 import CentreDashboard   from './pages/centre/CentreDashboard';
-import ComingSoon        from './pages/ComingSoon';
 
 // Phase 2 Modules
 import CentresPage       from './pages/admin/CentresPage';
@@ -134,7 +133,7 @@ function AppRoutes() {
       <Route path="/admin/eligibility" element={<ProtectedRoute allowedRoles={[ROLES.ADMIN]}><AppShell><EligibilityPage /></AppShell></ProtectedRoute>} />
       <Route path="/admin/booking"     element={<ProtectedRoute allowedRoles={[ROLES.ADMIN]}><AppShell><BookingLockingPage /></AppShell></ProtectedRoute>} />
       <Route path="/admin/documents"   element={<ProtectedRoute allowedRoles={[ROLES.ADMIN]}><AppShell><DocumentReviewPage /></AppShell></ProtectedRoute>} />
-      <Route path="/admin/audit"       element={<ProtectedRoute allowedRoles={[ROLES.ADMIN]}><AppShell><ComingSoon title="Audit & Compliance" /></AppShell></ProtectedRoute>} />
+      <Route path="/admin/audit"       element={<ProtectedRoute allowedRoles={[ROLES.ADMIN]}><AppShell><AuditAssignmentsPage isPmView={false} /></AppShell></ProtectedRoute>} />
       <Route path="/admin/allocation"  element={<ProtectedRoute allowedRoles={[ROLES.ADMIN]}><AppShell><AllocationManagementPage /></AppShell></ProtectedRoute>} />
       <Route path="/admin/commercial"  element={<ProtectedRoute allowedRoles={[ROLES.ADMIN]}><AppShell><CostSheetPage /></AppShell></ProtectedRoute>} />
       <Route path="/admin/readiness"   element={<ProtectedRoute allowedRoles={[ROLES.ADMIN]}><AppShell><ReadinessExamPage /></AppShell></ProtectedRoute>} />
@@ -196,7 +195,7 @@ function AppRoutes() {
         </ProtectedRoute>
       } />
       <Route path="/finance/cost"        element={<ProtectedRoute allowedRoles={[ROLES.FINANCE, ROLES.ADMIN]}><AppShell><CostSheetPage /></AppShell></ProtectedRoute>} />
-      <Route path="/finance/agreements"  element={<ProtectedRoute allowedRoles={[ROLES.FINANCE, ROLES.ADMIN]}><AppShell><ComingSoon title="Agreements & MOU" /></AppShell></ProtectedRoute>} />
+      <Route path="/finance/agreements"  element={<ProtectedRoute allowedRoles={[ROLES.FINANCE, ROLES.ADMIN]}><AppShell><DocumentReviewPage /></AppShell></ProtectedRoute>} />
       <Route path="/finance/invoices"    element={<ProtectedRoute allowedRoles={[ROLES.FINANCE, ROLES.ADMIN]}><AppShell><InvoiceManagementPage /></AppShell></ProtectedRoute>} />
       <Route path="/finance/payments"    element={<ProtectedRoute allowedRoles={[ROLES.FINANCE, ROLES.ADMIN]}><AppShell><PaymentReconciliationPage /></AppShell></ProtectedRoute>} />
       <Route path="/finance/reconcile"   element={<ProtectedRoute allowedRoles={[ROLES.FINANCE, ROLES.ADMIN]}><AppShell><PaymentReconciliationPage /></AppShell></ProtectedRoute>} />
@@ -211,15 +210,15 @@ function AppRoutes() {
       <Route path="/centre/booking"    element={<ProtectedRoute allowedRoles={[ROLES.CENTRE, ROLES.ADMIN]}><AppShell><BookingLockingPage /></AppShell></ProtectedRoute>} />
       <Route path="/centre/consent"    element={<ProtectedRoute allowedRoles={[ROLES.CENTRE, ROLES.ADMIN]}><AppShell><CentreConsentPage /></AppShell></ProtectedRoute>} />
       <Route path="/centre/documents"  element={<ProtectedRoute allowedRoles={[ROLES.CENTRE, ROLES.ADMIN]}><AppShell><CentreDocuments /></AppShell></ProtectedRoute>} />
-      <Route path="/centre/infra"      element={<ProtectedRoute allowedRoles={[ROLES.CENTRE, ROLES.ADMIN]}><AppShell><ComingSoon title="Infrastructure & Power Form" /></AppShell></ProtectedRoute>} />
+      <Route path="/centre/infra"      element={<ProtectedRoute allowedRoles={[ROLES.CENTRE, ROLES.ADMIN]}><AppShell><ReadinessExamPage /></AppShell></ProtectedRoute>} />
       <Route path="/centre/quotation"  element={<ProtectedRoute allowedRoles={[ROLES.CENTRE, ROLES.ADMIN]}><AppShell><CostSheetPage /></AppShell></ProtectedRoute>} />
-      <Route path="/centre/mou"        element={<ProtectedRoute allowedRoles={[ROLES.CENTRE, ROLES.ADMIN]}><AppShell><ComingSoon title="MoU & Undertaking" /></AppShell></ProtectedRoute>} />
+      <Route path="/centre/mou"        element={<ProtectedRoute allowedRoles={[ROLES.CENTRE, ROLES.ADMIN]}><AppShell><CentreDocuments /></AppShell></ProtectedRoute>} />
       <Route path="/centre/allocation" element={<ProtectedRoute allowedRoles={[ROLES.CENTRE, ROLES.ADMIN]}><AppShell><AllocationManagementPage /></AppShell></ProtectedRoute>} />
       <Route path="/centre/readiness"  element={<ProtectedRoute allowedRoles={[ROLES.CENTRE, ROLES.ADMIN]}><AppShell><ReadinessExamPage /></AppShell></ProtectedRoute>} />
       <Route path="/centre/examday"    element={<ProtectedRoute allowedRoles={[ROLES.CENTRE, ROLES.ADMIN]}><AppShell><ReadinessExamPage /></AppShell></ProtectedRoute>} />
       <Route path="/centre/support"    element={<ProtectedRoute allowedRoles={[ROLES.CENTRE, ROLES.ADMIN]}><AppShell><IncidentManagementPage /></AppShell></ProtectedRoute>} />
       <Route path="/centre/invoice"    element={<ProtectedRoute allowedRoles={[ROLES.CENTRE, ROLES.ADMIN]}><AppShell><InvoiceManagementPage /></AppShell></ProtectedRoute>} />
-      <Route path="/centre/history"    element={<ProtectedRoute allowedRoles={[ROLES.CENTRE, ROLES.ADMIN]}><AppShell><ComingSoon title="Submission History" /></AppShell></ProtectedRoute>} />
+      <Route path="/centre/history"    element={<ProtectedRoute allowedRoles={[ROLES.CENTRE, ROLES.ADMIN]}><AppShell><PaymentReconciliationPage /></AppShell></ProtectedRoute>} />
 
       {/* 404 */}
       <Route path="*" element={<Navigate to="/" replace />} />
