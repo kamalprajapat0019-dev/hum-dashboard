@@ -1,0 +1,57 @@
+/* ============================================================
+   OEM Portal — Typography
+   ============================================================ */
+
+html {
+  font-size: 14px;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+body {
+  font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+  font-size: 0.875rem;
+  line-height: 1.5;
+  color: var(--text-primary);
+}
+
+h1, .h1 {
+  font-size: 1.5rem;
+  font-weight: 700;
+  line-height: 1.25;
+  letter-spacing: -0.02em;
+}
+
+h2, .h2 {
+  font-size: 1.25rem;
+  font-weight: 600;
+  line-height: 1.3;
+  letter-spacing: -0.015em;
+}
+
+h3, .h3 {
+  font-size: 1.05rem;
+  font-weight: 600;
+  line-height: 1.35;
+}
+
+h4, .h4 {
+  font-size: 0.925rem;
+  font-weight: 600;
+  line-height: 1.4;
+}
+
+p, .text-body {
+  font-size: 0.875rem;
+  line-height: 1.5;
+}
+
+small, .text-sm {
+  font-size: 0.775rem;
+  line-height: 1.4;
+}
+
+.text-xs {
+  font-size: 0.7rem;
+  line-height: 1.3;
+}

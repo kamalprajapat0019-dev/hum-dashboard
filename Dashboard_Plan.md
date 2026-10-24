@@ -363,17 +363,3 @@ src/
 └── utils/               (permissions, dateUtils, fileUtils)
 ```
 
----
-
-## ✅ Recommended Starting Point
-
-> **Start here → Build the Admin Dashboard shell first:**
-> 1. Login page → role detection → route to correct dashboard
-> 2. Admin sidebar with all 15 menu items
-> 3. Executive Overview KPI cards (placeholder data)
-> 4. Then replicate skeleton for other 5 roles
-> 5. Then fill modules one by one per phase
-
----
-
-*Plan created from: 9 source PDFs — FRD, SRS, Centre Management Fields, Admin v1.2, PM v1.1, Auditor/IT v1.1, Ops Exec v1.1, Accounts/Finance v1.1, Centre User v1.1*

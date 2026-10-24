@@ -1,0 +1,97 @@
+/* ============================================================
+   OEM Portal — Design Tokens
+   ============================================================ */
+
+:root {
+  /* Brand Colors */
+  --color-primary:       #1e40af;   /* Deep blue */
+  --color-primary-light: #3b82f6;
+  --color-primary-dark:  #1e3a8a;
+  --color-accent:        #0ea5e9;
+
+  /* Sidebar — Dark Navy */
+  --sidebar-bg:          #0f172a;
+  --sidebar-border:      #1e293b;
+  --sidebar-text:        #94a3b8;
+  --sidebar-text-active: #f1f5f9;
+  --sidebar-item-hover:  #1e293b;
+  --sidebar-item-active: #1e40af;
+  --sidebar-icon-active: #60a5fa;
+
+  /* Surface & Background */
+  --bg-base:       #f8fafc;
+  --bg-surface:    #ffffff;
+  --bg-subtle:     #f1f5f9;
+  --bg-hover:      #e2e8f0;
+
+  /* Borders */
+  --border-default: #e2e8f0;
+  --border-subtle:  #f1f5f9;
+  --border-strong:  #cbd5e1;
+
+  /* Typography */
+  --text-primary:   #0f172a;
+  --text-secondary: #475569;
+  --text-muted:     #94a3b8;
+  --text-inverse:   #f8fafc;
+
+  /* Status Colors */
+  --color-success:  #16a34a;
+  --color-success-bg: #f0fdf4;
+  --color-success-border: #bbf7d0;
+  --color-warning:  #d97706;
+  --color-warning-bg: #fffbeb;
+  --color-warning-border: #fde68a;
+  --color-danger:   #dc2626;
+  --color-danger-bg: #fef2f2;
+  --color-danger-border: #fecaca;
+  --color-info:     #0284c7;
+  --color-info-bg:  #f0f9ff;
+  --color-info-border: #bae6fd;
+  --color-purple:   #7c3aed;
+  --color-purple-bg: #faf5ff;
+
+  /* Chart Colors (accessible palette) */
+  --chart-1: #1e40af;
+  --chart-2: #0ea5e9;
+  --chart-3: #16a34a;
+  --chart-4: #d97706;
+  --chart-5: #dc2626;
+  --chart-6: #7c3aed;
+  --chart-7: #0891b2;
+  --chart-8: #65a30d;
+
+  /* Shadows */
+  --shadow-sm:  0 1px 2px 0 rgb(0 0 0 / 0.05);
+  --shadow-md:  0 4px 6px -1px rgb(0 0 0 / 0.07), 0 2px 4px -2px rgb(0 0 0 / 0.05);
+  --shadow-lg:  0 10px 15px -3px rgb(0 0 0 / 0.08), 0 4px 6px -4px rgb(0 0 0 / 0.04);
+  --shadow-xl:  0 20px 25px -5px rgb(0 0 0 / 0.10), 0 8px 10px -6px rgb(0 0 0 / 0.04);
+
+  /* Spacing */
+  --sidebar-width: 260px;
+  --sidebar-collapsed: 64px;
+  --header-height: 60px;
+
+  /* Glassmorphism Design Tokens */
+  --glass-surface:        rgba(255, 255, 255, 0.78);
+  --glass-surface-hover:  rgba(255, 255, 255, 0.92);
+  --glass-surface-subtle: rgba(248, 250, 252, 0.65);
+  --glass-border:         rgba(255, 255, 255, 0.85);
+  --glass-border-subtle:  rgba(226, 232, 240, 0.70);
+  --glass-blur:           blur(16px) saturate(180%);
+  --glass-blur-heavy:     blur(24px) saturate(200%);
+  --glass-shadow:         0 8px 30px -4px rgba(15, 23, 42, 0.06), inset 0 1px 1px rgba(255, 255, 255, 0.95);
+  --glass-shadow-hover:   0 14px 34px -4px rgba(15, 23, 42, 0.10), inset 0 1px 1px #ffffff;
+
+  /* Border Radius */
+  --radius-sm: 6px;
+  --radius-md: 8px;
+  --radius-lg: 12px;
+  --radius-xl: 16px;
+  --radius-full: 9999px;
+
+  /* Transitions */
+  --transition-fast: 150ms ease;
+  --transition-base: 200ms ease;
+  --transition-slow: 300ms ease;
+}

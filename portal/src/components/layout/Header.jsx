@@ -277,8 +277,11 @@ export default function Header({ onMobileMenuToggle }) {
       <style>{`
         .app-header {
           height: var(--header-height);
-          background: var(--bg-surface);
-          border-bottom: 1px solid var(--border-default);
+          background: rgba(255, 255, 255, 0.82);
+          backdrop-filter: blur(20px) saturate(190%);
+          -webkit-backdrop-filter: blur(20px) saturate(190%);
+          border-bottom: 1px solid rgba(226, 232, 240, 0.85);
+          box-shadow: 0 4px 20px -2px rgba(15, 23, 42, 0.04), inset 0 1px 0 rgba(255, 255, 255, 0.95);
           display: flex;
           align-items: center;
           gap: 16px;
@@ -318,19 +321,22 @@ export default function Header({ onMobileMenuToggle }) {
         .search-input {
           width: 100%;
           padding: 7px 12px 7px 32px;
-          background: var(--bg-subtle);
-          border: 1px solid var(--border-default);
+          background: rgba(241, 245, 249, 0.65);
+          backdrop-filter: blur(12px);
+          -webkit-backdrop-filter: blur(12px);
+          border: 1px solid rgba(226, 232, 240, 0.9);
           border-radius: var(--radius-full);
           font-size: 0.8125rem;
           color: var(--text-primary);
           font-family: inherit;
+          box-shadow: inset 0 1px 2px rgba(15, 23, 42, 0.04);
           transition: all var(--transition-fast);
         }
         .search-input:focus {
           outline: none;
-          background: var(--bg-surface);
+          background: rgba(255, 255, 255, 0.96);
           border-color: var(--color-primary-light);
-          box-shadow: 0 0 0 3px rgb(59 130 246 / 0.1);
+          box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.15), inset 0 1px 1px #fff;
         }
         .search-input::placeholder { color: var(--text-muted); }
 
@@ -347,16 +353,24 @@ export default function Header({ onMobileMenuToggle }) {
           width: 36px;
           height: 36px;
           border-radius: var(--radius-md);
-          background: var(--bg-subtle);
-          border: 1px solid var(--border-default);
+          background: rgba(248, 250, 252, 0.75);
+          backdrop-filter: blur(10px);
+          -webkit-backdrop-filter: blur(10px);
+          border: 1px solid rgba(226, 232, 240, 0.9);
           color: var(--text-secondary);
           display: flex;
           align-items: center;
           justify-content: center;
           cursor: pointer;
+          box-shadow: 0 1px 3px rgba(15, 23, 42, 0.04), inset 0 1px 0 #fff;
           transition: all var(--transition-fast);
         }
-        .header__icon-btn:hover { background: var(--bg-hover); color: var(--text-primary); }
+        .header__icon-btn:hover {
+          background: rgba(255, 255, 255, 0.95);
+          color: var(--text-primary);
+          box-shadow: 0 4px 12px rgba(15, 23, 42, 0.08), inset 0 1px 0 #fff;
+          transform: translateY(-1px);
+        }
         .header__notif-badge {
           position: absolute;
           top: -4px;
@@ -379,13 +393,19 @@ export default function Header({ onMobileMenuToggle }) {
           align-items: center;
           gap: 8px;
           padding: 5px 10px 5px 5px;
-          background: var(--bg-subtle);
-          border: 1px solid var(--border-default);
+          background: rgba(248, 250, 252, 0.75);
+          backdrop-filter: blur(10px);
+          -webkit-backdrop-filter: blur(10px);
+          border: 1px solid rgba(226, 232, 240, 0.9);
           border-radius: var(--radius-lg);
           cursor: pointer;
+          box-shadow: 0 1px 3px rgba(15, 23, 42, 0.04), inset 0 1px 0 #fff;
           transition: all var(--transition-fast);
         }
-        .header__profile-btn:hover { background: var(--bg-hover); }
+        .header__profile-btn:hover {
+          background: rgba(255, 255, 255, 0.95);
+          box-shadow: 0 4px 12px rgba(15, 23, 42, 0.08), inset 0 1px 0 #fff;
+        }
         .header__profile-info {
           display: flex;
           flex-direction: column;
