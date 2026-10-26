@@ -1,10 +1,12 @@
 # Dependencies
 node_modules/
-portal/node_modules/
+frontend/node_modules/
+backend/node_modules/
 
 # Production builds
 dist/
-portal/dist/
+frontend/dist/
+backend/dist/
 
 # Logs
 *.log
@@ -24,6 +26,6 @@ Thumbs.db
 
 # Scratch & Archives
 scratch/
-portal/scratch/
+frontend/scratch/
 *.zip
 

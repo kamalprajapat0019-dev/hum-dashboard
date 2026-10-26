@@ -16,7 +16,7 @@ The portal enforces strict Role-Based Access Control (RBAC) across six distinct 
 ## 2. Layered Target Architecture
 
 ```
-portal/src/
+frontend/src/
 ├── app/                  # Application Bootstrap & Composition Layer
 │   ├── App.jsx           # Root application container
 │   ├── router.jsx        # Centralized route tree with RBAC guards

@@ -1,0 +1,250 @@
+// Prisma schema for Operations & Examination Management Portal (OEM Portal)
+// Neon Cloud PostgreSQL Datasource
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider  = "postgresql"
+  url       = env("DATABASE_URL")
+  directUrl = env("DIRECT_URL")
+}
+
+enum Role {
+  ADMIN
+  PM
+  AUDITOR
+  OPERATIONS
+  FINANCE
+  CENTRE
+}
+
+enum UserStatus {
+  Active
+  Inactive
+  Suspended
+}
+
+model User {
+  id               String            @id @default(cuid())
+  email            String            @unique
+  passwordHash     String
+  name             String
+  role             Role              @default(ADMIN)
+  avatar           String?
+  status           UserStatus        @default(Active)
+  scope            Json?             // { clients: string[], projects: string[], centres: string[] }
+  lastLogin        DateTime?
+  createdAt        DateTime          @default(now())
+  updatedAt        DateTime          @updatedAt
+
+  projectsManaged  Project[]
+  auditAssignments AuditAssignment[]
+  auditLogs        AuditLog[]
+
+  @@index([role, status])
+  @@map("users")
+}
+
+model Client {
+  id           String    @id @default(cuid())
+  code         String?   @unique
+  name         String    // e.g. "NTA"
+  fullName     String    // "National Testing Agency"
+  contactEmail String
+  status       String    @default("Active")
+  createdAt    DateTime  @default(now())
+  updatedAt    DateTime  @updatedAt
+
+  projects     Project[]
+
+  @@map("clients")
+}
+
+model Project {
+  id              String            @id @default(cuid())
+  projectCode     String            @unique // PRJ-001
+  name            String            // "NEET UG 2026 – Season 1"
+  clientId        String
+  client          Client            @relation(fields: [clientId], references: [id])
+  examType        String            // "NEET UG", "JEE Mains", etc.
+  stage           String            @default("Setup") // Setup, Booking, Document Verification, Audit & Compliance, Allocation, Execution, Closed
+  status          String            @default("Active") // Active, OnHold, Completed, Closed
+  examDate        DateTime?
+  citiesCount     Int               @default(0)
+  candidateTarget Int               @default(0)
+  centreTarget    Int               @default(0)
+  pmId            String?
+  projectManager  User?             @relation(fields: [pmId], references: [id])
+  slaHealth       String            @default("OnTrack") // OnTrack, AtRisk, Delayed, Completed
+  createdAt       DateTime          @default(now())
+  updatedAt       DateTime          @updatedAt
+
+  bookings        Booking[]
+  audits          AuditAssignment[]
+
+  @@index([status, stage])
+  @@map("projects")
+}
+
+model Centre {
+  id                String            @id @default(cuid())
+  centreCode        String            @unique // CN-001
+  regionId          String?
+  stateId           String?
+  cityId            String?
+  stateName         String?
+  cityName          String?
+  eduCode           String?
+  tcCode            String?
+  centreName        String
+  centreAddress     String
+  pincode           String
+  venueStatus       String            @default("Old") // New, Old
+  previousEduExam   String?
+  officialEmail     String?
+  googleMapLink     String?
+  remarks           String?
+  centreStatus      String            @default("Draft") // Draft, Active, Approved, Rejected, Inactive
+  eligibilityStatus String            @default("Eligible") // Eligible, ConditionallyEligible, Ineligible, Blacklisted
+  organizationType  String            @default("Trust") // Individual, Trust, Society, Partnership, Company, Other
+  createdAt         DateTime          @default(now())
+  updatedAt         DateTime          @updatedAt
+
+  contacts          CentreContact[]
+  capacity          CentreCapacity?
+  bookings          Booking[]
+  audits            AuditAssignment[]
+  blacklists        BlacklistRecord[]
+
+  @@index([centreStatus, eligibilityStatus])
+  @@index([cityId, stateId])
+  @@map("centres")
+}
+
+model CentreContact {
+  id               String   @id @default(cuid())
+  centreId         String
+  centre           Centre   @relation(fields: [centreId], references: [id], onDelete: Cascade)
+  personType       String   // Owner, TCA, IT Person, Electrician, Centre Head / Venue CS
+  fullName         String
+  contactNumber    String
+  email            String?
+  aadhaarNumber    String?
+  fatherName       String?
+  motherName       String?
+  permanentAddress String?
+  currentAddress   String?
+  isPrimary        Boolean  @default(false)
+  isActive         Boolean  @default(true)
+  createdAt        DateTime @default(now())
+  updatedAt        DateTime @updatedAt
+
+  @@index([centreId, personType])
+  @@map("centre_contacts")
+}
+
+model CentreCapacity {
+  id               String   @id @default(cuid())
+  centreId         String   @unique
+  centre           Centre   @relation(fields: [centreId], references: [id], onDelete: Cascade)
+  totalSystems     Int      @default(0)
+  examNodes        Int      @default(0)
+  bufferPercent    Float    @default(10.0)
+  regDeskCount     Int      @default(2)
+  serverCount      Int      @default(1)
+  networkSpeedMbps Float    @default(100.0)
+  upsCapacityKva   Float    @default(10.0)
+  createdAt        DateTime @default(now())
+  updatedAt        DateTime @updatedAt
+
+  @@map("centre_capacities")
+}
+
+model Booking {
+  id            String    @id @default(cuid())
+  bookingCode   String    @unique
+  projectId     String
+  project       Project   @relation(fields: [projectId], references: [id])
+  centreId      String
+  centre        Centre    @relation(fields: [centreId], references: [id])
+  dates         Json      // array of dates
+  shiftsCount   Int       @default(1)
+  systemsBooked Int       @default(0)
+  status        String    @default("Draft") // Draft, Requested, Confirmed, Cancelled
+  isLocked      Boolean   @default(false)
+  lockReason    String?
+  lockedBy      String?
+  lockedAt      DateTime?
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+
+  @@index([projectId, centreId])
+  @@map("bookings")
+}
+
+model AuditAssignment {
+  id               String    @id @default(cuid())
+  assignmentCode   String    @unique
+  projectId        String
+  project          Project   @relation(fields: [projectId], references: [id])
+  centreId         String
+  centre           Centre    @relation(fields: [centreId], references: [id])
+  auditorId        String?
+  auditor          User?     @relation(fields: [auditorId], references: [id])
+  auditDate        DateTime?
+  status           String    @default("Pending") // Pending, Assigned, InProgress, Completed, ReworkRequired, Failed
+  complianceScore  Float?
+  findingsSummary  String?
+  createdAt        DateTime  @default(now())
+  updatedAt        DateTime  @updatedAt
+
+  @@index([projectId, centreId, auditorId])
+  @@map("audit_assignments")
+}
+
+model BlacklistRecord {
+  id             String    @id @default(cuid())
+  centreId       String
+  centre         Centre    @relation(fields: [centreId], references: [id], onDelete: Cascade)
+  reason         String    // Confidential reason
+  flaggedBy      String
+  isActive       Boolean   @default(true)
+  overrideReason String?
+  overriddenBy   String?
+  overriddenAt   DateTime?
+  createdAt      DateTime  @default(now())
+  updatedAt      DateTime  @updatedAt
+
+  @@index([centreId, isActive])
+  @@map("blacklist_records")
+}
+
+model AuditLog {
+  id        String   @id @default(cuid())
+  userId    String?
+  user      User?    @relation(fields: [userId], references: [id])
+  userEmail String?
+  action    String   // e.g. "USER_CREATED", "USER_UPDATED", "CENTRE_APPROVED", "PROJECT_STAGE_UPDATED"
+  entity    String   // "User", "Centre", "Project", "SystemConfig", "Booking"
+  entityId  String?
+  details   Json?    // Contextual payload / differences
+  ipAddress String?
+  createdAt DateTime @default(now())
+
+  @@index([entity, entityId])
+  @@index([createdAt])
+  @@map("audit_logs")
+}
+
+model SystemConfig {
+  id        String   @id @default(cuid())
+  key       String   @unique
+  value     Json
+  category  String   @default("GENERAL") // GENERAL, SECURITY, NOTIFICATION, COMPLIANCE
+  updatedBy String?
+  updatedAt DateTime @updatedAt
+
+  @@map("system_configs")
+}
