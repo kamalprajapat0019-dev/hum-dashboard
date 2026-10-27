@@ -429,14 +429,84 @@ export default function Header({ onMobileMenuToggle }) {
           white-space: nowrap;
         }
 
+        .header__left {
+          display: flex;
+          align-items: center;
+          gap: 12px;
+          min-width: 0;
+          flex: 1;
+        }
+
+        .breadcrumb {
+          display: flex;
+          align-items: center;
+          gap: 6px;
+          font-size: 0.75rem;
+          color: var(--text-muted);
+          min-width: 0;
+          overflow: hidden;
+        }
+
+        .breadcrumb-current {
+          color: var(--text-primary);
+          font-weight: 500;
+          overflow: hidden;
+          text-overflow: ellipsis;
+          white-space: nowrap;
+          min-width: 0;
+        }
+
+        @media (max-width: 1024px) {
+          .header__search { max-width: 260px; }
+        }
+
         @media (max-width: 768px) {
           .header__menu-btn { display: flex; }
           .header__search { display: none; }
           .header__profile-info { display: none; }
           .header__profile-btn { padding: 5px; }
         }
+
+        @media (max-width: 540px) {
+          .breadcrumb-sep { display: none; }
+          .breadcrumb-current {
+            max-width: 140px;
+          }
+        }
+
         @media (max-width: 480px) {
-          .app-header { padding: 0 14px; }
+          .app-header { padding: 0 10px; gap: 8px; }
+          .header__right { gap: 6px; }
+          .notif-panel {
+            position: fixed;
+            top: calc(var(--header-height) + 4px);
+            left: 10px;
+            right: 10px;
+            width: auto;
+            max-width: none;
+            max-height: calc(100dvh - var(--header-height) - 16px);
+          }
+          .dropdown-menu {
+            position: fixed;
+            top: calc(var(--header-height) + 4px);
+            right: 10px;
+            left: auto;
+            max-width: calc(100vw - 20px);
+          }
+        }
+
+        @media (max-width: 360px) {
+          .breadcrumb-current {
+            max-width: 95px;
+          }
+          .header__icon-btn {
+            width: 32px;
+            height: 32px;
+          }
+          .app-header {
+            padding: 0 8px;
+            gap: 6px;
+          }
         }
       `}</style>
     </header>

@@ -431,13 +431,13 @@ export default function ExamCalendarModal({ onClose }) {
                     textAlign: 'center',
                     padding: '8px 0'
                   }}>
-                    <div>Sunday</div>
-                    <div>Monday</div>
-                    <div>Tuesday</div>
-                    <div>Wednesday</div>
-                    <div>Thursday</div>
-                    <div>Friday</div>
-                    <div>Saturday</div>
+                    <div><span className="cal-day-full">Sunday</span><span className="cal-day-short">Sun</span></div>
+                    <div><span className="cal-day-full">Monday</span><span className="cal-day-short">Mon</span></div>
+                    <div><span className="cal-day-full">Tuesday</span><span className="cal-day-short">Tue</span></div>
+                    <div><span className="cal-day-full">Wednesday</span><span className="cal-day-short">Wed</span></div>
+                    <div><span className="cal-day-full">Thursday</span><span className="cal-day-short">Thu</span></div>
+                    <div><span className="cal-day-full">Friday</span><span className="cal-day-short">Fri</span></div>
+                    <div><span className="cal-day-full">Saturday</span><span className="cal-day-short">Sat</span></div>
                   </div>
 
                   <div style={{ display: 'grid', gridTemplateColumns: 'repeat(7, 1fr)' }}>
@@ -446,15 +446,15 @@ export default function ExamCalendarModal({ onClose }) {
                       const totalDays = new Date(selectedYear, selectedMonth + 1, 0).getDate();
                       const cells = [];
                       for (let i = 0; i < firstDay; i++) {
-                        cells.push(<div key={`empty_${i}`} style={{ minHeight: 90, background: 'var(--bg-subtle)', borderBottom: '1px solid var(--border-subtle)', borderRight: '1px solid var(--border-subtle)' }} />);
+                        cells.push(<div key={`empty_${i}`} className="calendar-month-cell calendar-month-cell--empty" style={{ background: 'var(--bg-subtle)', borderBottom: '1px solid var(--border-subtle)', borderRight: '1px solid var(--border-subtle)' }} />);
                       }
                       for (let d = 1; d <= totalDays; d++) {
                         const examsOnDay = getExamsForDate(selectedYear, selectedMonth, d);
                         cells.push(
                           <div
                             key={`day_${d}`}
+                            className="calendar-month-cell"
                             style={{
-                              minHeight: 90,
                               padding: 8,
                               borderBottom: '1px solid var(--border-subtle)',
                               borderRight: '1px solid var(--border-subtle)',
@@ -649,6 +649,30 @@ export default function ExamCalendarModal({ onClose }) {
             </div>
           </div>
         </div>
+
+        <style>{`
+          .calendar-month-cell {
+            min-height: 90px;
+          }
+          .cal-day-short {
+            display: none;
+          }
+          @media (max-width: 640px) {
+            .calendar-month-cell {
+              min-height: 54px;
+              padding: 4px !important;
+            }
+            .calendar-month-cell--empty {
+              min-height: 54px;
+            }
+            .cal-day-full {
+              display: none;
+            }
+            .cal-day-short {
+              display: inline;
+            }
+          }
+        `}</style>
       </div>
     </div>,
     document.body

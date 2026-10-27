@@ -73,6 +73,8 @@ export default function ConfigPage() {
           position: 'fixed',
           top: 24,
           right: 24,
+          maxWidth: 'calc(100vw - 32px)',
+          boxSizing: 'border-box',
           background: 'var(--color-primary-dark)',
           color: '#fff',
           padding: '12px 20px',
@@ -146,7 +148,7 @@ export default function ConfigPage() {
       {activeTab === 'audit' && (
         <div className="card">
           <div className="card-header" style={{ flexWrap: 'wrap', gap: 12 }}>
-            <div style={{ position: 'relative', width: 280 }}>
+            <div style={{ position: 'relative', width: 'min(100%, 280px)' }}>
               <Search size={14} style={{ position: 'absolute', left: 10, top: 10, color: 'var(--text-muted)' }} />
               <input
                 type="text"

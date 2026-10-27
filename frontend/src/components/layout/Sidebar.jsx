@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { NavLink, useLocation } from 'react-router-dom';
 import {
   LayoutDashboard, Users, FolderOpen, Building2, ShieldCheck,
@@ -17,6 +17,29 @@ export default function Sidebar({ mobileOpen, onMobileClose }) {
   const [collapsed, setCollapsed] = useState(false);
   const { user, logout, ROLE_LABELS: RL } = useAuth();
   const location = useLocation();
+
+  // Escape key to dismiss mobile drawer
+  useEffect(() => {
+    if (!mobileOpen) return;
+    const handleKeyDown = (e) => {
+      if (e.key === 'Escape') {
+        onMobileClose?.();
+      }
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [mobileOpen, onMobileClose]);
+
+  // Lock body scroll when mobile navigation is open
+  useEffect(() => {
+    if (mobileOpen) {
+      const prevOverflow = document.body.style.overflow;
+      document.body.style.overflow = 'hidden';
+      return () => {
+        document.body.style.overflow = prevOverflow;
+      };
+    }
+  }, [mobileOpen]);
 
   if (!user) return null;
 
@@ -379,13 +402,25 @@ export default function Sidebar({ mobileOpen, onMobileClose }) {
           border-color: var(--color-danger-border);
         }
 
+        /* Tablet */
+        @media (min-width: 769px) and (max-width: 1024px) {
+          .sidebar {
+            width: 220px;
+          }
+          .sidebar--collapsed {
+            width: var(--sidebar-collapsed);
+          }
+        }
+
         /* Mobile */
         @media (max-width: 768px) {
           .sidebar-backdrop {
             display: block;
             position: fixed;
             inset: 0;
-            background: rgb(0 0 0 / 0.5);
+            background: rgba(15, 23, 42, 0.6);
+            backdrop-filter: blur(4px);
+            -webkit-backdrop-filter: blur(4px);
             z-index: 199;
           }
           .sidebar {
@@ -393,14 +428,26 @@ export default function Sidebar({ mobileOpen, onMobileClose }) {
             left: -100%;
             top: 0;
             height: 100vh;
-            width: var(--sidebar-width) !important;
+            height: 100dvh;
+            max-height: 100dvh;
+            width: min(280px, 86vw) !important;
             transition: left var(--transition-slow);
+            box-shadow: 10px 0 30px rgba(0, 0, 0, 0.35);
           }
           .sidebar--mobile-open {
             left: 0;
           }
           .sidebar__collapse-btn { display: none; }
-          .sidebar__mobile-close { display: flex; }
+          .sidebar__mobile-close {
+            display: flex;
+            min-width: 36px;
+            min-height: 36px;
+            border-radius: var(--radius-md);
+          }
+          .sidebar__item {
+            min-height: 42px;
+            padding: 10px 12px;
+          }
         }
       `}</style>
     </>

@@ -115,6 +115,8 @@ body {
   border-radius: var(--radius-lg);
   box-shadow: var(--glass-shadow);
   transition: transform var(--transition-fast), box-shadow var(--transition-fast), border-color var(--transition-fast);
+  min-width: 0;
+  max-width: 100%;
 }
 .card:hover {
   box-shadow: var(--glass-shadow-hover);
@@ -128,13 +130,19 @@ body {
   align-items: center;
   justify-content: space-between;
   gap: 12px;
+  flex-wrap: wrap;
 }
 .card-title {
   font-size: 0.875rem;
   font-weight: 600;
   color: var(--text-primary);
+  min-width: 0;
 }
-.card-body { padding: 20px; }
+.card-body {
+  padding: 20px;
+  min-width: 0;
+  max-width: 100%;
+}
 .card-footer {
   padding: 12px 20px;
   border-top: 1px solid var(--glass-border-subtle);
@@ -145,7 +153,7 @@ body {
 /* ---- KPI Cards (Glassmorphism) ---- */
 .kpi-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 200px), 1fr));
   gap: 16px;
 }
 .kpi-card {
@@ -160,6 +168,7 @@ body {
   flex-direction: column;
   gap: 12px;
   transition: transform var(--transition-fast), box-shadow var(--transition-fast), border-color var(--transition-fast);
+  min-width: 0;
 }
 .kpi-card:hover {
   transform: translateY(-2px);
@@ -170,6 +179,7 @@ body {
   display: flex;
   align-items: flex-start;
   justify-content: space-between;
+  gap: 8px;
 }
 .kpi-card__icon {
   width: 38px;
@@ -191,16 +201,20 @@ body {
   color: var(--text-muted);
   text-transform: uppercase;
   letter-spacing: 0.04em;
+  min-width: 0;
+  word-break: break-word;
 }
 .kpi-card__value {
-  font-size: 1.75rem;
+  font-size: clamp(1.35rem, 2.5vw, 1.75rem);
   font-weight: 700;
   color: var(--text-primary);
-  line-height: 1;
+  line-height: 1.1;
+  word-break: break-word;
 }
 .kpi-card__sub {
   font-size: 0.75rem;
   color: var(--text-muted);
+  word-break: break-word;
 }
 .kpi-card__badge {
   display: inline-flex;
@@ -237,8 +251,12 @@ body {
 .badge-purple  { background: var(--color-purple-bg);  color: var(--color-purple); }
 
 /* ---- Tables (Glassmorphism) ---- */
-.table-wrapper {
+.table-wrapper,
+.table-responsive {
+  width: 100%;
+  max-width: 100%;
   overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
   background: var(--glass-surface);
   backdrop-filter: var(--glass-blur);
   -webkit-backdrop-filter: var(--glass-blur);
@@ -309,6 +327,8 @@ select.form-control { cursor: pointer; }
 .app-layout {
   display: flex;
   height: 100vh;
+  height: 100dvh;
+  width: 100%;
   overflow: hidden;
 }
 
@@ -318,12 +338,17 @@ select.form-control { cursor: pointer; }
   flex-direction: column;
   overflow: hidden;
   min-width: 0;
+  width: 100%;
 }
 
 .page-body {
   flex: 1;
   overflow-y: auto;
+  overflow-x: hidden;
   padding: 24px;
+  min-width: 0;
+  width: 100%;
+  -webkit-overflow-scrolling: touch;
 }
 
 /* ---- Page Header ---- */
@@ -554,17 +579,18 @@ select.form-control { cursor: pointer; }
 .modal-backdrop {
   position: fixed;
   inset: 0;
-  background: rgba(15, 23, 42, 0.45);
+  background: rgba(15, 23, 42, 0.52);
   backdrop-filter: blur(10px);
   -webkit-backdrop-filter: blur(10px);
   z-index: 500;
   display: flex;
   align-items: center;
   justify-content: center;
-  padding: 24px;
+  padding: 20px;
+  box-sizing: border-box;
 }
 .modal {
-  background: rgba(255, 255, 255, 0.88);
+  background: rgba(255, 255, 255, 0.94);
   backdrop-filter: blur(28px) saturate(190%);
   -webkit-backdrop-filter: blur(28px) saturate(190%);
   border: 1px solid rgba(255, 255, 255, 0.95);
@@ -574,8 +600,42 @@ select.form-control { cursor: pointer; }
               inset 0 1px 1px #ffffff;
   width: 100%;
   max-width: 560px;
-  max-height: 80vh;
+  max-height: calc(100dvh - 32px);
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  box-sizing: border-box;
+}
+.modal-header {
+  padding: 16px 22px;
+  border-bottom: 1px solid rgba(226, 232, 240, 0.85);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-shrink: 0;
+  gap: 12px;
+}
+.modal-title {
+  font-size: 1rem;
+  font-weight: 700;
+  min-width: 0;
+  word-break: break-word;
+}
+.modal-body {
+  padding: 20px 22px;
+  flex: 1;
   overflow-y: auto;
+  -webkit-overflow-scrolling: touch;
+  min-height: 0;
+}
+.modal-footer {
+  padding: 14px 22px;
+  border-top: 1px solid var(--border-default);
+  display: flex;
+  gap: 8px;
+  justify-content: flex-end;
+  flex-shrink: 0;
+  flex-wrap: wrap;
 }
 
 /* ---- Examination Calendar Modal (Viewport Centered & Portal-safe) ---- */
@@ -619,6 +679,7 @@ select.form-control { cursor: pointer; }
   justify-content: space-between;
   flex-shrink: 0;
   gap: 12px;
+  flex-wrap: wrap;
 }
 
 .calendar-modal-filterbar {
@@ -643,6 +704,7 @@ select.form-control { cursor: pointer; }
 .calendar-modal-main {
   flex: 1;
   overflow-y: auto;
+  -webkit-overflow-scrolling: touch;
   padding: 20px;
   min-width: 0;
 }
@@ -653,6 +715,7 @@ select.form-control { cursor: pointer; }
   background: var(--bg-subtle);
   padding: 18px;
   overflow-y: auto;
+  -webkit-overflow-scrolling: touch;
   display: flex;
   flex-direction: column;
   gap: 16px;
@@ -692,16 +755,20 @@ select.form-control { cursor: pointer; }
     border-radius: var(--radius-lg);
   }
   .calendar-modal-header {
-    padding: 12px 16px;
+    padding: 12px 14px;
     flex-direction: column;
     align-items: flex-start;
+    gap: 10px;
   }
   .calendar-modal-header-actions {
     width: 100%;
+    display: flex;
     justify-content: space-between;
+    flex-wrap: wrap;
+    gap: 8px;
   }
   .calendar-modal-filterbar {
-    padding: 8px 16px;
+    padding: 8px 12px;
   }
   .calendar-modal-main {
     padding: 12px;
@@ -710,21 +777,21 @@ select.form-control { cursor: pointer; }
     padding: 12px;
   }
 }
-.modal-header {
-  padding: 20px 24px 16px;
-  border-bottom: 1px solid rgba(226, 232, 240, 0.8);
+
+/* ---- Tabs ---- */
+.tabs {
   display: flex;
-  align-items: center;
-  justify-content: space-between;
+  gap: 2px;
+  border-bottom: 1px solid var(--border-default);
+  margin-bottom: 20px;
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
+  max-width: 100%;
+  flex-wrap: nowrap;
 }
-.modal-title { font-size: 1rem; font-weight: 700; }
-.modal-body { padding: 20px 24px; }
-.modal-footer {
-  padding: 16px 24px;
-  border-top: 1px solid var(--border-default);
-  display: flex;
-  gap: 8px;
-  justify-content: flex-end;
+.tab-btn {
+  white-space: nowrap;
+  flex-shrink: 0;
 }
 
 /* ---- Utility ---- */
@@ -759,16 +826,44 @@ select.form-control { cursor: pointer; }
 @media (max-width: 1024px) {
   .grid-3 { grid-template-columns: 1fr 1fr; }
   .grid-cols-chart { grid-template-columns: 1fr; }
+  .page-body { padding: 20px; }
 }
 @media (max-width: 768px) {
   .grid-2 { grid-template-columns: 1fr; }
   .grid-3 { grid-template-columns: 1fr; }
   .grid-4 { grid-template-columns: 1fr 1fr; }
-  .kpi-grid { grid-template-columns: repeat(2, 1fr); }
+  .kpi-grid { grid-template-columns: repeat(2, 1fr); gap: 12px; }
   .page-body { padding: 16px; }
-  .page-header__top { flex-direction: column; align-items: flex-start; }
+  .page-header { margin-bottom: 18px; }
+  .page-header__top { flex-direction: column; align-items: flex-start; gap: 12px; }
+  .page-header__actions { width: 100%; justify-content: flex-start; }
+}
+@media (max-width: 640px) {
+  .modal-backdrop {
+    padding: 10px;
+  }
+  .modal {
+    max-height: calc(100dvh - 20px);
+    border-radius: var(--radius-lg);
+  }
+  .modal-header { padding: 14px 16px; }
+  .modal-body { padding: 14px 16px; }
+  .modal-footer { padding: 12px 16px; }
 }
 @media (max-width: 480px) {
   .grid-4 { grid-template-columns: 1fr; }
-  .kpi-grid { grid-template-columns: 1fr; }
+  .kpi-grid { grid-template-columns: 1fr; gap: 10px; }
+  .kpi-card { padding: 16px; }
+  .page-body { padding: 12px; }
+  .card-header { padding: 14px 16px; }
+  .card-body { padding: 16px; }
+  .card-footer { padding: 12px 16px; }
+  .btn { padding: 7px 12px; min-height: 36px; }
+  .btn-sm { padding: 5px 10px; min-height: 30px; }
+}
+@media (max-width: 360px) {
+  .page-body { padding: 8px; }
+  .card-header { padding: 12px 14px; }
+  .card-body { padding: 12px 14px; }
+  .kpi-card { padding: 14px; }
 }

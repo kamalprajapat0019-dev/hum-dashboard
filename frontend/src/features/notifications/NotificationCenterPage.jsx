@@ -740,12 +740,13 @@ export default function NotificationCenterPage() {
           display: flex;
           align-items: center;
           gap: 12px;
+          flex-wrap: wrap;
         }
 
         /* KPI Cards */
         .notif-kpi-grid {
           display: grid;
-          grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+          grid-template-columns: repeat(auto-fit, minmax(min(100%, 200px), 1fr));
           gap: 16px;
           margin-bottom: 24px;
         }
@@ -1134,7 +1135,7 @@ export default function NotificationCenterPage() {
         }
         .rules-grid {
           display: grid;
-          grid-template-columns: repeat(auto-fit, minmax(360px, 1fr));
+          grid-template-columns: repeat(auto-fit, minmax(min(100%, 300px), 1fr));
           gap: 16px;
         }
         .rule-card {
@@ -1145,11 +1146,14 @@ export default function NotificationCenterPage() {
           display: flex;
           flex-direction: column;
           gap: 10px;
+          min-width: 0;
         }
         .rule-card-header {
           display: flex;
           align-items: center;
           justify-content: space-between;
+          flex-wrap: wrap;
+          gap: 8px;
         }
         .rule-code {
           font-family: monospace;
@@ -1280,7 +1284,8 @@ export default function NotificationCenterPage() {
           align-items: center;
           justify-content: center;
           z-index: 999;
-          padding: 20px;
+          padding: 14px;
+          box-sizing: border-box;
         }
         .notif-modal-card {
           background: var(--bg-surface);
@@ -1288,19 +1293,23 @@ export default function NotificationCenterPage() {
           border-radius: 12px;
           width: 100%;
           max-width: 600px;
-          max-height: 85vh;
-          overflow-y: auto;
+          max-height: calc(100dvh - 28px);
+          display: flex;
+          flex-direction: column;
+          overflow: hidden;
           box-shadow: 0 20px 40px rgba(0, 0, 0, 0.5);
+          box-sizing: border-box;
         }
         .payload-modal {
           max-width: 740px;
         }
         .modal-header {
-          padding: 18px 24px;
+          padding: 16px 20px;
           border-bottom: 1px solid var(--border-default);
           display: flex;
           align-items: center;
           justify-content: space-between;
+          flex-shrink: 0;
         }
         .modal-header h3 {
           margin: 0;
@@ -1314,15 +1323,20 @@ export default function NotificationCenterPage() {
           cursor: pointer;
         }
         .modal-body {
-          padding: 20px 24px;
+          padding: 18px 20px;
+          flex: 1;
+          overflow-y: auto;
+          -webkit-overflow-scrolling: touch;
         }
         .modal-footer {
-          padding: 14px 24px;
+          padding: 14px 20px;
           border-top: 1px solid var(--border-default);
           display: flex;
           align-items: center;
           justify-content: flex-end;
           gap: 10px;
+          flex-shrink: 0;
+          flex-wrap: wrap;
         }
 
         .simulation-rule-list {
@@ -1341,6 +1355,7 @@ export default function NotificationCenterPage() {
           border: 1px solid var(--border-default);
           border-radius: 8px;
           gap: 14px;
+          flex-wrap: wrap;
         }
 
         .payload-field-grid {
@@ -1360,6 +1375,20 @@ export default function NotificationCenterPage() {
           font-size: 0.75rem;
           overflow-x: auto;
           margin-top: 8px;
+        }
+
+        @media (max-width: 600px) {
+          .payload-field-grid {
+            grid-template-columns: 1fr;
+          }
+          .sim-rule-item {
+            flex-direction: column;
+            align-items: flex-start;
+          }
+          .sim-rule-item .btn {
+            width: 100%;
+            justify-content: center;
+          }
         }
       `}</style>
     </div>

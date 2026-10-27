@@ -152,15 +152,17 @@ export default function OpsDashboard() {
             <span className="card-title">Document Completion Status</span>
           </div>
           <div className="card-body" style={{ paddingTop: 12 }}>
-            <div style={{ display: 'flex', gap: 24, alignItems: 'center', flexWrap: 'wrap' }}>
-              <ResponsiveContainer width="40%" height={160} style={{ flexShrink: 0 }}>
-                <PieChart>
-                  <Pie data={DOC_COMPLETION} cx="50%" cy="50%" innerRadius={40} outerRadius={70} dataKey="value" labelLine={false}>
-                    {DOC_COMPLETION.map((e,i) => <Cell key={i} fill={e.color} />)}
-                  </Pie>
-                  <Tooltip content={<CustomTooltip />} />
-                </PieChart>
-              </ResponsiveContainer>
+            <div style={{ display: 'flex', gap: 20, alignItems: 'center', flexWrap: 'wrap', justifyContent: 'center' }}>
+              <div style={{ flex: '0 0 160px', width: 160, height: 160, minWidth: 160 }}>
+                <ResponsiveContainer width="100%" height="100%">
+                  <PieChart>
+                    <Pie data={DOC_COMPLETION} cx="50%" cy="50%" innerRadius={40} outerRadius={70} dataKey="value" labelLine={false}>
+                      {DOC_COMPLETION.map((e,i) => <Cell key={i} fill={e.color} />)}
+                    </Pie>
+                    <Tooltip content={<CustomTooltip />} />
+                  </PieChart>
+                </ResponsiveContainer>
+              </div>
               <div style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: 10 }}>
                 {DOC_COMPLETION.map((d, i) => (
                   <div key={i} style={{ display: 'flex', alignItems: 'center', gap: 10 }}>

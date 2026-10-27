@@ -313,7 +313,7 @@ export default function CentresPage() {
       <div className="card">
         {/* Filters bar */}
         <div className="card-header" style={{ flexWrap: 'wrap', gap: 12 }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: 10, flex: 1, minWidth: 260 }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 10, flex: 1, minWidth: 'min(100%, 220px)' }}>
             <div style={{ position: 'relative', width: '100%', maxWidth: 320 }}>
               <Search size={14} style={{ position: 'absolute', left: 10, top: 10, color: 'var(--text-muted)' }} />
               <input
@@ -475,22 +475,22 @@ export default function CentresPage() {
             style={{ maxWidth: 840, maxHeight: '90vh' }}
           >
             {/* Modal Header */}
-            <div className="modal-header">
-              <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
-                <div style={{ width: 40, height: 40, borderRadius: 'var(--radius-md)', background: '#eff6ff', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+            <div className="modal-header" style={{ flexWrap: 'wrap', gap: 12 }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 12, flex: 1, minWidth: 0 }}>
+                <div style={{ width: 40, height: 40, borderRadius: 'var(--radius-md)', background: '#eff6ff', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
                   <Building2 size={20} color="var(--color-primary)" />
                 </div>
-                <div>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                <div style={{ flex: 1, minWidth: 0 }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
                     <h3 className="modal-title">{activeCentreDrawer.centre_name}</h3>
                     <StatusBadge status={activeCentreDrawer.centre_status} />
                   </div>
-                  <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>
-                    ID: <code style={{ color: 'var(--color-primary)' }}>{activeCentreDrawer.centre_id}</code> • TC Code: {activeCentreDrawer.tc_code} • Edu Code: {activeCentreDrawer.edu_code}
+                  <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)', wordBreak: 'break-word' }}>
+                    ID: <code style={{ color: 'var(--color-primary)' }}>{activeCentreDrawer.centre_id}</code> • TC: {activeCentreDrawer.tc_code} • Edu: {activeCentreDrawer.edu_code}
                   </div>
                 </div>
               </div>
-              <button className="btn-ghost" onClick={() => setActiveCentreDrawer(null)} style={{ padding: 4 }}>
+              <button className="btn-ghost" onClick={() => setActiveCentreDrawer(null)} style={{ padding: 6, flexShrink: 0 }}>
                 <X size={18} />
               </button>
             </div>

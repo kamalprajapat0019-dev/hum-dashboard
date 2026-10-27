@@ -313,7 +313,7 @@ export default function CentresPage() {
       <div className="card">
         {/* Filters bar */}
         <div className="card-header" style={{ flexWrap: 'wrap', gap: 12 }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: 10, flex: 1, minWidth: 260 }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 10, flex: 1, minWidth: 'min(100%, 240px)' }}>
             <div style={{ position: 'relative', width: '100%', maxWidth: 320 }}>
               <Search size={14} style={{ position: 'absolute', left: 10, top: 10, color: 'var(--text-muted)' }} />
               <input

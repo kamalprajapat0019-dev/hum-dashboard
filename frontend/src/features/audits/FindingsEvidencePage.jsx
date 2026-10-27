@@ -130,7 +130,7 @@ export default function FindingsEvidencePage() {
 
       {/* Filter and Search Bar */}
       <div className="card" style={{ padding: '14px 20px', display: 'flex', flexWrap: 'wrap', gap: 14, alignItems: 'center', justifyContent: 'space-between' }}>
-        <div style={{ display: 'flex', gap: 12, flex: 1, minWidth: 260 }}>
+        <div style={{ display: 'flex', gap: 12, flex: 1, minWidth: 'min(100%, 240px)' }}>
           <div style={{ position: 'relative', flex: 1 }}>
             <Search size={16} style={{ position: 'absolute', left: 12, top: '50%', transform: 'translateY(-50%)', color: 'var(--text-tertiary)' }} />
             <input 
@@ -144,7 +144,7 @@ export default function FindingsEvidencePage() {
           </div>
         </div>
 
-        <div style={{ display: 'flex', gap: 12, alignItems: 'center' }}>
+        <div style={{ display: 'flex', gap: 12, alignItems: 'center', flexWrap: 'wrap' }}>
           <select 
             value={severityFilter} 
             onChange={(e) => setSeverityFilter(e.target.value)}
@@ -173,7 +173,7 @@ export default function FindingsEvidencePage() {
       </div>
 
       {/* Findings Cards Grid */}
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(360px, 1fr))', gap: 16 }}>
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(min(100%, 300px), 1fr))', gap: 16 }}>
         {filteredFindings.length === 0 ? (
           <div className="card" style={{ padding: 40, textAlign: 'center', color: 'var(--text-tertiary)', gridColumn: '1 / -1' }}>
             No findings match your filter criteria.

@@ -305,7 +305,7 @@ export default function ProjectsPage() {
           {/* Table Card */}
           <div className="card">
             <div className="card-header" style={{ flexWrap: 'wrap', gap: 12 }}>
-              <div style={{ position: 'relative', width: 280 }}>
+              <div style={{ position: 'relative', width: 'min(100%, 280px)' }}>
                 <Search size={14} style={{ position: 'absolute', left: 10, top: 10, color: 'var(--text-muted)' }} />
                 <input
                   type="text"

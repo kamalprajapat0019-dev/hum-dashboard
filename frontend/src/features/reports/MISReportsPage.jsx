@@ -1027,7 +1027,7 @@ export default function MISReportsPage() {
           display: flex;
           align-items: center;
           flex: 1;
-          min-width: 260px;
+          min-width: min(100%, 240px);
           max-width: 420px;
         }
         .search-icon {
@@ -1084,12 +1084,20 @@ export default function MISReportsPage() {
           border-radius: 10px;
           overflow: hidden;
         }
+        .table-responsive {
+          width: 100%;
+          max-width: 100%;
+          overflow-x: auto;
+          -webkit-overflow-scrolling: touch;
+        }
         .table-header-box {
           padding: 16px 20px;
           border-bottom: 1px solid var(--border-default);
           display: flex;
           align-items: center;
           justify-content: space-between;
+          flex-wrap: wrap;
+          gap: 12px;
         }
         .table-header-box h3 {
           margin: 0;
@@ -1186,7 +1194,7 @@ export default function MISReportsPage() {
         /* Charts Grid */
         .mis-charts-grid {
           display: grid;
-          grid-template-columns: repeat(auto-fit, minmax(460px, 1fr));
+          grid-template-columns: repeat(auto-fit, minmax(min(100%, 360px), 1fr));
           gap: 20px;
         }
         .chart-card {
@@ -1194,6 +1202,7 @@ export default function MISReportsPage() {
           border: 1px solid var(--border-default);
           border-radius: 10px;
           padding: 20px;
+          min-width: 0;
         }
         .chart-header h3 {
           margin: 0 0 4px 0;
@@ -1214,6 +1223,8 @@ export default function MISReportsPage() {
           display: flex;
           align-items: center;
           justify-content: space-between;
+          flex-wrap: wrap;
+          gap: 14px;
           margin-bottom: 20px;
         }
         .executive-banner h3 {
@@ -1226,9 +1237,31 @@ export default function MISReportsPage() {
         }
         .executive-kpi-row {
           display: grid;
-          grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+          grid-template-columns: repeat(auto-fit, minmax(min(100%, 200px), 1fr));
           gap: 16px;
           margin-bottom: 24px;
+        }
+
+        @media (max-width: 768px) {
+          .mis-charts-grid {
+            grid-template-columns: 1fr;
+          }
+          .executive-banner {
+            flex-direction: column;
+            align-items: flex-start;
+          }
+          .executive-banner .btn {
+            width: 100%;
+            justify-content: center;
+          }
+        }
+        @media (max-width: 480px) {
+          .mis-metrics-deck {
+            grid-template-columns: 1fr;
+          }
+          .executive-kpi-row {
+            grid-template-columns: 1fr;
+          }
         }
         .exec-card {
           background: var(--bg-surface);

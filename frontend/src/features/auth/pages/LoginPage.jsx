@@ -378,7 +378,9 @@ export default function LoginPage() {
         .lp-page {
           position: relative;
           min-height: 100vh;
-          overflow: hidden;
+          min-height: 100dvh;
+          overflow-x: hidden;
+          overflow-y: auto;
           display: flex;
           flex-direction: column;
           font-family: Inter, "Segoe UI", -apple-system, BlinkMacSystemFont, Roboto, sans-serif;
@@ -1003,6 +1005,17 @@ export default function LoginPage() {
           .lp-submit { font-size: 15px; height: 48px; }
           .lp-roles { grid-template-columns: repeat(3, 1fr); }
           .lp-tile { flex: 1 1 calc(50% - 6px); height: 70px; }
+        }
+
+        /* ─── Responsive: Extra-small mobile (320px - 360px) ─── */
+        @media (max-width: 360px) {
+          .lp-cols { padding: 16px 10px 48px; gap: 14px; }
+          .lp-card { padding: 18px 12px 16px; border-radius: 16px; }
+          .lp-card-h2 { font-size: 20px; }
+          .lp-roles { gap: 4px; }
+          .lp-role { padding: 8px 2px 6px; }
+          .lp-role span { font-size: 9px; }
+          .lp-tile { min-width: 0; }
         }
 
         /* ─── Focus states (accessibility) ─── */
