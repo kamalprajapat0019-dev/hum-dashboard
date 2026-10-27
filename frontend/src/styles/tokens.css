@@ -4,62 +4,62 @@
 
 :root {
   /* Brand Colors */
-  --color-primary:       #1e40af;   /* Deep blue */
+  --color-primary:       #2563eb;   /* Modern vibrant enterprise blue */
   --color-primary-light: #3b82f6;
-  --color-primary-dark:  #1e3a8a;
-  --color-accent:        #0ea5e9;
+  --color-primary-dark:  #1d4ed8;
+  --color-accent:        #0d9488;   /* Teal accent */
 
-  /* Sidebar — Dark Navy */
-  --sidebar-bg:          #0f172a;
-  --sidebar-border:      #1e293b;
+  /* Sidebar — Sophisticated Deep Frosted Glass */
+  --sidebar-bg:          rgba(15, 23, 42, 0.92);
+  --sidebar-border:      rgba(255, 255, 255, 0.10);
   --sidebar-text:        #94a3b8;
-  --sidebar-text-active: #f1f5f9;
-  --sidebar-item-hover:  #1e293b;
-  --sidebar-item-active: #1e40af;
+  --sidebar-text-active: #ffffff;
+  --sidebar-item-hover:  rgba(255, 255, 255, 0.08);
+  --sidebar-item-active: #2563eb;
   --sidebar-icon-active: #60a5fa;
 
   /* Surface & Background */
-  --bg-base:       #f8fafc;
+  --bg-base:       #e9eef5;
   --bg-surface:    #ffffff;
   --bg-subtle:     #f1f5f9;
   --bg-hover:      #e2e8f0;
 
   /* Borders */
-  --border-default: #e2e8f0;
-  --border-subtle:  #f1f5f9;
+  --border-default: rgba(226, 232, 240, 0.85);
+  --border-subtle:  rgba(241, 245, 249, 0.80);
   --border-strong:  #cbd5e1;
 
   /* Typography */
-  --text-primary:   #0f172a;
-  --text-secondary: #475569;
+  --text-primary:   #172033;
+  --text-secondary: #64748b;
   --text-muted:     #94a3b8;
   --text-inverse:   #f8fafc;
 
   /* Status Colors */
   --color-success:  #16a34a;
-  --color-success-bg: #f0fdf4;
-  --color-success-border: #bbf7d0;
+  --color-success-bg: rgba(240, 253, 244, 0.85);
+  --color-success-border: rgba(187, 247, 208, 0.90);
   --color-warning:  #d97706;
-  --color-warning-bg: #fffbeb;
-  --color-warning-border: #fde68a;
+  --color-warning-bg: rgba(254, 252, 232, 0.85);
+  --color-warning-border: rgba(254, 240, 138, 0.90);
   --color-danger:   #dc2626;
-  --color-danger-bg: #fef2f2;
-  --color-danger-border: #fecaca;
+  --color-danger-bg: rgba(254, 242, 242, 0.85);
+  --color-danger-border: rgba(254, 202, 202, 0.90);
   --color-info:     #0284c7;
-  --color-info-bg:  #f0f9ff;
-  --color-info-border: #bae6fd;
+  --color-info-bg:  rgba(240, 249, 255, 0.85);
+  --color-info-border: rgba(186, 230, 253, 0.90);
   --color-purple:   #7c3aed;
-  --color-purple-bg: #faf5ff;
+  --color-purple-bg: rgba(250, 245, 255, 0.85);
 
   /* Chart Colors (accessible palette) */
-  --chart-1: #1e40af;
-  --chart-2: #0ea5e9;
+  --chart-1: #2563eb;
+  --chart-2: #0d9488;
   --chart-3: #16a34a;
   --chart-4: #d97706;
   --chart-5: #dc2626;
   --chart-6: #7c3aed;
-  --chart-7: #0891b2;
-  --chart-8: #65a30d;
+  --chart-7: #0284c7;
+  --chart-8: #f59e0b;
 
   /* Shadows */
   --shadow-sm:  0 1px 2px 0 rgb(0 0 0 / 0.05);
@@ -72,26 +72,56 @@
   --sidebar-collapsed: 64px;
   --header-height: 60px;
 
-  /* Glassmorphism Design Tokens */
-  --glass-surface:        rgba(255, 255, 255, 0.78);
-  --glass-surface-hover:  rgba(255, 255, 255, 0.92);
-  --glass-surface-subtle: rgba(248, 250, 252, 0.65);
-  --glass-border:         rgba(255, 255, 255, 0.85);
-  --glass-border-subtle:  rgba(226, 232, 240, 0.70);
-  --glass-blur:           blur(16px) saturate(180%);
-  --glass-blur-heavy:     blur(24px) saturate(200%);
-  --glass-shadow:         0 8px 30px -4px rgba(15, 23, 42, 0.06), inset 0 1px 1px rgba(255, 255, 255, 0.95);
-  --glass-shadow-hover:   0 14px 34px -4px rgba(15, 23, 42, 0.10), inset 0 1px 1px #ffffff;
+  /* Glassmorphism Design Tokens — Reference Matched */
+  --glass-surface:        rgba(255, 255, 255, 0.58);
+  --glass-surface-strong: rgba(255, 255, 255, 0.76);
+  --glass-surface-subtle: rgba(255, 255, 255, 0.45);
+  --glass-surface-hover:  rgba(255, 255, 255, 0.85);
+  --glass-surface-kpi:    rgba(255, 255, 255, 0.72);
+  --glass-surface-panel:  rgba(255, 255, 255, 0.62);
+  --glass-surface-table:  rgba(255, 255, 255, 0.78);
+  --glass-surface-header: rgba(255, 255, 255, 0.45);
+
+  /* Colored glass surfaces */
+  --glass-blue:           rgba(59, 130, 246, 0.16);
+  --glass-green:          rgba(16, 185, 129, 0.16);
+  --glass-purple:         rgba(139, 92, 246, 0.15);
+  --glass-red:            rgba(239, 68, 68, 0.13);
+  --glass-orange:         rgba(245, 158, 11, 0.16);
+  --glass-teal:           rgba(20, 184, 166, 0.15);
+  --glass-indigo:         rgba(99, 102, 241, 0.15);
+
+  /* Chart panel tints */
+  --chart-glass-blue:     rgba(59, 130, 246, 0.09);
+  --chart-glass-green:    rgba(16, 185, 129, 0.09);
+  --chart-glass-purple:   rgba(139, 92, 246, 0.07);
+  --chart-glass-amber:    rgba(245, 158, 11, 0.08);
+  --chart-glass-neutral:  rgba(255, 255, 255, 0.52);
+
+  --glass-border:         rgba(255, 255, 255, 0.88);
+  --glass-border-subtle:  rgba(255, 255, 255, 0.55);
+  --glass-border-strong:  rgba(255, 255, 255, 0.95);
+
+  --glass-blur:           blur(16px) saturate(135%);
+  --glass-blur-sm:        blur(10px) saturate(130%);
+  --glass-blur-heavy:     blur(22px) saturate(140%);
+
+  --glass-shadow:         0 8px 28px rgba(15, 23, 42, 0.07), inset 0 1px 0 rgba(255, 255, 255, 0.80);
+  --glass-shadow-hover:   0 12px 30px rgba(15, 23, 42, 0.10), inset 0 1px 0 rgba(255, 255, 255, 0.90);
+  --glass-shadow-strong:  0 18px 40px rgba(15, 23, 42, 0.12), inset 0 1px 0 #ffffff;
+  --glass-shadow-subtle:  0 4px 16px rgba(15, 23, 42, 0.04), inset 0 1px 0 rgba(255, 255, 255, 0.60);
+
+  --glass-radius:         16px;
 
   /* Border Radius */
   --radius-sm: 6px;
-  --radius-md: 8px;
-  --radius-lg: 12px;
+  --radius-md: 10px;
+  --radius-lg: 14px;
   --radius-xl: 16px;
   --radius-full: 9999px;
 
   /* Transitions */
-  --transition-fast: 150ms ease;
-  --transition-base: 200ms ease;
-  --transition-slow: 300ms ease;
+  --transition-fast: 150ms cubic-bezier(0.16, 1, 0.3, 1);
+  --transition-base: 220ms cubic-bezier(0.16, 1, 0.3, 1);
+  --transition-slow: 320ms cubic-bezier(0.16, 1, 0.3, 1);
 }

@@ -281,15 +281,15 @@ export default function Header({ onMobileMenuToggle }) {
       <style>{`
         .app-header {
           height: var(--header-height);
-          background: rgba(255, 255, 255, 0.82);
-          backdrop-filter: blur(20px) saturate(190%);
-          -webkit-backdrop-filter: blur(20px) saturate(190%);
-          border-bottom: 1px solid rgba(226, 232, 240, 0.85);
-          box-shadow: 0 4px 20px -2px rgba(15, 23, 42, 0.04), inset 0 1px 0 rgba(255, 255, 255, 0.95);
+          background: rgba(255, 255, 255, 0.65);
+          backdrop-filter: blur(16px) saturate(135%);
+          -webkit-backdrop-filter: blur(16px) saturate(135%);
+          border-bottom: 1px solid var(--glass-border);
+          box-shadow: 0 4px 20px -2px rgba(15, 23, 42, 0.04), inset 0 1px 0 rgba(255, 255, 255, 0.80);
           display: flex;
           align-items: center;
           gap: 16px;
-          padding: 0 20px;
+          padding: 0 24px;
           flex-shrink: 0;
           position: sticky;
           top: 0;
@@ -318,28 +318,28 @@ export default function Header({ onMobileMenuToggle }) {
         }
         .search-icon {
           position: absolute;
-          left: 10px;
+          left: 11px;
           color: var(--text-muted);
           pointer-events: none;
         }
         .search-input {
           width: 100%;
-          padding: 7px 12px 7px 32px;
-          background: rgba(241, 245, 249, 0.65);
-          backdrop-filter: blur(12px);
-          -webkit-backdrop-filter: blur(12px);
-          border: 1px solid rgba(226, 232, 240, 0.9);
+          padding: 8px 14px 8px 34px;
+          background: rgba(255, 255, 255, 0.45);
+          backdrop-filter: var(--glass-blur-sm);
+          -webkit-backdrop-filter: var(--glass-blur-sm);
+          border: 1px solid rgba(255, 255, 255, 0.60);
           border-radius: var(--radius-full);
           font-size: 0.8125rem;
-          color: var(--text-primary);
+          color: #0f172a;
           font-family: inherit;
-          box-shadow: inset 0 1px 2px rgba(15, 23, 42, 0.04);
+          box-shadow: inset 0 1px 2px rgba(15, 23, 42, 0.03);
           transition: all var(--transition-fast);
         }
         .search-input:focus {
           outline: none;
-          background: rgba(255, 255, 255, 0.96);
-          border-color: var(--color-primary-light);
+          background: rgba(255, 255, 255, 0.85);
+          border-color: var(--color-primary);
           box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.15), inset 0 1px 1px #fff;
         }
         .search-input::placeholder { color: var(--text-muted); }
@@ -347,32 +347,33 @@ export default function Header({ onMobileMenuToggle }) {
         .header__right {
           display: flex;
           align-items: center;
-          gap: 8px;
+          gap: 10px;
           margin-left: auto;
           flex-shrink: 0;
         }
 
         .header__icon-btn {
           position: relative;
-          width: 36px;
-          height: 36px;
+          width: 38px;
+          height: 38px;
           border-radius: var(--radius-md);
-          background: rgba(248, 250, 252, 0.75);
-          backdrop-filter: blur(10px);
-          -webkit-backdrop-filter: blur(10px);
-          border: 1px solid rgba(226, 232, 240, 0.9);
+          background: rgba(255, 255, 255, 0.40);
+          backdrop-filter: var(--glass-blur-sm);
+          -webkit-backdrop-filter: var(--glass-blur-sm);
+          border: 1px solid rgba(255, 255, 255, 0.55);
           color: var(--text-secondary);
           display: flex;
           align-items: center;
           justify-content: center;
           cursor: pointer;
-          box-shadow: 0 1px 3px rgba(15, 23, 42, 0.04), inset 0 1px 0 #fff;
+          box-shadow: 0 2px 8px rgba(15, 23, 42, 0.04), inset 0 1px 0 #fff;
           transition: all var(--transition-fast);
         }
         .header__icon-btn:hover {
-          background: rgba(255, 255, 255, 0.95);
-          color: var(--text-primary);
-          box-shadow: 0 4px 12px rgba(15, 23, 42, 0.08), inset 0 1px 0 #fff;
+          background: rgba(255, 255, 255, 0.80);
+          color: var(--color-primary);
+          box-shadow: 0 4px 14px rgba(37, 99, 235, 0.12), inset 0 1px 0 #fff;
+          border-color: rgba(147, 197, 253, 0.6);
           transform: translateY(-1px);
         }
         .header__notif-badge {
@@ -395,20 +396,22 @@ export default function Header({ onMobileMenuToggle }) {
         .header__profile-btn {
           display: flex;
           align-items: center;
-          gap: 8px;
-          padding: 5px 10px 5px 5px;
-          background: rgba(248, 250, 252, 0.75);
-          backdrop-filter: blur(10px);
-          -webkit-backdrop-filter: blur(10px);
-          border: 1px solid rgba(226, 232, 240, 0.9);
-          border-radius: var(--radius-lg);
+          gap: 10px;
+          padding: 5px 12px 5px 5px;
+          background: rgba(255, 255, 255, 0.45);
+          backdrop-filter: var(--glass-blur-sm);
+          -webkit-backdrop-filter: var(--glass-blur-sm);
+          border: 1px solid rgba(255, 255, 255, 0.55);
+          border-radius: var(--radius-xl);
           cursor: pointer;
-          box-shadow: 0 1px 3px rgba(15, 23, 42, 0.04), inset 0 1px 0 #fff;
+          box-shadow: 0 2px 8px rgba(15, 23, 42, 0.04), inset 0 1px 0 #fff;
           transition: all var(--transition-fast);
         }
         .header__profile-btn:hover {
-          background: rgba(255, 255, 255, 0.95);
-          box-shadow: 0 4px 12px rgba(15, 23, 42, 0.08), inset 0 1px 0 #fff;
+          background: rgba(255, 255, 255, 0.80);
+          border-color: rgba(147, 197, 253, 0.6);
+          box-shadow: 0 4px 16px rgba(15, 23, 42, 0.08), inset 0 1px 0 #fff;
+          transform: translateY(-1px);
         }
         .header__profile-info {
           display: flex;

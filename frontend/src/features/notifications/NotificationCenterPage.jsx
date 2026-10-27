@@ -1139,14 +1139,23 @@ export default function NotificationCenterPage() {
           gap: 16px;
         }
         .rule-card {
-          background: var(--bg-surface);
-          border: 1px solid var(--border-default);
-          border-radius: 10px;
-          padding: 18px;
+          background: var(--glass-surface);
+          backdrop-filter: var(--glass-blur);
+          -webkit-backdrop-filter: var(--glass-blur);
+          border: 1px solid var(--glass-border);
+          border-radius: var(--radius-xl);
+          box-shadow: var(--glass-shadow);
+          padding: 20px;
           display: flex;
           flex-direction: column;
-          gap: 10px;
+          gap: 12px;
           min-width: 0;
+          transition: transform var(--transition-fast), box-shadow var(--transition-fast);
+        }
+        .rule-card:hover {
+          transform: translateY(-2px);
+          box-shadow: var(--glass-shadow-hover);
+          border-color: rgba(255, 255, 255, 0.95);
         }
         .rule-card-header {
           display: flex;
@@ -1163,10 +1172,11 @@ export default function NotificationCenterPage() {
         }
         .rule-module-tag {
           font-size: 0.7rem;
-          background: var(--bg-subtle);
-          padding: 2px 7px;
-          border-radius: 4px;
-          border: 1px solid var(--border-default);
+          background: rgba(255, 255, 255, 0.70);
+          padding: 2px 8px;
+          border-radius: var(--radius-sm);
+          border: 1px solid var(--glass-border-subtle);
+          font-weight: 500;
         }
         .rule-name {
           font-size: 0.95rem;
@@ -1179,9 +1189,11 @@ export default function NotificationCenterPage() {
           line-height: 1.45;
         }
         .rule-condition-box {
-          background: var(--bg-subtle);
-          border-radius: 6px;
-          padding: 8px 10px;
+          background: rgba(255, 255, 255, 0.50);
+          backdrop-filter: blur(6px);
+          border: 1px solid var(--glass-border-subtle);
+          border-radius: var(--radius-md);
+          padding: 10px 12px;
           font-size: 0.725rem;
         }
         .condition-label {
@@ -1194,7 +1206,7 @@ export default function NotificationCenterPage() {
           align-items: center;
           justify-content: space-between;
           padding-top: 10px;
-          border-top: 1px solid var(--border-default);
+          border-top: 1px solid var(--glass-border-subtle);
           margin-top: auto;
         }
         .roles-pill-row {
@@ -1204,13 +1216,14 @@ export default function NotificationCenterPage() {
           flex-wrap: wrap;
         }
         .role-chip {
-          background: rgba(56, 189, 248, 0.1);
-          color: #38bdf8;
+          background: rgba(37, 99, 235, 0.10);
+          color: var(--color-primary);
           font-size: 0.65rem;
           font-weight: 600;
-          padding: 1px 6px;
+          padding: 1px 7px;
           border-radius: 4px;
           text-transform: capitalize;
+          border: 1px solid rgba(37, 99, 235, 0.20);
         }
         .subtle-lbl {
           font-size: 0.675rem;
@@ -1219,18 +1232,23 @@ export default function NotificationCenterPage() {
 
         /* Audit Table */
         .audit-table-card {
-          background: var(--bg-surface);
-          border: 1px solid var(--border-default);
-          border-radius: 10px;
+          background: var(--glass-surface-strong);
+          backdrop-filter: var(--glass-blur);
+          -webkit-backdrop-filter: var(--glass-blur);
+          border: 1px solid var(--glass-border);
+          border-radius: var(--radius-xl);
+          box-shadow: var(--glass-shadow);
           overflow: hidden;
         }
         .audit-table-header {
           padding: 18px 24px;
-          border-bottom: 1px solid var(--border-default);
+          border-bottom: 1px solid var(--glass-border-subtle);
+          background: rgba(255, 255, 255, 0.40);
         }
         .audit-table-header h3 {
           margin: 0 0 4px 0;
           font-size: 1.05rem;
+          color: var(--text-primary);
         }
         .audit-table-header p {
           margin: 0;
@@ -1244,17 +1262,17 @@ export default function NotificationCenterPage() {
         }
         .audit-table th {
           text-align: left;
-          padding: 12px 16px;
-          background: var(--bg-subtle);
-          border-bottom: 1px solid var(--border-default);
-          color: var(--text-muted);
+          padding: 12px 18px;
+          background: rgba(233, 238, 245, 0.70);
+          border-bottom: 1px solid var(--glass-border-subtle);
+          color: var(--text-secondary);
           font-size: 0.75rem;
           font-weight: 600;
           text-transform: uppercase;
         }
         .audit-table td {
-          padding: 12px 16px;
-          border-bottom: 1px solid var(--border-default);
+          padding: 12px 18px;
+          border-bottom: 1px solid rgba(226, 232, 240, 0.65);
         }
         .status-pill {
           font-size: 0.675rem;
@@ -1264,11 +1282,13 @@ export default function NotificationCenterPage() {
         }
         .status-pill.delivered {
           background: rgba(234, 179, 8, 0.15);
-          color: #eab308;
+          color: #d97706;
+          border: 1px solid rgba(234, 179, 8, 0.30);
         }
         .status-pill.read {
           background: rgba(16, 185, 129, 0.15);
-          color: #10b981;
+          color: #16a34a;
+          border: 1px solid rgba(16, 185, 129, 0.30);
         }
 
         /* Modals */
@@ -1278,8 +1298,9 @@ export default function NotificationCenterPage() {
           left: 0;
           right: 0;
           bottom: 0;
-          background: rgba(0, 0, 0, 0.7);
-          backdrop-filter: blur(4px);
+          background: rgba(15, 23, 42, 0.45);
+          backdrop-filter: blur(12px);
+          -webkit-backdrop-filter: blur(12px);
           display: flex;
           align-items: center;
           justify-content: center;
@@ -1288,16 +1309,18 @@ export default function NotificationCenterPage() {
           box-sizing: border-box;
         }
         .notif-modal-card {
-          background: var(--bg-surface);
-          border: 1px solid var(--border-default);
-          border-radius: 12px;
+          background: var(--glass-surface-strong);
+          backdrop-filter: var(--glass-blur-heavy);
+          -webkit-backdrop-filter: var(--glass-blur-heavy);
+          border: 1px solid var(--glass-border);
+          border-radius: var(--radius-xl);
           width: 100%;
           max-width: 600px;
           max-height: calc(100dvh - 28px);
           display: flex;
           flex-direction: column;
           overflow: hidden;
-          box-shadow: 0 20px 40px rgba(0, 0, 0, 0.5);
+          box-shadow: var(--glass-shadow-strong);
           box-sizing: border-box;
         }
         .payload-modal {

@@ -169,11 +169,11 @@ export default function Sidebar({ mobileOpen, onMobileClose }) {
         .sidebar {
           width: var(--sidebar-width);
           height: 100vh;
-          background: linear-gradient(180deg, rgba(15, 23, 42, 0.96) 0%, rgba(17, 24, 39, 0.94) 100%);
-          backdrop-filter: blur(24px) saturate(190%);
-          -webkit-backdrop-filter: blur(24px) saturate(190%);
-          border-right: 1px solid rgba(255, 255, 255, 0.08);
-          box-shadow: 4px 0 24px rgba(0, 0, 0, 0.12), inset -1px 0 0 rgba(255, 255, 255, 0.05);
+          background: linear-gradient(180deg, rgba(15, 23, 42, 0.92) 0%, rgba(20, 29, 47, 0.95) 100%);
+          backdrop-filter: blur(24px) saturate(180%);
+          -webkit-backdrop-filter: blur(24px) saturate(180%);
+          border-right: 1px solid rgba(255, 255, 255, 0.10);
+          box-shadow: 4px 0 28px rgba(15, 23, 42, 0.16), inset -1px 0 0 rgba(255, 255, 255, 0.06);
           display: flex;
           flex-direction: column;
           flex-shrink: 0;
@@ -321,19 +321,19 @@ export default function Sidebar({ mobileOpen, onMobileClose }) {
           white-space: nowrap;
         }
         .sidebar__item:hover {
-          background: rgba(255, 255, 255, 0.07);
+          background: rgba(255, 255, 255, 0.08);
           backdrop-filter: blur(8px);
           -webkit-backdrop-filter: blur(8px);
           color: var(--sidebar-text-active);
-          border-color: rgba(255, 255, 255, 0.08);
+          border-color: rgba(255, 255, 255, 0.10);
           transform: translateX(2px);
         }
         .sidebar__item--active {
-          background: linear-gradient(90deg, rgba(37, 99, 235, 0.28) 0%, rgba(30, 64, 175, 0.16) 100%);
+          background: linear-gradient(90deg, rgba(37, 99, 235, 0.32) 0%, rgba(30, 64, 175, 0.18) 100%);
           backdrop-filter: blur(10px);
           -webkit-backdrop-filter: blur(10px);
-          border: 1px solid rgba(96, 165, 250, 0.28);
-          box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.12), 0 2px 8px rgba(37, 99, 235, 0.2);
+          border: 1px solid rgba(96, 165, 250, 0.35);
+          box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.16), 0 4px 12px rgba(37, 99, 235, 0.25);
           color: var(--sidebar-text-active);
           font-weight: 500;
         }
@@ -345,7 +345,7 @@ export default function Sidebar({ mobileOpen, onMobileClose }) {
           background: var(--color-primary-light);
           border-radius: var(--radius-full);
           flex-shrink: 0;
-          box-shadow: 0 0 8px var(--color-primary-light);
+          box-shadow: 0 0 10px var(--color-primary-light);
         }
 
         /* Footer */
@@ -358,12 +358,12 @@ export default function Sidebar({ mobileOpen, onMobileClose }) {
           display: flex;
           align-items: center;
           gap: 8px;
-          padding: 8px;
-          border-radius: var(--radius-md);
-          background: rgba(255, 255, 255, 0.04);
+          padding: 8px 10px;
+          border-radius: var(--radius-lg);
+          background: rgba(255, 255, 255, 0.05);
           backdrop-filter: blur(12px);
           -webkit-backdrop-filter: blur(12px);
-          border: 1px solid rgba(255, 255, 255, 0.06);
+          border: 1px solid rgba(255, 255, 255, 0.08);
           box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.08);
         }
         .sidebar__user--compact { justify-content: center; }

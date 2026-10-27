@@ -21,12 +21,14 @@ const CustomTooltip = ({ active, payload, label }) => {
   if (!active || !payload?.length) return null;
   return (
     <div style={{
-      background: 'var(--bg-surface)',
-      border: '1px solid var(--border-default)',
+      background: 'rgba(255, 255, 255, 0.92)',
+      backdropFilter: 'blur(12px)',
+      WebkitBackdropFilter: 'blur(12px)',
+      border: '1px solid rgba(255, 255, 255, 0.90)',
       borderRadius: 'var(--radius-md)',
       padding: '8px 12px',
       fontSize: '0.75rem',
-      boxShadow: 'var(--shadow-md)',
+      boxShadow: '0 8px 24px rgba(15, 23, 42, 0.12)',
     }}>
       {label && <div style={{ fontWeight: 600, marginBottom: 4, color: 'var(--text-primary)' }}>{label}</div>}
       {payload.map(p => (
@@ -158,7 +160,9 @@ export default function AdminDashboard() {
           value={activeProjectsCount}
           sub={`${totalProjectsCount} total projects`}
           icon="Briefcase"
-          iconBg="#eff6ff" iconColor="#1e40af"
+          variant="blue"
+          iconBg="rgba(37, 99, 235, 0.12)"
+          iconColor="#1d4ed8"
           onClick={() => navigate('/admin/projects')}
         />
         <KpiCard
@@ -166,7 +170,9 @@ export default function AdminDashboard() {
           value={totalCentresCount}
           sub={`${activeCentresCount} active / verified`}
           icon="Building2"
-          iconBg="#f0fdf4" iconColor="#16a34a"
+          variant="teal"
+          iconBg="rgba(13, 148, 136, 0.12)"
+          iconColor="#0d9488"
           onClick={() => navigate('/admin/centres')}
         />
         <KpiCard
@@ -174,7 +180,9 @@ export default function AdminDashboard() {
           value={activeUsersCount}
           sub={`${totalUsersCount} accounts`}
           icon="Users"
-          iconBg="#faf5ff" iconColor="#7c3aed"
+          variant="purple"
+          iconBg="rgba(124, 58, 237, 0.10)"
+          iconColor="#7c3aed"
           onClick={() => navigate('/admin/users')}
         />
         <KpiCard
@@ -182,22 +190,29 @@ export default function AdminDashboard() {
           value={openExceptionsCount}
           sub={`${openExceptionsCount} critical`}
           icon="AlertTriangle"
-          iconBg="#fef2f2" iconColor="#dc2626"
+          variant="red"
+          iconBg="rgba(220, 38, 38, 0.10)"
+          iconColor="#dc2626"
           onClick={() => navigate('/admin/config')}
         />
         <KpiCard
           label="Pending Approvals"
           value={pendingApprovalsCount}
+          sub="Requires review"
           icon="CheckCircle"
-          iconBg="#fffbeb" iconColor="#d97706"
+          variant="orange"
+          iconBg="rgba(217, 119, 6, 0.10)"
+          iconColor="#d97706"
           onClick={() => navigate('/admin/centres')}
         />
         <KpiCard
-          label="Security Logs"
+          label="Security & Audit"
           value="Audit Trail"
-          sub="Live Immutable Log"
-          icon="Settings"
-          iconBg="#eff6ff" iconColor="#1e40af"
+          sub="Live immutable log"
+          icon="ShieldCheck"
+          variant="indigo"
+          iconBg="rgba(37, 99, 235, 0.10)"
+          iconColor="#2563eb"
           onClick={() => navigate('/admin/config')}
         />
       </div>
@@ -206,12 +221,12 @@ export default function AdminDashboard() {
       <div className="grid-cols-chart" style={{ marginBottom: 24 }}>
 
         {/* Project Status */}
-        <div className="card">
+        <div className="card card--chart-blue" style={{ display: 'flex', flexDirection: 'column' }}>
           <div className="card-header">
             <span className="card-title">Project Status Distribution</span>
             <span className="badge badge-neutral">{projectChartData.length} stages</span>
           </div>
-          <div className="card-body" style={{ paddingTop: 12 }}>
+          <div className="card-body" style={{ paddingTop: 12, flex: 1, display: 'flex', flexDirection: 'column', justifyContent: 'center' }}>
             <ResponsiveContainer width="100%" height={220}>
               <PieChart>
                 <Pie
@@ -238,12 +253,12 @@ export default function AdminDashboard() {
         </div>
 
         {/* Centre Status */}
-        <div className="card">
+        <div className="card card--chart-teal" style={{ display: 'flex', flexDirection: 'column' }}>
           <div className="card-header">
             <span className="card-title">Centre Status Distribution</span>
             <span className="badge badge-neutral">{totalCentresCount} centres</span>
           </div>
-          <div className="card-body" style={{ paddingTop: 12 }}>
+          <div className="card-body" style={{ paddingTop: 12, flex: 1, display: 'flex', flexDirection: 'column', justifyContent: 'center' }}>
             <ResponsiveContainer width="100%" height={220}>
               <PieChart>
                 <Pie
@@ -272,12 +287,12 @@ export default function AdminDashboard() {
 
       {/* Exceptions by Severity */}
       <div className="grid-cols-chart" style={{ marginBottom: 24 }}>
-        <div className="card">
+        <div className="card card--chart-amber" style={{ display: 'flex', flexDirection: 'column' }}>
           <div className="card-header">
             <span className="card-title">Exceptions by Severity</span>
             <span className="badge badge-danger">{EXCEPTION_DATA.reduce((s, d) => s + d.value, 0)} total</span>
           </div>
-          <div className="card-body" style={{ paddingTop: 12 }}>
+          <div className="card-body" style={{ paddingTop: 12, flex: 1, display: 'flex', flexDirection: 'column', justifyContent: 'center' }}>
             <ResponsiveContainer width="100%" height={200}>
               <BarChart data={EXCEPTION_DATA} barSize={36} margin={{ left: -10 }}>
                 <XAxis dataKey="name" tick={{ fontSize: 11 }} axisLine={false} tickLine={false} />
@@ -295,18 +310,18 @@ export default function AdminDashboard() {
         </div>
 
         {/* Recent Activity */}
-        <div className="card">
+        <div className="card card--chart-activity" style={{ display: 'flex', flexDirection: 'column' }}>
           <div className="card-header">
             <span className="card-title">Recent Activity</span>
             <button className="btn btn-ghost btn-sm" style={{ gap: 4 }} onClick={() => navigate('/admin/config')}>
               View all <ArrowRight size={12} />
             </button>
           </div>
-          <div style={{ padding: '4px 0' }}>
+          <div style={{ padding: '4px 0', flex: 1 }}>
             {recentActivityData.map((a) => (
               <div key={a.id} style={{
                 padding: '10px 20px',
-                borderBottom: '1px solid var(--border-subtle)',
+                borderBottom: '1px solid var(--glass-border-subtle)',
                 display: 'flex',
                 gap: 10,
                 alignItems: 'flex-start',

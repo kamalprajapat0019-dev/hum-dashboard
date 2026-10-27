@@ -1264,10 +1264,13 @@ export default function MISReportsPage() {
           }
         }
         .exec-card {
-          background: var(--bg-surface);
-          border: 1px solid var(--border-default);
-          border-radius: 10px;
-          padding: 20px;
+          background: var(--glass-surface);
+          backdrop-filter: var(--glass-blur);
+          -webkit-backdrop-filter: var(--glass-blur);
+          border: 1px solid var(--glass-border);
+          border-radius: var(--radius-xl);
+          box-shadow: var(--glass-shadow);
+          padding: 22px;
           text-align: center;
         }
         .exec-title {
@@ -1280,7 +1283,7 @@ export default function MISReportsPage() {
         .exec-num {
           font-size: 2rem;
           font-weight: 800;
-          color: #38bdf8;
+          color: var(--color-primary);
           margin-bottom: 6px;
         }
         .exec-sub {
@@ -1289,14 +1292,18 @@ export default function MISReportsPage() {
         }
 
         .exec-watchlist-card {
-          background: var(--bg-surface);
-          border: 1px solid var(--border-default);
-          border-radius: 10px;
+          background: var(--glass-surface);
+          backdrop-filter: var(--glass-blur);
+          -webkit-backdrop-filter: var(--glass-blur);
+          border: 1px solid var(--glass-border);
+          border-radius: var(--radius-xl);
+          box-shadow: var(--glass-shadow);
           padding: 24px;
         }
         .exec-watchlist-card h4 {
           margin: 0 0 16px 0;
           font-size: 1.05rem;
+          color: var(--text-primary);
         }
         .watchlist-items {
           display: flex;
@@ -1308,9 +1315,11 @@ export default function MISReportsPage() {
           align-items: center;
           gap: 16px;
           padding: 14px 18px;
-          border-radius: 8px;
-          background: var(--bg-subtle);
-          border: 1px solid var(--border-default);
+          border-radius: var(--radius-md);
+          background: rgba(255, 255, 255, 0.50);
+          backdrop-filter: blur(8px);
+          -webkit-backdrop-filter: blur(8px);
+          border: 1px solid var(--glass-border-subtle);
         }
         .risk-indicator {
           width: 8px;
