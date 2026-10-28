@@ -1,46 +1,74 @@
+import { useState, useEffect, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import {
-  BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer,
-  PieChart, Pie, Cell, Legend, FunnelChart, Funnel, LabelList
+  PieChart, Pie, Cell, ResponsiveContainer, Legend, Tooltip
 } from 'recharts';
-import { ArrowRight, Building2, FileText, Plus } from 'lucide-react';
+import { Building2, Plus, RefreshCw, AlertCircle, Loader2 } from 'lucide-react';
 import { KpiCard, StatusBadge, LastUpdated } from '@/components/common';
-import { OPS_KPIS, BOOKING_FUNNEL_DATA, CONSENT_STATUS_DATA, CENTRES } from '@/data/mockData';
-import { CentreStore, DocStore } from '@/services/dataService';
+import { apiClient } from '@/services/apiClient';
+import { ENDPOINTS } from '@/services/endpoints';
 
 const CustomTooltip = ({ active, payload }) => {
   if (!active || !payload?.length) return null;
   return (
-    <div style={{ background: 'var(--bg-surface)', border: '1px solid var(--border-default)', borderRadius: 'var(--radius-md)', padding: '8px 12px', fontSize: '0.75rem', boxShadow: 'var(--shadow-md)' }}>
-      {payload.map(p => (
-        <div key={p.name} style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
-          <span style={{ width: 8, height: 8, borderRadius: '50%', background: p.fill || '#1e40af', display: 'inline-block' }} />
-          {p.name}: <strong>{p.value}</strong>
+    <div style={{
+      background: 'rgba(255, 255, 255, 0.94)',
+      backdropFilter: 'blur(12px)',
+      border: '1px solid var(--border-default, #e2e8f0)',
+      borderRadius: 'var(--radius-md, 8px)',
+      padding: '8px 12px',
+      fontSize: '0.75rem',
+      boxShadow: 'var(--shadow-md, 0 4px 6px -1px rgba(0, 0, 0, 0.1))',
+    }}>
+      {payload.map((p, i) => (
+        <div key={i} style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
+          <span style={{ width: 8, height: 8, borderRadius: '50%', background: p.fill || p.color || '#1e40af', display: 'inline-block' }} />
+          <span>{p.name}: <strong>{p.value}</strong></span>
         </div>
       ))}
     </div>
   );
 };
 
-const DOC_COMPLETION = [
-  { name: 'Complete',   value: 102, color: '#16a34a' },
-  { name: 'Incomplete', value: 47,  color: '#d97706' },
-  { name: 'Rework',     value: 13,  color: '#dc2626' },
-];
-
-const INCIDENT_DATA = [
-  { region: 'Delhi',   high: 2, medium: 1, low: 0 },
-  { region: 'Mumbai',  high: 0, medium: 2, low: 1 },
-  { region: 'Bangalore',high: 1, medium: 0, low: 2 },
-  { region: 'Hyderabad',high: 0, medium: 1, low: 1 },
-  { region: 'Kolkata', high: 0, medium: 0, low: 1 },
-];
-
 export default function OpsDashboard() {
   const navigate = useNavigate();
-  const liveCentres = CentreStore.getAll();
-  const liveDocs = DocStore.getAll();
-  const pendingDocsCount = liveDocs.filter(d => d.status === 'Pending').length;
+  const [centres, setCentres] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(null);
+
+  const loadData = useCallback(async () => {
+    setLoading(true);
+    setError(null);
+    try {
+      const res = await apiClient.get(ENDPOINTS.ADMIN.CENTRES, { params: { limit: 100 } });
+      if (res && res.success && Array.isArray(res.data)) {
+        setCentres(res.data);
+      } else {
+        setCentres([]);
+      }
+    } catch (err) {
+      console.error('Failed to query operations database:', err);
+      setError(err.message || 'Unable to retrieve operations pipeline');
+    } finally {
+      setLoading(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    loadData();
+  }, [loadData]);
+
+  const approvedCentres = centres.filter(c => (c.centreStatus || c.centre_status) === 'Approved');
+  const draftCentres = centres.filter(c => (c.centreStatus || c.centre_status) === 'Draft');
+  const activeCentres = centres.filter(c => (c.centreStatus || c.centre_status) === 'Active');
+  const inactiveCentres = centres.filter(c => (c.centreStatus || c.centre_status) === 'Rejected' || (c.centreStatus || c.centre_status) === 'Inactive');
+
+  const statusChartData = [
+    { name: 'Approved', value: approvedCentres.length, color: '#16a34a' },
+    { name: 'Active', value: activeCentres.length, color: '#2563eb' },
+    { name: 'Draft', value: draftCentres.length, color: '#d97706' },
+    { name: 'Inactive', value: inactiveCentres.length, color: '#dc2626' },
+  ].filter(d => d.value > 0);
 
   return (
     <div>
@@ -48,13 +76,13 @@ export default function OpsDashboard() {
         <div className="page-header__top">
           <div>
             <h1 className="page-header__title">Operations Board</h1>
-            <p className="page-header__subtitle">Booking pipeline, consent, documents, readiness and incidents</p>
+            <p className="page-header__subtitle">Live centre operations, capacity metrics, and venue onboarding status</p>
           </div>
           <div className="page-header__actions">
-            <LastUpdated />
-            <button className="btn btn-secondary btn-sm" onClick={() => navigate('/ops/documents')}>
-              <FileText size={13} /> Document Checklist
+            <button className="btn btn-secondary btn-sm" onClick={loadData} disabled={loading}>
+              <RefreshCw size={13} className={loading ? 'animate-spin' : ''} />
             </button>
+            <LastUpdated />
             <button className="btn btn-primary btn-sm" onClick={() => navigate('/ops/booking')}>
               <Building2 size={13} /> Manage Centres
             </button>
@@ -62,179 +90,157 @@ export default function OpsDashboard() {
         </div>
       </div>
 
+      {/* Error Banner */}
+      {error && (
+        <div style={{
+          background: '#fee2e2',
+          border: '1px solid #ef4444',
+          borderRadius: 'var(--radius-md, 8px)',
+          padding: '12px 16px',
+          marginBottom: 20,
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'space-between',
+          color: '#991b1b',
+        }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+            <AlertCircle size={20} />
+            <div>
+              <strong>Failed to query operations database:</strong> {error}
+            </div>
+          </div>
+          <button
+            className="btn btn-sm btn-secondary"
+            onClick={loadData}
+            style={{ background: '#fff', borderColor: '#f87171', color: '#991b1b' }}
+          >
+            Retry
+          </button>
+        </div>
+      )}
+
       {/* KPI Cards */}
       <div className="kpi-grid" style={{ marginBottom: 24 }}>
         <KpiCard
           label="Total Centres"
-          value={liveCentres.length}
-          sub={`${liveCentres.filter(c => c.centre_status === 'Approved').length} approved`}
-          icon="CalendarCheck"
-          iconBg="#eff6ff" iconColor="#1e40af"
+          value={loading ? '...' : centres.length}
+          sub={`${approvedCentres.length} approved`}
+          icon="Building2"
+          iconBg="#eff6ff"
+          iconColor="#1e40af"
           onClick={() => navigate('/ops/booking')}
         />
         <KpiCard
-          label="Consent Pending"
-          value={OPS_KPIS.consentPending.value}
-          icon="MessageSquare"
-          iconBg="#fffbeb" iconColor="#d97706"
+          label="Approved Venues"
+          value={loading ? '...' : approvedCentres.length}
+          sub="Verified and ready"
+          icon="ShieldCheck"
+          iconBg="#f0fdf4"
+          iconColor="#16a34a"
         />
         <KpiCard
-          label="Docs Pending / Checklist"
-          value={pendingDocsCount || OPS_KPIS.docsIncomplete.value}
-          sub="Requires verification"
+          label="Onboarding Drafts"
+          value={loading ? '...' : draftCentres.length}
+          sub="Awaiting verification"
           icon="FileWarning"
-          iconBg="#fef2f2" iconColor="#dc2626"
-          onClick={() => navigate('/ops/documents')}
+          iconBg="#fffbeb"
+          iconColor="#d97706"
         />
         <KpiCard
-          label="Open Incidents"
-          value={OPS_KPIS.incidentsOpen.value}
+          label="Inactive / Flagged"
+          value={loading ? '...' : inactiveCentres.length}
+          sub="Deactivated venues"
           icon="AlertCircle"
-          iconBg="#faf5ff" iconColor="#7c3aed"
+          iconBg="#fef2f2"
+          iconColor="#dc2626"
         />
       </div>
 
-      {/* Charts Row 1 */}
+      {/* Charts Row */}
       <div className="grid-cols-chart" style={{ marginBottom: 24 }}>
-
-        {/* Booking Funnel as horizontal bar */}
-        <div className="card">
+        <div className="card" style={{ gridColumn: '1 / -1' }}>
           <div className="card-header">
-            <span className="card-title">Booking Pipeline</span>
+            <span className="card-title">Centre Onboarding &amp; Status Distribution</span>
+            <span className="badge badge-neutral">{centres.length} total venues in DB</span>
           </div>
           <div className="card-body" style={{ paddingTop: 12 }}>
-            <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
-              {BOOKING_FUNNEL_DATA.map((d, i) => {
-                const pct = Math.round((d.count / BOOKING_FUNNEL_DATA[0].count) * 100);
-                const colors = ['#1e40af','#3b82f6','#0ea5e9','#16a34a','#16a34a'];
-                return (
-                  <div key={i}>
-                    <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 4, fontSize: '0.75rem' }}>
-                      <span style={{ color: 'var(--text-secondary)', fontWeight: 500 }}>{d.stage}</span>
-                      <span style={{ fontWeight: 700 }}>{d.count} <span style={{ color: 'var(--text-muted)', fontWeight: 400 }}>({pct}%)</span></span>
-                    </div>
-                    <div className="progress-bar">
-                      <div className="progress-fill" style={{ width: `${pct}%`, background: colors[i] }} />
-                    </div>
-                  </div>
-                );
-              })}
-            </div>
-          </div>
-        </div>
-
-        {/* Consent Status */}
-        <div className="card">
-          <div className="card-header">
-            <span className="card-title">Consent Status</span>
-            <span className="badge badge-neutral">{CONSENT_STATUS_DATA.reduce((s,d) => s+d.value, 0)} centres</span>
-          </div>
-          <div className="card-body" style={{ paddingTop: 12 }}>
-            <ResponsiveContainer width="100%" height={210}>
-              <PieChart>
-                <Pie data={CONSENT_STATUS_DATA} cx="50%" cy="50%" innerRadius={50} outerRadius={85} dataKey="value" labelLine={false}>
-                  {CONSENT_STATUS_DATA.map((e,i) => <Cell key={i} fill={e.color} />)}
-                </Pie>
-                <Tooltip content={<CustomTooltip />} />
-                <Legend iconType="circle" iconSize={8} formatter={v => <span style={{ fontSize: '0.75rem', color: 'var(--text-primary)' }}>{v}</span>} />
-              </PieChart>
-            </ResponsiveContainer>
+            {statusChartData.length > 0 ? (
+              <ResponsiveContainer width="100%" height={210}>
+                <PieChart>
+                  <Pie data={statusChartData} cx="50%" cy="50%" innerRadius={50} outerRadius={85} dataKey="value" labelLine={false}>
+                    {statusChartData.map((e, i) => <Cell key={i} fill={e.color} />)}
+                  </Pie>
+                  <Tooltip content={<CustomTooltip />} />
+                  <Legend iconType="circle" iconSize={8} formatter={v => <span style={{ fontSize: '0.75rem', color: 'var(--text-primary)' }}>{v}</span>} />
+                </PieChart>
+              </ResponsiveContainer>
+            ) : (
+              <div style={{ height: 210, display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--text-muted)', fontSize: '0.8125rem' }}>
+                No centre records available in MySQL database.
+              </div>
+            )}
           </div>
         </div>
       </div>
 
-      {/* Charts Row 2 */}
-      <div className="grid-cols-chart" style={{ marginBottom: 24 }}>
-
-        {/* Document Completion */}
-        <div className="card">
-          <div className="card-header">
-            <span className="card-title">Document Completion Status</span>
-          </div>
-          <div className="card-body" style={{ paddingTop: 12 }}>
-            <div style={{ display: 'flex', gap: 20, alignItems: 'center', flexWrap: 'wrap', justifyContent: 'center' }}>
-              <div style={{ flex: '0 0 160px', width: 160, height: 160, minWidth: 160 }}>
-                <ResponsiveContainer width="100%" height="100%">
-                  <PieChart>
-                    <Pie data={DOC_COMPLETION} cx="50%" cy="50%" innerRadius={40} outerRadius={70} dataKey="value" labelLine={false}>
-                      {DOC_COMPLETION.map((e,i) => <Cell key={i} fill={e.color} />)}
-                    </Pie>
-                    <Tooltip content={<CustomTooltip />} />
-                  </PieChart>
-                </ResponsiveContainer>
-              </div>
-              <div style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: 10 }}>
-                {DOC_COMPLETION.map((d, i) => (
-                  <div key={i} style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-                    <span style={{ width: 10, height: 10, borderRadius: '50%', background: d.color, flexShrink: 0 }} />
-                    <span style={{ fontSize: '0.8125rem', flex: 1, color: 'var(--text-secondary)' }}>{d.name}</span>
-                    <span style={{ fontWeight: 700, fontSize: '0.9375rem' }}>{d.value}</span>
-                  </div>
-                ))}
-              </div>
-            </div>
-          </div>
-        </div>
-
-        {/* Incident by Region */}
-        <div className="card">
-          <div className="card-header">
-            <span className="card-title">Incidents by Region &amp; Priority</span>
-          </div>
-          <div className="card-body" style={{ paddingTop: 12 }}>
-            <ResponsiveContainer width="100%" height={200}>
-              <BarChart data={INCIDENT_DATA} barSize={14} margin={{ left: -20 }}>
-                <XAxis dataKey="region" tick={{ fontSize: 10 }} axisLine={false} tickLine={false} />
-                <YAxis tick={{ fontSize: 11 }} axisLine={false} tickLine={false} allowDecimals={false} />
-                <Tooltip content={<CustomTooltip />} cursor={{ fill: 'var(--bg-subtle)' }} />
-                <Legend formatter={v => <span style={{ fontSize: '0.75rem', textTransform: 'capitalize' }}>{v}</span>} />
-                <Bar dataKey="high"   name="High"   fill="#dc2626" radius={[3,3,0,0]} stackId="a" />
-                <Bar dataKey="medium" name="Medium" fill="#d97706" radius={[3,3,0,0]} stackId="a" />
-                <Bar dataKey="low"    name="Low"    fill="#0ea5e9" radius={[3,3,0,0]} stackId="a" />
-              </BarChart>
-            </ResponsiveContainer>
-          </div>
-        </div>
-      </div>
-
-      {/* Centre Status Table */}
+      {/* Main Table */}
       <div className="card">
         <div className="card-header">
-          <span className="card-title">Centre Operational Status</span>
-          <button className="btn btn-ghost btn-sm" style={{ gap: 4 }}>All Centres <ArrowRight size={12} /></button>
+          <span className="card-title">Operations Centre Registry — Live Records</span>
         </div>
         <div className="table-wrapper" style={{ border: 'none', borderRadius: 0 }}>
           <table>
             <thead>
               <tr>
-                <th>Centre</th>
-                <th>City</th>
-                <th>Eligibility</th>
-                <th>Consent</th>
-                <th>Documents</th>
-                <th>Audit</th>
+                <th>Centre Code</th>
+                <th>Venue Name</th>
+                <th>Jurisdiction</th>
+                <th>Venue Status</th>
+                <th>Operations Status</th>
+                <th>Capacity</th>
               </tr>
             </thead>
             <tbody>
-              {CENTRES.map(c => (
-                <tr key={c.id}>
-                  <td><span style={{ fontWeight: 500 }}>{c.name}</span></td>
-                  <td style={{ color: 'var(--text-muted)' }}>{c.city}</td>
-                  <td><StatusBadge status={c.eligibility === 'Eligible' ? 'Active' : c.eligibility === 'Under Review' ? 'Pending' : 'Rejected'} /></td>
-                  <td><StatusBadge status={c.consentStatus === 'Accepted' ? 'Active' : c.consentStatus === 'Pending' ? 'Pending' : 'Rejected'} /></td>
-                  <td>
-                    {c.docsComplete
-                      ? <span className="badge badge-success">Complete</span>
-                      : <span className="badge badge-warning">Incomplete</span>
-                    }
+              {loading ? (
+                <tr>
+                  <td colSpan={6} style={{ textAlign: 'center', padding: '36px', color: 'var(--text-muted)' }}>
+                    <Loader2 className="animate-spin" size={22} style={{ margin: '0 auto 8px', display: 'block' }} />
+                    Loading operations queue from database...
                   </td>
-                  <td><StatusBadge status={
-                    c.auditStatus === 'Passed' ? 'Approved' :
-                    c.auditStatus === 'Pending' ? 'Pending' :
-                    c.auditStatus === 'Re-audit Required' ? 'Under Review' : 'Draft'
-                  } /></td>
                 </tr>
-              ))}
+              ) : centres.length === 0 ? (
+                <tr>
+                  <td colSpan={6} style={{ textAlign: 'center', padding: '36px', color: 'var(--text-muted)' }}>
+                    No centres found in MySQL database.
+                  </td>
+                </tr>
+              ) : (
+                centres.map(c => (
+                  <tr key={c.id}>
+                    <td>
+                      <span style={{ fontFamily: 'monospace', fontWeight: 700, color: 'var(--color-primary)' }}>
+                        {c.centreCode || c.centre_id}
+                      </span>
+                    </td>
+                    <td>
+                      <div style={{ fontWeight: 600 }}>{c.centreName || c.centre_name}</div>
+                      <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>{c.centreAddress || c.centre_address}</div>
+                    </td>
+                    <td>{c.cityName || '—'}, {c.stateName || '—'}</td>
+                    <td>
+                      <span className={`badge ${c.venueStatus === 'Old' ? 'badge-info' : 'badge-neutral'}`}>
+                        {c.venueStatus || 'Old'}
+                      </span>
+                    </td>
+                    <td>
+                      <StatusBadge status={c.centreStatus || c.centre_status || 'Draft'} />
+                    </td>
+                    <td>
+                      <strong>{c.capacity?.examNodes || 0}</strong> nodes
+                    </td>
+                  </tr>
+                ))
+              )}
             </tbody>
           </table>
         </div>

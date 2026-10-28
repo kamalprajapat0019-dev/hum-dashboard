@@ -4,7 +4,6 @@ import {
   Filter, RefreshCw, CheckCircle2, Lock, Key, Eye, AlertCircle,
   Pencil, UserX, UserCheck, Trash2, Loader2
 } from 'lucide-react';
-import { UserStore, appendAuditLog } from '@/services/dataService';
 import { useAuth, ROLES, ROLE_LABELS, ROLE_COLORS } from '@/context/AuthContext';
 import { StatusBadge } from '@/components/common';
 import { apiClient } from '@/services/apiClient';
@@ -56,7 +55,7 @@ export default function UsersPage() {
     setTimeout(() => setToast(null), 4000);
   };
 
-  // Fetch users from live Backend API with graceful cache fallback
+  // Fetch users directly from MySQL database API with zero mock fallbacks
   const loadUsers = useCallback(async () => {
     setLoading(true);
     try {
@@ -64,16 +63,16 @@ export default function UsersPage() {
       if (res && res.success && Array.isArray(res.data)) {
         setUsers(res.data);
         setIsApiConnected(true);
-        setLoading(false);
-        return;
+      } else {
+        setUsers([]);
       }
     } catch (err) {
-      console.warn('API users fetch failed, falling back to local store:', err);
+      console.error('API users fetch failed:', err);
       setIsApiConnected(false);
+      setUsers([]);
     } finally {
       setLoading(false);
     }
-    setUsers(UserStore.getAll());
   }, []);
 
   useEffect(() => {

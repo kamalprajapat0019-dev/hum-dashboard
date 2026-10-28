@@ -1,23 +1,24 @@
-import { useState } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import {
   Building2, Plus, Search, Filter, Edit, Trash2, Eye, MapPin,
   Mail, Phone, ShieldCheck, UserCheck, CheckCircle2, AlertTriangle,
-  X, Check, ExternalLink, RefreshCw, Users, FileText, Cpu, Download
+  X, Check, ExternalLink, RefreshCw, Users, FileText, Cpu, Download,
+  AlertCircle, Loader2
 } from 'lucide-react';
 import {
-  CentreStore, ContactStore, DocStore, AssignmentStore,
   REGIONS, STATES, CITIES, ORG_TYPES, VENUE_STATUS_OPTS, CENTRE_STATUSES,
-  CONTACT_TYPES, DOC_TYPES, appendAuditLog
+  CONTACT_TYPES, DOC_TYPES
 } from '@/services/dataService';
+import { apiClient } from '@/services/apiClient';
+import { ENDPOINTS } from '@/services/endpoints';
 import { useAuth } from '@/context/AuthContext';
 import { StatusBadge } from '@/components/common';
 
 export default function CentresPage() {
   const { user } = useAuth();
-  const [centres, setCentres] = useState(() => CentreStore.getAll());
-  const [contacts, setContacts] = useState(() => ContactStore.getAll());
-  const [docs, setDocs] = useState(() => DocStore.getAll());
-  const [assignments, setAssignments] = useState(() => AssignmentStore.getAll());
+  const [centres, setCentres] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(null);
 
   // Search & Filter state
   const [search, setSearch] = useState('');
@@ -31,195 +32,218 @@ export default function CentresPage() {
   const [activeCentreDrawer, setActiveCentreDrawer] = useState(null);
   const [drawerTab, setDrawerTab] = useState('overview'); // overview | contacts | capacity | docs
   const [showAddContactModal, setShowAddContactModal] = useState(false);
-  const [toastMessage, setToastMessage] = useState(null);
+  const [submitting, setSubmitting] = useState(false);
+  const [toast, setToast] = useState(null); // { message: string, type: 'success' | 'error' }
 
   // Form State for Centre
   const initialForm = {
-    centre_id: `CN-${String(centres.length + 1).padStart(3, '0')}`,
-    region_id: 'r1',
-    state_id: 'st1',
-    city_id: 'c1',
-    edu_code: '',
-    tc_code: '',
-    centre_name: '',
-    centre_address: '',
+    centreCode: '',
+    regionId: 'r1',
+    stateId: 'st1',
+    cityId: 'c1',
+    stateName: 'Delhi',
+    cityName: 'Delhi',
+    eduCode: '',
+    tcCode: '',
+    centreName: '',
+    centreAddress: '',
     pincode: '',
-    actual_state_id: '',
-    actual_city_id: '',
-    actual_node: '',
-    venue_status: 'New',
-    previous_edu_exam: '',
-    official_email: '',
-    google_map_link: '',
-    organization_type: 'Individual',
-    centre_status: 'Draft',
+    venueStatus: 'Old',
+    previousEduExam: '',
+    officialEmail: '',
+    googleMapLink: '',
+    organizationType: 'Trust',
+    centreStatus: 'Draft',
     remarks: '',
   };
   const [formData, setFormData] = useState(initialForm);
 
   // Form State for Contact
   const initialContact = {
-    person_type: 'Owner',
-    full_name: '',
-    contact_number: '',
+    personType: 'Owner',
+    fullName: '',
+    contactNumber: '',
     email: '',
-    aadhaar_number: '',
-    father_name: '',
-    mother_name: '',
-    permanent_address: '',
-    current_address: '',
-    is_primary: true,
+    aadhaarNumber: '',
+    fatherName: '',
+    motherName: '',
+    permanentAddress: '',
+    isPrimary: true,
   };
   const [contactForm, setContactForm] = useState(initialContact);
 
-  const showToast = (msg) => {
-    setToastMessage(msg);
-    setTimeout(() => setToastMessage(null), 3500);
+  const showToast = (message, type = 'success') => {
+    setToast({ message, type });
+    setTimeout(() => setToast(null), 3500);
   };
 
-  const reloadData = () => {
-    setCentres(CentreStore.getAll());
-    setContacts(ContactStore.getAll());
-    setDocs(DocStore.getAll());
-    setAssignments(AssignmentStore.getAll());
-  };
-
-  // Filtered centres
-  const filteredCentres = centres.filter(c => {
-    if (search) {
-      const q = search.toLowerCase();
-      const match = c.centre_name?.toLowerCase().includes(q) ||
-                    c.centre_id?.toLowerCase().includes(q) ||
-                    c.tc_code?.toLowerCase().includes(q) ||
-                    c.edu_code?.toLowerCase().includes(q) ||
-                    c.official_email?.toLowerCase().includes(q);
-      if (!match) return false;
+  const loadCentres = useCallback(async () => {
+    setLoading(true);
+    setError(null);
+    try {
+      const res = await apiClient.get(ENDPOINTS.ADMIN.CENTRES, {
+        params: {
+          search: search || undefined,
+          status: statusFilter || undefined,
+          regionId: regionFilter || undefined,
+          limit: 100,
+        },
+      });
+      if (res && res.success && Array.isArray(res.data)) {
+        setCentres(res.data);
+      } else {
+        setCentres([]);
+      }
+    } catch (err) {
+      console.error('Failed to query centre master:', err);
+      setError(err.message || 'Unable to connect to centre database');
+    } finally {
+      setLoading(false);
     }
-    if (regionFilter && c.region_id !== regionFilter) return false;
-    if (statusFilter && c.centre_status !== statusFilter) return false;
-    if (venueFilter && c.venue_status !== venueFilter) return false;
-    return true;
-  });
+  }, [search, statusFilter, regionFilter]);
+
+  useEffect(() => {
+    loadCentres();
+  }, [loadCentres]);
 
   // Dynamic state/city helpers
-  const availableStates = STATES.filter(s => !formData.region_id || s.regionId === formData.region_id);
-  const availableCities = CITIES.filter(c => !formData.state_id || c.stateId === formData.state_id);
+  const availableStates = STATES.filter(s => !formData.regionId || s.regionId === formData.regionId);
+  const availableCities = CITIES.filter(c => !formData.stateId || c.stateId === formData.stateId);
 
   const handleOpenAdd = () => {
     setEditingCentre(null);
+    const nextCode = `CN-${String(centres.length + 1).padStart(3, '0')}`;
     setFormData({
       ...initialForm,
-      centre_id: `CN-${String(centres.length + 1).padStart(3, '0')}`
+      centreCode: nextCode,
     });
     setShowAddModal(true);
   };
 
   const handleOpenEdit = (c) => {
     setEditingCentre(c);
-    setFormData({ ...c });
+    setFormData({
+      centreCode: c.centreCode || c.centre_id || '',
+      regionId: c.regionId || c.region_id || 'r1',
+      stateId: c.stateId || c.state_id || 'st1',
+      cityId: c.cityId || c.city_id || 'c1',
+      stateName: c.stateName || c.actual_state_id || 'Delhi',
+      cityName: c.cityName || c.actual_city_id || 'Delhi',
+      eduCode: c.eduCode || c.edu_code || '',
+      tcCode: c.tcCode || c.tc_code || '',
+      centreName: c.centreName || c.centre_name || '',
+      centreAddress: c.centreAddress || c.centre_address || '',
+      pincode: c.pincode || '',
+      venueStatus: c.venueStatus || c.venue_status || 'Old',
+      previousEduExam: c.previousEduExam || c.previous_edu_exam || '',
+      officialEmail: c.officialEmail || c.official_email || '',
+      googleMapLink: c.googleMapLink || c.google_map_link || '',
+      organizationType: c.organizationType || c.organization_type || 'Trust',
+      centreStatus: c.centreStatus || c.centre_status || 'Draft',
+      remarks: c.remarks || '',
+    });
     setShowAddModal(true);
   };
 
-  const handleSaveCentre = (e) => {
+  const handleSaveCentre = async (e) => {
     e.preventDefault();
-    if (!formData.centre_name) return;
-
-    if (editingCentre) {
-      CentreStore.update(editingCentre.id, formData);
-      appendAuditLog({
-        user: user?.name || 'Admin',
-        role: user?.role || 'admin',
-        action: 'UPDATE_CENTRE',
-        entity: `Centre: ${formData.centre_name} (${formData.centre_id})`,
-        details: `Updated details and status to ${formData.centre_status}`,
-      });
-      showToast(`Centre "${formData.centre_name}" updated successfully!`);
-    } else {
-      CentreStore.create(formData);
-      appendAuditLog({
-        user: user?.name || 'Admin',
-        role: user?.role || 'admin',
-        action: 'CREATE_CENTRE',
-        entity: `Centre: ${formData.centre_name} (${formData.centre_id})`,
-        details: `Created new centre record in ${formData.centre_status} status`,
-      });
-      showToast(`Centre "${formData.centre_name}" created successfully!`);
+    if (!formData.centreName?.trim() || !formData.centreCode?.trim() || !formData.centreAddress?.trim()) {
+      showToast('Please provide Centre Code, Name, and Address', 'error');
+      return;
     }
 
-    reloadData();
-    setShowAddModal(false);
-  };
+    setSubmitting(true);
+    try {
+      const payload = {
+        centreCode: formData.centreCode.trim(),
+        centreName: formData.centreName.trim(),
+        centreAddress: formData.centreAddress.trim(),
+        pincode: String(formData.pincode).trim(),
+        regionId: formData.regionId,
+        stateId: formData.stateId,
+        cityId: formData.cityId,
+        stateName: STATES.find(s => s.id === formData.stateId)?.label || formData.stateName,
+        cityName: CITIES.find(c => c.id === formData.cityId)?.label || formData.cityName,
+        eduCode: formData.eduCode?.trim() || undefined,
+        tcCode: formData.tcCode?.trim() || undefined,
+        venueStatus: formData.venueStatus || 'Old',
+        previousEduExam: formData.previousEduExam?.trim() || undefined,
+        officialEmail: formData.officialEmail?.trim() || undefined,
+        googleMapLink: formData.googleMapLink?.trim() || undefined,
+        organizationType: formData.organizationType || 'Trust',
+        centreStatus: formData.centreStatus || 'Draft',
+        remarks: formData.remarks?.trim() || undefined,
+      };
 
-  const handleDeleteCentre = (c) => {
-    if (confirm(`Are you sure you want to delete centre "${c.centre_name}" (${c.centre_id})?`)) {
-      CentreStore.delete(c.id);
-      appendAuditLog({
-        user: user?.name || 'Admin',
-        role: user?.role || 'admin',
-        action: 'DELETE_CENTRE',
-        entity: `Centre: ${c.centre_name} (${c.centre_id})`,
-        details: 'Centre permanently removed from active registry',
-      });
-      reloadData();
-      if (activeCentreDrawer?.id === c.id) setActiveCentreDrawer(null);
-      showToast(`Centre "${c.centre_name}" deleted.`);
+      if (editingCentre) {
+        const res = await apiClient.put(`${ENDPOINTS.ADMIN.CENTRES}/${editingCentre.id}`, payload);
+        if (res && res.success) {
+          showToast(`Centre "${formData.centreName}" updated successfully in database!`, 'success');
+          setShowAddModal(false);
+          await loadCentres();
+        }
+      } else {
+        const res = await apiClient.post(ENDPOINTS.ADMIN.CENTRES, payload);
+        if (res && res.success) {
+          showToast(`Centre "${formData.centreName}" registered in database!`, 'success');
+          setShowAddModal(false);
+          await loadCentres();
+        }
+      }
+    } catch (err) {
+      const msg = err.data?.error?.message || err.message || 'Failed to save centre';
+      showToast(msg, 'error');
+    } finally {
+      setSubmitting(false);
     }
   };
 
-  const handleSaveContact = (e) => {
-    e.preventDefault();
-    if (!activeCentreDrawer) return;
-
-    ContactStore.create({
-      ...contactForm,
-      centre_id: activeCentreDrawer.id,
-      is_active: true,
-    });
-
-    appendAuditLog({
-      user: user?.name || 'Admin',
-      role: user?.role || 'admin',
-      action: 'ADD_CONTACT',
-      entity: `Centre: ${activeCentreDrawer.centre_name}`,
-      details: `Added ${contactForm.person_type} contact: ${contactForm.full_name}`,
-    });
-
-    reloadData();
-    setShowAddContactModal(false);
-    setContactForm(initialContact);
-    showToast(`Added ${contactForm.person_type} contact!`);
+  const handleToggleStatus = async (centre, newStatus) => {
+    try {
+      const res = await apiClient.patch(ENDPOINTS.ADMIN.CENTRE_STATUS(centre.id), {
+        status: newStatus,
+        reason: `Status changed to ${newStatus} by Administrator`,
+      });
+      if (res && res.success) {
+        showToast(`Centre status changed to ${newStatus}`, 'success');
+        await loadCentres();
+      }
+    } catch (err) {
+      const msg = err.data?.error?.message || err.message || 'Failed to update status';
+      showToast(msg, 'error');
+    }
   };
 
   // Helper labels
-  const getRegionLabel = (rid) => REGIONS.find(r => r.id === rid)?.label || rid;
-  const getStateLabel = (sid) => STATES.find(s => s.id === sid)?.label || sid;
-  const getCityLabel = (cid) => CITIES.find(c => c.id === cid)?.label || cid;
+  const getRegionLabel = (rid) => REGIONS.find(r => r.id === rid)?.label || rid || '—';
+  const getStateLabel = (sid) => STATES.find(s => s.id === sid)?.label || sid || '—';
+  const getCityLabel = (cid) => CITIES.find(c => c.id === cid)?.label || cid || '—';
 
-  const currentContacts = activeCentreDrawer ? contacts.filter(c => c.centre_id === activeCentreDrawer.id) : [];
-  const currentDocs = activeCentreDrawer ? docs.filter(d => d.centre_id === activeCentreDrawer.id) : [];
-  const currentAssignment = activeCentreDrawer ? assignments.find(a => a.centre_id === activeCentreDrawer.id) : null;
+  const approvedCount = centres.filter(c => (c.centreStatus || c.centre_status) === 'Approved' || (c.centreStatus || c.centre_status) === 'Active').length;
+  const draftCount = centres.filter(c => (c.centreStatus || c.centre_status) === 'Draft').length;
+  const inactiveCount = centres.filter(c => (c.centreStatus || c.centre_status) === 'Rejected' || (c.centreStatus || c.centre_status) === 'Inactive').length;
 
   return (
     <div>
       {/* Toast Alert */}
-      {toastMessage && (
+      {toast && (
         <div style={{
           position: 'fixed',
           top: 24,
           right: 24,
-          background: 'var(--color-primary-dark)',
+          background: toast.type === 'error' ? '#b91c1c' : 'var(--color-primary-dark, #1e3a8a)',
           color: '#fff',
           padding: '12px 20px',
-          borderRadius: 'var(--radius-lg)',
-          boxShadow: 'var(--shadow-xl)',
+          borderRadius: 'var(--radius-lg, 12px)',
+          boxShadow: 'var(--shadow-xl, 0 20px 25px -5px rgba(0,0,0,0.1))',
           zIndex: 9999,
           display: 'flex',
           alignItems: 'center',
           gap: 10,
           fontWeight: 600
         }}>
-          <CheckCircle2 size={18} color="#4ade80" />
-          <span>{toastMessage}</span>
+          {toast.type === 'error' ? <AlertCircle size={18} /> : <CheckCircle2 size={18} color="#4ade80" />}
+          <span>{toast.message}</span>
         </div>
       )}
 
@@ -234,20 +258,17 @@ export default function CentresPage() {
             </div>
             <h1 className="page-header__title" style={{ marginTop: 6 }}>Centre Master Registry</h1>
             <p className="page-header__subtitle">
-              Comprehensive registry of testing venues, capacity parameters, legal compliance, and multi-tier contacts
+              Live MySQL database: examination centres, venue capacity, and multi-tier contacts
             </p>
           </div>
           <div className="page-header__actions">
             <button
               className="btn btn-secondary"
-              onClick={() => {
-                CentreStore.reset();
-                ContactStore.reset();
-                reloadData();
-                showToast('Reset to original master seed dataset');
-              }}
+              onClick={loadCentres}
+              disabled={loading}
+              title="Refresh from Database"
             >
-              <RefreshCw size={14} /> Reset Data
+              <RefreshCw size={14} className={loading ? 'animate-spin' : ''} /> Refresh
             </button>
             <button className="btn btn-primary" onClick={handleOpenAdd}>
               <Plus size={14} /> Add New Centre
@@ -255,6 +276,35 @@ export default function CentresPage() {
           </div>
         </div>
       </div>
+
+      {/* Error Banner */}
+      {error && (
+        <div style={{
+          background: '#fee2e2',
+          border: '1px solid #ef4444',
+          borderRadius: 'var(--radius-md, 8px)',
+          padding: '12px 16px',
+          marginBottom: 20,
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'space-between',
+          color: '#991b1b',
+        }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+            <AlertCircle size={20} />
+            <div>
+              <strong>Failed to query centre records:</strong> {error}
+            </div>
+          </div>
+          <button
+            className="btn btn-sm btn-secondary"
+            onClick={loadCentres}
+            style={{ background: '#fff', borderColor: '#f87171', color: '#991b1b' }}
+          >
+            Retry
+          </button>
+        </div>
+      )}
 
       {/* Summary KPI Cards */}
       <div className="kpi-grid" style={{ marginBottom: 24 }}>
@@ -265,32 +315,32 @@ export default function CentresPage() {
               <Building2 size={16} color="#1e40af" />
             </div>
           </div>
-          <div className="kpi-card__value">{centres.length}</div>
-          <div className="kpi-card__sub">Across all regions & states</div>
+          <div className="kpi-card__value">{loading ? '...' : centres.length}</div>
+          <div className="kpi-card__sub">Across all database records</div>
         </div>
 
         <div className="kpi-card">
           <div className="kpi-card__header">
-            <span className="kpi-card__label">Approved & Active</span>
+            <span className="kpi-card__label">Approved &amp; Active</span>
             <div className="kpi-card__icon" style={{ background: '#f0fdf4' }}>
               <ShieldCheck size={16} color="#16a34a" />
             </div>
           </div>
-          <div className="kpi-card__value" style={{ color: 'var(--color-success)' }}>
-            {centres.filter(c => c.centre_status === 'Approved' || c.centre_status === 'Active').length}
+          <div className="kpi-card__value" style={{ color: 'var(--color-success, #16a34a)' }}>
+            {loading ? '...' : approvedCount}
           </div>
-          <div className="kpi-card__sub">Audit & document verified</div>
+          <div className="kpi-card__sub">Operational verified venues</div>
         </div>
 
         <div className="kpi-card">
           <div className="kpi-card__header">
-            <span className="kpi-card__label">Draft / Under Review</span>
+            <span className="kpi-card__label">Draft / Pending Review</span>
             <div className="kpi-card__icon" style={{ background: '#fffbeb' }}>
               <AlertTriangle size={16} color="#d97706" />
             </div>
           </div>
-          <div className="kpi-card__value" style={{ color: 'var(--color-warning)' }}>
-            {centres.filter(c => c.centre_status === 'Draft').length}
+          <div className="kpi-card__value" style={{ color: 'var(--color-warning, #d97706)' }}>
+            {loading ? '...' : draftCount}
           </div>
           <div className="kpi-card__sub">Onboarding in progress</div>
         </div>
@@ -302,10 +352,10 @@ export default function CentresPage() {
               <Building2 size={16} color="#dc2626" />
             </div>
           </div>
-          <div className="kpi-card__value" style={{ color: 'var(--color-danger)' }}>
-            {centres.filter(c => c.centre_status === 'Rejected' || c.centre_status === 'Inactive').length}
+          <div className="kpi-card__value" style={{ color: 'var(--color-danger, #dc2626)' }}>
+            {loading ? '...' : inactiveCount}
           </div>
-          <div className="kpi-card__sub">Non-compliant / blacklisted</div>
+          <div className="kpi-card__sub">Flagged or deactivated</div>
         </div>
       </div>
 
@@ -330,33 +380,12 @@ export default function CentresPage() {
           <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
             <select
               className="form-control"
-              value={regionFilter}
-              onChange={e => setRegionFilter(e.target.value)}
-              style={{ width: 130, fontSize: '0.75rem' }}
-            >
-              <option value="">All Regions</option>
-              {REGIONS.map(r => <option key={r.id} value={r.id}>{r.label}</option>)}
-            </select>
-
-            <select
-              className="form-control"
               value={statusFilter}
               onChange={e => setStatusFilter(e.target.value)}
-              style={{ width: 130, fontSize: '0.75rem' }}
+              style={{ width: 140, fontSize: '0.75rem' }}
             >
               <option value="">All Statuses</option>
               {CENTRE_STATUSES.map(s => <option key={s} value={s}>{s}</option>)}
-            </select>
-
-            <select
-              className="form-control"
-              value={venueFilter}
-              onChange={e => setVenueFilter(e.target.value)}
-              style={{ width: 120, fontSize: '0.75rem' }}
-            >
-              <option value="">Venue (All)</option>
-              <option value="Old">Old Venue</option>
-              <option value="New">New Venue</option>
             </select>
           </div>
         </div>
@@ -367,8 +396,8 @@ export default function CentresPage() {
             <thead>
               <tr>
                 <th>Centre ID</th>
-                <th>Centre Name & Details</th>
-                <th>Region / State / City</th>
+                <th>Centre Name &amp; Details</th>
+                <th>Location / Jurisdiction</th>
                 <th>Codes (Edu / TC)</th>
                 <th>Org Type</th>
                 <th>Venue Type</th>
@@ -377,442 +406,216 @@ export default function CentresPage() {
               </tr>
             </thead>
             <tbody>
-              {filteredCentres.length === 0 ? (
+              {loading ? (
                 <tr>
                   <td colSpan={8} style={{ textAlign: 'center', padding: '40px', color: 'var(--text-muted)' }}>
-                    No centres found matching your search and filter criteria.
+                    <Loader2 className="animate-spin" size={24} style={{ margin: '0 auto 8px', display: 'block' }} />
+                    Loading centres from database...
+                  </td>
+                </tr>
+              ) : centres.length === 0 ? (
+                <tr>
+                  <td colSpan={8} style={{ textAlign: 'center', padding: '40px', color: 'var(--text-muted)' }}>
+                    No centres found in MySQL database. Click &quot;Add New Centre&quot; to register your first centre.
                   </td>
                 </tr>
               ) : (
-                filteredCentres.map(centre => (
-                  <tr key={centre.id}>
-                    <td>
-                      <span style={{ fontFamily: 'monospace', fontWeight: 700, color: 'var(--color-primary)' }}>
-                        {centre.centre_id}
-                      </span>
-                    </td>
-                    <td>
-                      <div style={{ fontWeight: 600, color: 'var(--text-primary)' }}>{centre.centre_name}</div>
-                      <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)', maxWidth: 280 }} className="truncate" title={centre.centre_address}>
-                        {centre.centre_address}
-                      </div>
-                      {centre.official_email && (
-                        <div style={{ fontSize: '0.6875rem', color: 'var(--color-primary-light)', marginTop: 2 }}>
-                          {centre.official_email}
+                centres.map(centre => {
+                  const code = centre.centreCode || centre.centre_id;
+                  const name = centre.centreName || centre.centre_name;
+                  const address = centre.centreAddress || centre.centre_address;
+                  const email = centre.officialEmail || centre.official_email;
+                  const city = centre.cityName || getCityLabel(centre.cityId || centre.city_id);
+                  const state = centre.stateName || getStateLabel(centre.stateId || centre.state_id);
+                  const status = centre.centreStatus || centre.centre_status || 'Draft';
+                  const venue = centre.venueStatus || centre.venue_status || 'Old';
+                  const orgType = centre.organizationType || centre.organization_type || 'Trust';
+
+                  return (
+                    <tr key={centre.id}>
+                      <td>
+                        <span style={{ fontFamily: 'monospace', fontWeight: 700, color: 'var(--color-primary)' }}>
+                          {code}
+                        </span>
+                      </td>
+                      <td>
+                        <div style={{ fontWeight: 600, color: 'var(--text-primary)' }}>{name}</div>
+                        <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)', maxWidth: 280 }} className="truncate" title={address}>
+                          {address}
                         </div>
-                      )}
-                    </td>
-                    <td>
-                      <div style={{ fontWeight: 500 }}>{getCityLabel(centre.city_id)}, {getStateLabel(centre.state_id)}</div>
-                      <div style={{ fontSize: '0.6875rem', color: 'var(--text-muted)' }}>
-                        Region: {getRegionLabel(centre.region_id)} • Pin: {centre.pincode}
-                      </div>
-                    </td>
-                    <td>
-                      <div style={{ fontSize: '0.75rem', fontFamily: 'monospace' }}>
-                        <span style={{ color: 'var(--text-muted)' }}>Edu:</span> {centre.edu_code || '—'}
-                      </div>
-                      <div style={{ fontSize: '0.75rem', fontFamily: 'monospace' }}>
-                        <span style={{ color: 'var(--text-muted)' }}>TC:</span> {centre.tc_code || '—'}
-                      </div>
-                    </td>
-                    <td>
-                      <span style={{ fontSize: '0.75rem', background: 'var(--bg-subtle)', padding: '2px 8px', borderRadius: 4, fontWeight: 500 }}>
-                        {centre.organization_type}
-                      </span>
-                    </td>
-                    <td>
-                      <span className={`badge ${centre.venue_status === 'Old' ? 'badge-info' : 'badge-neutral'}`} style={{ fontSize: '0.6875rem' }}>
-                        {centre.venue_status}
-                      </span>
-                    </td>
-                    <td>
-                      <StatusBadge status={centre.centre_status} />
-                    </td>
-                    <td style={{ textAlign: 'right' }}>
-                      <div style={{ display: 'inline-flex', gap: 6 }}>
-                        <button
-                          className="btn btn-secondary btn-sm"
-                          title="Manage Centre Details, Contacts, Capacity & Docs"
-                          onClick={() => {
-                            setActiveCentreDrawer(centre);
-                            setDrawerTab('overview');
-                          }}
-                        >
-                          <Eye size={13} /> Manage
-                        </button>
-                        <button
-                          className="btn btn-secondary btn-sm"
-                          title="Edit Centre"
-                          onClick={() => handleOpenEdit(centre)}
-                        >
-                          <Edit size={13} />
-                        </button>
-                        <button
-                          className="btn btn-ghost btn-sm"
-                          title="Delete Centre"
-                          style={{ color: 'var(--color-danger)' }}
-                          onClick={() => handleDeleteCentre(centre)}
-                        >
-                          <Trash2 size={13} />
-                        </button>
-                      </div>
-                    </td>
-                  </tr>
-                ))
+                        {email && (
+                          <div style={{ fontSize: '0.6875rem', color: 'var(--color-primary-light)', marginTop: 2 }}>
+                            {email}
+                          </div>
+                        )}
+                      </td>
+                      <td>
+                        <div style={{ fontWeight: 500 }}>{city}, {state}</div>
+                        <div style={{ fontSize: '0.6875rem', color: 'var(--text-muted)' }}>
+                          Pin: {centre.pincode}
+                        </div>
+                      </td>
+                      <td>
+                        <div style={{ fontSize: '0.75rem', fontFamily: 'monospace' }}>
+                          <span style={{ color: 'var(--text-muted)' }}>Edu:</span> {centre.eduCode || centre.edu_code || '—'}
+                        </div>
+                        <div style={{ fontSize: '0.75rem', fontFamily: 'monospace' }}>
+                          <span style={{ color: 'var(--text-muted)' }}>TC:</span> {centre.tcCode || centre.tc_code || '—'}
+                        </div>
+                      </td>
+                      <td>
+                        <span style={{ fontSize: '0.75rem', background: 'var(--bg-subtle, #f1f5f9)', padding: '2px 8px', borderRadius: 4, fontWeight: 500 }}>
+                          {orgType}
+                        </span>
+                      </td>
+                      <td>
+                        <span className={`badge ${venue === 'Old' ? 'badge-info' : 'badge-neutral'}`} style={{ fontSize: '0.6875rem' }}>
+                          {venue}
+                        </span>
+                      </td>
+                      <td>
+                        <StatusBadge status={status} />
+                      </td>
+                      <td style={{ textAlign: 'right' }}>
+                        <div style={{ display: 'inline-flex', gap: 6 }}>
+                          <button
+                            className="btn btn-secondary btn-sm"
+                            title="Manage Centre"
+                            onClick={() => {
+                              setActiveCentreDrawer(centre);
+                              setDrawerTab('overview');
+                            }}
+                          >
+                            <Eye size={13} /> Manage
+                          </button>
+                          <button
+                            className="btn btn-secondary btn-sm"
+                            title="Edit Centre"
+                            onClick={() => handleOpenEdit(centre)}
+                          >
+                            <Edit size={13} />
+                          </button>
+                        </div>
+                      </td>
+                    </tr>
+                  );
+                })
               )}
             </tbody>
           </table>
         </div>
       </div>
 
-      {/* Centre Detail / Manage Drawer */}
+      {/* Drawer */}
       {activeCentreDrawer && (
         <div className="modal-backdrop" onClick={() => setActiveCentreDrawer(null)}>
-          <div
-            className="modal"
-            onClick={e => e.stopPropagation()}
-            style={{ maxWidth: 840, maxHeight: '90vh' }}
-          >
-            {/* Modal Header */}
-            <div className="modal-header" style={{ flexWrap: 'wrap', gap: 12 }}>
-              <div style={{ display: 'flex', alignItems: 'center', gap: 12, flex: 1, minWidth: 0 }}>
-                <div style={{ width: 40, height: 40, borderRadius: 'var(--radius-md)', background: '#eff6ff', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
-                  <Building2 size={20} color="var(--color-primary)" />
-                </div>
-                <div style={{ flex: 1, minWidth: 0 }}>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
-                    <h3 className="modal-title">{activeCentreDrawer.centre_name}</h3>
-                    <StatusBadge status={activeCentreDrawer.centre_status} />
+          <div className="drawer" onClick={e => e.stopPropagation()} style={{ width: 'min(100vw, 560px)', background: '#fff', height: '100vh', position: 'fixed', right: 0, top: 0, overflowY: 'auto', boxShadow: 'var(--shadow-2xl, 0 25px 50px -12px rgba(0, 0, 0, 0.25))', zIndex: 9999, display: 'flex', flexDirection: 'column' }}>
+            <div style={{ padding: '20px 24px', borderBottom: '1px solid var(--border-default, #e2e8f0)', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+              <div>
+                <span className="badge badge-primary">{activeCentreDrawer.centreCode || activeCentreDrawer.centre_id}</span>
+                <h2 style={{ fontSize: '1.125rem', fontWeight: 700, marginTop: 4 }}>{activeCentreDrawer.centreName || activeCentreDrawer.centre_name}</h2>
+              </div>
+              <button className="btn-ghost" onClick={() => setActiveCentreDrawer(null)} style={{ padding: 4 }}>
+                <X size={20} />
+              </button>
+            </div>
+
+            <div style={{ padding: 24, flex: 1 }}>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '12px 16px', background: 'var(--bg-subtle, #f8fafc)', borderRadius: 8 }}>
+                  <div>
+                    <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>Current Status</div>
+                    <StatusBadge status={activeCentreDrawer.centreStatus || activeCentreDrawer.centre_status || 'Draft'} />
                   </div>
-                  <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)', wordBreak: 'break-word' }}>
-                    ID: <code style={{ color: 'var(--color-primary)' }}>{activeCentreDrawer.centre_id}</code> • TC: {activeCentreDrawer.tc_code} • Edu: {activeCentreDrawer.edu_code}
+                  <div style={{ display: 'flex', gap: 6 }}>
+                    {(activeCentreDrawer.centreStatus || activeCentreDrawer.centre_status) !== 'Approved' && (
+                      <button
+                        className="btn btn-sm btn-primary"
+                        onClick={() => handleToggleStatus(activeCentreDrawer, 'Approved')}
+                      >
+                        Approve
+                      </button>
+                    )}
+                    {(activeCentreDrawer.centreStatus || activeCentreDrawer.centre_status) !== 'Inactive' && (
+                      <button
+                        className="btn btn-sm btn-secondary"
+                        onClick={() => handleToggleStatus(activeCentreDrawer, 'Inactive')}
+                      >
+                        Deactivate
+                      </button>
+                    )}
+                  </div>
+                </div>
+
+                <div>
+                  <h4 style={{ fontSize: '0.8125rem', fontWeight: 600, color: 'var(--text-secondary)' }}>Address &amp; Geographic Details</h4>
+                  <p style={{ fontSize: '0.875rem', marginTop: 4 }}>{activeCentreDrawer.centreAddress || activeCentreDrawer.centre_address}</p>
+                  <p style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>
+                    Pincode: {activeCentreDrawer.pincode} • State: {activeCentreDrawer.stateName || '—'}
+                  </p>
+                </div>
+
+                <div>
+                  <h4 style={{ fontSize: '0.8125rem', fontWeight: 600, color: 'var(--text-secondary)' }}>Capacity &amp; Infrastructure</h4>
+                  <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: 10, marginTop: 8 }}>
+                    <div style={{ padding: 10, background: 'var(--bg-subtle, #f8fafc)', borderRadius: 6 }}>
+                      <div style={{ fontSize: '0.6875rem', color: 'var(--text-muted)' }}>Exam Nodes</div>
+                      <div style={{ fontSize: '1.125rem', fontWeight: 700 }}>{activeCentreDrawer.capacity?.examNodes || 0}</div>
+                    </div>
+                    <div style={{ padding: 10, background: 'var(--bg-subtle, #f8fafc)', borderRadius: 6 }}>
+                      <div style={{ fontSize: '0.6875rem', color: 'var(--text-muted)' }}>Total Systems</div>
+                      <div style={{ fontSize: '1.125rem', fontWeight: 700 }}>{activeCentreDrawer.capacity?.totalSystems || 0}</div>
+                    </div>
                   </div>
                 </div>
               </div>
-              <button className="btn-ghost" onClick={() => setActiveCentreDrawer(null)} style={{ padding: 6, flexShrink: 0 }}>
-                <X size={18} />
-              </button>
-            </div>
-
-            {/* Modal Tabs */}
-            <div style={{ padding: '0 24px', background: 'var(--bg-subtle)', borderBottom: '1px solid var(--border-default)' }}>
-              <div className="tabs" style={{ marginBottom: 0, borderBottom: 'none' }}>
-                <button
-                  className={`tab-btn ${drawerTab === 'overview' ? 'active' : ''}`}
-                  onClick={() => setDrawerTab('overview')}
-                >
-                  Overview & Details
-                </button>
-                <button
-                  className={`tab-btn ${drawerTab === 'contacts' ? 'active' : ''}`}
-                  onClick={() => setDrawerTab('contacts')}
-                >
-                  Contacts ({currentContacts.length})
-                </button>
-                <button
-                  className={`tab-btn ${drawerTab === 'capacity' ? 'active' : ''}`}
-                  onClick={() => setDrawerTab('capacity')}
-                >
-                  Capacity & Assignment
-                </button>
-                <button
-                  className={`tab-btn ${drawerTab === 'docs' ? 'active' : ''}`}
-                  onClick={() => setDrawerTab('docs')}
-                >
-                  Compliance Documents ({currentDocs.length})
-                </button>
-              </div>
-            </div>
-
-            {/* Modal Body */}
-            <div className="modal-body" style={{ maxHeight: '60vh', overflowY: 'auto' }}>
-              {drawerTab === 'overview' && (
-                <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
-                  <div className="grid-2">
-                    <div style={{ background: 'var(--bg-subtle)', padding: 14, borderRadius: 'var(--radius-md)' }}>
-                      <div style={{ fontSize: '0.6875rem', color: 'var(--text-muted)', textTransform: 'uppercase', fontWeight: 600 }}>Location Profile</div>
-                      <div style={{ fontSize: '0.875rem', fontWeight: 600, marginTop: 4 }}>
-                        {getCityLabel(activeCentreDrawer.city_id)}, {getStateLabel(activeCentreDrawer.state_id)}
-                      </div>
-                      <div style={{ fontSize: '0.8125rem', color: 'var(--text-secondary)', marginTop: 2 }}>
-                        {activeCentreDrawer.centre_address}
-                      </div>
-                      <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)', marginTop: 4 }}>
-                        Pincode: {activeCentreDrawer.pincode} • Region: {getRegionLabel(activeCentreDrawer.region_id)}
-                      </div>
-                    </div>
-
-                    <div style={{ background: 'var(--bg-subtle)', padding: 14, borderRadius: 'var(--radius-md)' }}>
-                      <div style={{ fontSize: '0.6875rem', color: 'var(--text-muted)', textTransform: 'uppercase', fontWeight: 600 }}>Organization Details</div>
-                      <div style={{ fontSize: '0.875rem', fontWeight: 600, marginTop: 4 }}>
-                        {activeCentreDrawer.organization_type} Organization
-                      </div>
-                      <div style={{ fontSize: '0.8125rem', color: 'var(--text-secondary)', marginTop: 2 }}>
-                        Venue Status: <strong>{activeCentreDrawer.venue_status}</strong>
-                      </div>
-                      <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)', marginTop: 4 }}>
-                        Previous Exam: {activeCentreDrawer.previous_edu_exam || 'None recorded'}
-                      </div>
-                    </div>
-                  </div>
-
-                  <div className="grid-2">
-                    <div>
-                      <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>Official Email</div>
-                      <div style={{ fontWeight: 600, color: 'var(--color-primary)' }}>{activeCentreDrawer.official_email || '—'}</div>
-                    </div>
-                    <div>
-                      <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>Google Map Link</div>
-                      {activeCentreDrawer.google_map_link ? (
-                        <a href={activeCentreDrawer.google_map_link} target="_blank" rel="noreferrer" style={{ color: 'var(--color-primary-light)', display: 'inline-flex', alignItems: 'center', gap: 4 }}>
-                          <MapPin size={12} /> View on Google Maps <ExternalLink size={11} />
-                        </a>
-                      ) : <span style={{ color: 'var(--text-muted)' }}>No link provided</span>}
-                    </div>
-                  </div>
-
-                  {activeCentreDrawer.remarks && (
-                    <div style={{ background: '#fffbeb', border: '1px solid #fde68a', borderRadius: 'var(--radius-md)', padding: '10px 14px' }}>
-                      <div style={{ fontSize: '0.6875rem', fontWeight: 600, color: '#b45309', textTransform: 'uppercase' }}>Remarks & Audit Notes</div>
-                      <div style={{ fontSize: '0.8125rem', color: '#92400e', marginTop: 2 }}>{activeCentreDrawer.remarks}</div>
-                    </div>
-                  )}
-
-                  {/* Quick Status Update */}
-                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', borderTop: '1px solid var(--border-default)', paddingTop: 14 }}>
-                    <span style={{ fontSize: '0.8125rem', fontWeight: 600 }}>Update Status:</span>
-                    <div style={{ display: 'flex', gap: 6 }}>
-                      {['Active', 'Approved', 'Draft', 'Rejected'].map(st => (
-                        <button
-                          key={st}
-                          className={`btn ${activeCentreDrawer.centre_status === st ? 'btn-primary' : 'btn-secondary'} btn-sm`}
-                          onClick={() => {
-                            CentreStore.update(activeCentreDrawer.id, { centre_status: st });
-                            setActiveCentreDrawer(prev => ({ ...prev, centre_status: st }));
-                            reloadData();
-                            showToast(`Updated status to ${st}`);
-                          }}
-                        >
-                          {st}
-                        </button>
-                      ))}
-                    </div>
-                  </div>
-                </div>
-              )}
-
-              {drawerTab === 'contacts' && (
-                <div>
-                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 14 }}>
-                    <div style={{ fontSize: '0.8125rem', fontWeight: 600 }}>Registered Key Personnel</div>
-                    <button className="btn btn-primary btn-sm" onClick={() => setShowAddContactModal(true)}>
-                      <Plus size={13} /> Add Contact
-                    </button>
-                  </div>
-
-                  {currentContacts.length === 0 ? (
-                    <div className="empty-state">
-                      <Users size={32} />
-                      <div className="empty-state__title">No contacts registered yet</div>
-                      <div className="empty-state__desc">Add key contacts like Owner, TCA, IT Person, or Electrician.</div>
-                    </div>
-                  ) : (
-                    <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
-                      {currentContacts.map(ct => (
-                        <div key={ct.id} style={{
-                          border: '1px solid var(--border-default)',
-                          borderRadius: 'var(--radius-md)',
-                          padding: '12px 16px',
-                          display: 'flex',
-                          alignItems: 'center',
-                          justifyContent: 'space-between'
-                        }}>
-                          <div>
-                            <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                              <span style={{ fontWeight: 600, color: 'var(--text-primary)' }}>{ct.full_name}</span>
-                              <span className="badge badge-purple" style={{ fontSize: '0.625rem' }}>{ct.person_type}</span>
-                              {ct.is_primary && <span className="badge badge-success" style={{ fontSize: '0.625rem' }}>Primary</span>}
-                            </div>
-                            <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)', display: 'flex', gap: 14, marginTop: 4 }}>
-                              <span><Phone size={12} style={{ verticalAlign: 'middle' }} /> {ct.contact_number}</span>
-                              {ct.email && <span><Mail size={12} style={{ verticalAlign: 'middle' }} /> {ct.email}</span>}
-                              {ct.aadhaar_number && <span>Aadhaar: {ct.aadhaar_number}</span>}
-                            </div>
-                          </div>
-                          <button
-                            className="btn btn-ghost btn-sm"
-                            style={{ color: 'var(--color-danger)' }}
-                            onClick={() => {
-                              ContactStore.delete(ct.id);
-                              reloadData();
-                              showToast(`Removed contact ${ct.full_name}`);
-                            }}
-                          >
-                            <Trash2 size={13} />
-                          </button>
-                        </div>
-                      ))}
-                    </div>
-                  )}
-                </div>
-              )}
-
-              {drawerTab === 'capacity' && (
-                <div>
-                  <div className="grid-3" style={{ marginBottom: 16 }}>
-                    <div style={{ background: 'var(--bg-subtle)', padding: 14, borderRadius: 'var(--radius-md)', textAlign: 'center' }}>
-                      <div style={{ fontSize: '0.6875rem', color: 'var(--text-muted)', textTransform: 'uppercase', fontWeight: 600 }}>Total Systems Available</div>
-                      <div style={{ fontSize: '1.75rem', fontWeight: 700, color: 'var(--color-primary)', marginTop: 4 }}>
-                        {currentAssignment?.total_systems_available || 45}
-                      </div>
-                    </div>
-                    <div style={{ background: 'var(--bg-subtle)', padding: 14, borderRadius: 'var(--radius-md)', textAlign: 'center' }}>
-                      <div style={{ fontSize: '0.6875rem', color: 'var(--text-muted)', textTransform: 'uppercase', fontWeight: 600 }}>Active Exam Nodes</div>
-                      <div style={{ fontSize: '1.75rem', fontWeight: 700, color: 'var(--color-success)', marginTop: 4 }}>
-                        {currentAssignment?.exam_nodes || 40}
-                      </div>
-                    </div>
-                    <div style={{ background: 'var(--bg-subtle)', padding: 14, borderRadius: 'var(--radius-md)', textAlign: 'center' }}>
-                      <div style={{ fontSize: '0.6875rem', color: 'var(--text-muted)', textTransform: 'uppercase', fontWeight: 600 }}>Buffer Percentage</div>
-                      <div style={{ fontSize: '1.75rem', fontWeight: 700, color: 'var(--color-warning)', marginTop: 4 }}>
-                        {currentAssignment?.buffer_percentage || 10}%
-                      </div>
-                    </div>
-                  </div>
-
-                  <div style={{ border: '1px solid var(--border-default)', borderRadius: 'var(--radius-md)', padding: 16 }}>
-                    <div style={{ fontWeight: 600, fontSize: '0.875rem', marginBottom: 10 }}>Current Project Assignment Parameters</div>
-                    <div className="grid-2" style={{ fontSize: '0.8125rem', gap: 10 }}>
-                      <div>Buffer Node Count: <strong>{currentAssignment?.buffer_count || 4} nodes</strong></div>
-                      <div>Registration Desks: <strong>{currentAssignment?.registration_desk_count || 2} desks</strong></div>
-                      <div>Total Nodes (incl. buffer): <strong>{currentAssignment?.total_nodes_including_buffer || 44} nodes</strong></div>
-                      <div>Verified Working Systems: <strong>{currentAssignment?.working_count || 43} nodes</strong></div>
-                    </div>
-                  </div>
-                </div>
-              )}
-
-              {drawerTab === 'docs' && (
-                <div>
-                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}>
-                    <div style={{ fontSize: '0.8125rem', fontWeight: 600 }}>
-                      Compliance Records ({currentDocs.length} uploaded)
-                    </div>
-                  </div>
-                  <div className="table-wrapper">
-                    <table>
-                      <thead>
-                        <tr>
-                          <th>Document Type</th>
-                          <th>Status</th>
-                          <th>File</th>
-                          <th>Uploaded</th>
-                          <th>Action</th>
-                        </tr>
-                      </thead>
-                      <tbody>
-                        {currentDocs.length === 0 ? (
-                          <tr>
-                            <td colSpan={5} style={{ textAlign: 'center', padding: 24, color: 'var(--text-muted)' }}>
-                              No documents uploaded for this centre yet.
-                            </td>
-                          </tr>
-                        ) : (
-                          currentDocs.map(d => (
-                            <tr key={d.id}>
-                              <td style={{ fontWeight: 600 }}>{d.doc_type}</td>
-                              <td><StatusBadge status={d.status} /></td>
-                              <td>{d.file_name || '—'}</td>
-                              <td>{d.uploaded_at || '—'}</td>
-                              <td>
-                                <button
-                                  className="btn btn-secondary btn-sm"
-                                  onClick={() => {
-                                    const nextStatus = d.status === 'Approved' ? 'Rejected' : 'Approved';
-                                    DocStore.update(d.id, { status: nextStatus });
-                                    reloadData();
-                                    showToast(`Doc marked as ${nextStatus}`);
-                                  }}
-                                >
-                                  Toggle Status
-                                </button>
-                              </td>
-                            </tr>
-                          ))
-                        )}
-                      </tbody>
-                    </table>
-                  </div>
-                </div>
-              )}
-            </div>
-
-            {/* Modal Footer */}
-            <div className="modal-footer">
-              <button className="btn btn-secondary" onClick={() => setActiveCentreDrawer(null)}>
-                Close
-              </button>
-              <button className="btn btn-primary" onClick={() => {
-                handleOpenEdit(activeCentreDrawer);
-                setActiveCentreDrawer(null);
-              }}>
-                <Edit size={13} /> Edit Full Record
-              </button>
             </div>
           </div>
         </div>
       )}
 
-      {/* Add / Edit Centre Modal (Full 20+ Fields Form) */}
+      {/* Add / Edit Centre Modal */}
       {showAddModal && (
         <div className="modal-backdrop" onClick={() => setShowAddModal(false)}>
-          <div className="modal" onClick={e => e.stopPropagation()} style={{ maxWidth: 760, maxHeight: '90vh' }}>
+          <div className="modal" onClick={e => e.stopPropagation()} style={{ maxWidth: 680 }}>
             <div className="modal-header">
-              <h3 className="modal-title">{editingCentre ? `Edit Centre (${formData.centre_id})` : 'Register New Centre'}</h3>
+              <h3 className="modal-title">{editingCentre ? `Edit Centre (${formData.centreCode})` : 'Register New Testing Centre'}</h3>
               <button className="btn-ghost" onClick={() => setShowAddModal(false)} style={{ padding: 4 }}>
                 <X size={18} />
               </button>
             </div>
-
             <form onSubmit={handleSaveCentre}>
-              <div className="modal-body" style={{ maxHeight: '65vh', overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: 16 }}>
-                {/* 1. Basic Identifiers */}
-                <div style={{ fontSize: '0.8125rem', fontWeight: 700, color: 'var(--color-primary)', borderBottom: '1px solid var(--border-default)', paddingBottom: 6 }}>
-                  1. Identification & Nomenclature
-                </div>
-
+              <div className="modal-body" style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
                 <div className="grid-3">
                   <div className="form-group">
-                    <label className="form-label">Centre ID *</label>
+                    <label className="form-label">Centre Code *</label>
                     <input
                       type="text"
                       className="form-control"
                       required
-                      value={formData.centre_id}
-                      onChange={e => setFormData({ ...formData, centre_id: e.target.value })}
+                      placeholder="e.g. CN-001"
+                      value={formData.centreCode}
+                      onChange={e => setFormData({ ...formData, centreCode: e.target.value })}
                     />
                   </div>
                   <div className="form-group">
-                    <label className="form-label">Edu Code *</label>
+                    <label className="form-label">Edu Code</label>
                     <input
                       type="text"
                       className="form-control"
-                      required
                       placeholder="e.g. EDU-DL-2041"
-                      value={formData.edu_code}
-                      onChange={e => setFormData({ ...formData, edu_code: e.target.value })}
+                      value={formData.eduCode}
+                      onChange={e => setFormData({ ...formData, eduCode: e.target.value })}
                     />
                   </div>
                   <div className="form-group">
-                    <label className="form-label">TC Code *</label>
+                    <label className="form-label">TC Code</label>
                     <input
                       type="text"
                       className="form-control"
-                      required
                       placeholder="e.g. TC-DL-1082"
-                      value={formData.tc_code}
-                      onChange={e => setFormData({ ...formData, tc_code: e.target.value })}
+                      value={formData.tcCode}
+                      onChange={e => setFormData({ ...formData, tcCode: e.target.value })}
                     />
                   </div>
                 </div>
@@ -824,47 +627,9 @@ export default function CentresPage() {
                     className="form-control"
                     required
                     placeholder="e.g. Apex Institute of Information Technology"
-                    value={formData.centre_name}
-                    onChange={e => setFormData({ ...formData, centre_name: e.target.value })}
+                    value={formData.centreName}
+                    onChange={e => setFormData({ ...formData, centreName: e.target.value })}
                   />
-                </div>
-
-                {/* 2. Location & Address */}
-                <div style={{ fontSize: '0.8125rem', fontWeight: 700, color: 'var(--color-primary)', borderBottom: '1px solid var(--border-default)', paddingBottom: 6, marginTop: 8 }}>
-                  2. Geographic Location & Jurisdiction
-                </div>
-
-                <div className="grid-3">
-                  <div className="form-group">
-                    <label className="form-label">Region *</label>
-                    <select
-                      className="form-control"
-                      value={formData.region_id}
-                      onChange={e => setFormData({ ...formData, region_id: e.target.value })}
-                    >
-                      {REGIONS.map(r => <option key={r.id} value={r.id}>{r.label}</option>)}
-                    </select>
-                  </div>
-                  <div className="form-group">
-                    <label className="form-label">State *</label>
-                    <select
-                      className="form-control"
-                      value={formData.state_id}
-                      onChange={e => setFormData({ ...formData, state_id: e.target.value })}
-                    >
-                      {availableStates.map(s => <option key={s.id} value={s.id}>{s.label}</option>)}
-                    </select>
-                  </div>
-                  <div className="form-group">
-                    <label className="form-label">City *</label>
-                    <select
-                      className="form-control"
-                      value={formData.city_id}
-                      onChange={e => setFormData({ ...formData, city_id: e.target.value })}
-                    >
-                      {availableCities.map(c => <option key={c.id} value={c.id}>{c.label}</option>)}
-                    </select>
-                  </div>
                 </div>
 
                 <div className="grid-2">
@@ -875,8 +640,8 @@ export default function CentresPage() {
                       className="form-control"
                       required
                       placeholder="Plot, Street, Landmark"
-                      value={formData.centre_address}
-                      onChange={e => setFormData({ ...formData, centre_address: e.target.value })}
+                      value={formData.centreAddress}
+                      onChange={e => setFormData({ ...formData, centreAddress: e.target.value })}
                     />
                   </div>
                   <div className="form-group">
@@ -892,18 +657,13 @@ export default function CentresPage() {
                   </div>
                 </div>
 
-                {/* 3. Operational Details */}
-                <div style={{ fontSize: '0.8125rem', fontWeight: 700, color: 'var(--color-primary)', borderBottom: '1px solid var(--border-default)', paddingBottom: 6, marginTop: 8 }}>
-                  3. Operational & Organizational Parameters
-                </div>
-
                 <div className="grid-3">
                   <div className="form-group">
                     <label className="form-label">Organization Type</label>
                     <select
                       className="form-control"
-                      value={formData.organization_type}
-                      onChange={e => setFormData({ ...formData, organization_type: e.target.value })}
+                      value={formData.organizationType}
+                      onChange={e => setFormData({ ...formData, organizationType: e.target.value })}
                     >
                       {ORG_TYPES.map(ot => <option key={ot} value={ot}>{ot}</option>)}
                     </select>
@@ -912,8 +672,8 @@ export default function CentresPage() {
                     <label className="form-label">Venue Status</label>
                     <select
                       className="form-control"
-                      value={formData.venue_status}
-                      onChange={e => setFormData({ ...formData, venue_status: e.target.value })}
+                      value={formData.venueStatus}
+                      onChange={e => setFormData({ ...formData, venueStatus: e.target.value })}
                     >
                       {VENUE_STATUS_OPTS.map(vs => <option key={vs} value={vs}>{vs}</option>)}
                     </select>
@@ -922,8 +682,8 @@ export default function CentresPage() {
                     <label className="form-label">Centre Status</label>
                     <select
                       className="form-control"
-                      value={formData.centre_status}
-                      onChange={e => setFormData({ ...formData, centre_status: e.target.value })}
+                      value={formData.centreStatus}
+                      onChange={e => setFormData({ ...formData, centreStatus: e.target.value })}
                     >
                       {CENTRE_STATUSES.map(cs => <option key={cs} value={cs}>{cs}</option>)}
                     </select>
@@ -937,8 +697,8 @@ export default function CentresPage() {
                       type="email"
                       className="form-control"
                       placeholder="centre@org.in"
-                      value={formData.official_email}
-                      onChange={e => setFormData({ ...formData, official_email: e.target.value })}
+                      value={formData.officialEmail}
+                      onChange={e => setFormData({ ...formData, officialEmail: e.target.value })}
                     />
                   </div>
                   <div className="form-group">
@@ -947,32 +707,10 @@ export default function CentresPage() {
                       type="url"
                       className="form-control"
                       placeholder="https://maps.google.com/..."
-                      value={formData.google_map_link}
-                      onChange={e => setFormData({ ...formData, google_map_link: e.target.value })}
+                      value={formData.googleMapLink}
+                      onChange={e => setFormData({ ...formData, googleMapLink: e.target.value })}
                     />
                   </div>
-                </div>
-
-                <div className="form-group">
-                  <label className="form-label">Previous Edu Exam Conducted</label>
-                  <input
-                    type="text"
-                    className="form-control"
-                    placeholder="e.g. NEET PG 2025, JEE Mains 2024"
-                    value={formData.previous_edu_exam}
-                    onChange={e => setFormData({ ...formData, previous_edu_exam: e.target.value })}
-                  />
-                </div>
-
-                <div className="form-group">
-                  <label className="form-label">Remarks / History Notes</label>
-                  <textarea
-                    className="form-control"
-                    rows={2}
-                    placeholder="Audit findings, operational constraints, special instructions..."
-                    value={formData.remarks}
-                    onChange={e => setFormData({ ...formData, remarks: e.target.value })}
-                  />
                 </div>
               </div>
 
@@ -980,124 +718,9 @@ export default function CentresPage() {
                 <button type="button" className="btn btn-secondary" onClick={() => setShowAddModal(false)}>
                   Cancel
                 </button>
-                <button type="submit" className="btn btn-primary">
-                  <Check size={14} /> {editingCentre ? 'Update Centre Record' : 'Save Centre'}
-                </button>
-              </div>
-            </form>
-          </div>
-        </div>
-      )}
-
-      {/* Add Contact Modal */}
-      {showAddContactModal && (
-        <div className="modal-backdrop" onClick={() => setShowAddContactModal(false)}>
-          <div className="modal" onClick={e => e.stopPropagation()} style={{ maxWidth: 540 }}>
-            <div className="modal-header">
-              <h3 className="modal-title">Add Key Contact Person</h3>
-              <button className="btn-ghost" onClick={() => setShowAddContactModal(false)} style={{ padding: 4 }}>
-                <X size={18} />
-              </button>
-            </div>
-            <form onSubmit={handleSaveContact}>
-              <div className="modal-body" style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
-                <div className="grid-2">
-                  <div className="form-group">
-                    <label className="form-label">Person Type *</label>
-                    <select
-                      className="form-control"
-                      value={contactForm.person_type}
-                      onChange={e => setContactForm({ ...contactForm, person_type: e.target.value })}
-                    >
-                      {CONTACT_TYPES.map(ct => <option key={ct} value={ct}>{ct}</option>)}
-                    </select>
-                  </div>
-                  <div className="form-group">
-                    <label className="form-label">Full Name *</label>
-                    <input
-                      type="text"
-                      className="form-control"
-                      required
-                      placeholder="e.g. Rajesh Sharma"
-                      value={contactForm.full_name}
-                      onChange={e => setContactForm({ ...contactForm, full_name: e.target.value })}
-                    />
-                  </div>
-                </div>
-
-                <div className="grid-2">
-                  <div className="form-group">
-                    <label className="form-label">Contact Number *</label>
-                    <input
-                      type="tel"
-                      className="form-control"
-                      required
-                      placeholder="10-digit mobile"
-                      value={contactForm.contact_number}
-                      onChange={e => setContactForm({ ...contactForm, contact_number: e.target.value })}
-                    />
-                  </div>
-                  <div className="form-group">
-                    <label className="form-label">Email Address</label>
-                    <input
-                      type="email"
-                      className="form-control"
-                      placeholder="contact@domain.com"
-                      value={contactForm.email}
-                      onChange={e => setContactForm({ ...contactForm, email: e.target.value })}
-                    />
-                  </div>
-                </div>
-
-                <div className="form-group">
-                  <label className="form-label">Aadhaar Number (12 Digits)</label>
-                  <input
-                    type="text"
-                    className="form-control"
-                    placeholder="XXXX-XXXX-XXXX"
-                    value={contactForm.aadhaar_number}
-                    onChange={e => setContactForm({ ...contactForm, aadhaar_number: e.target.value })}
-                  />
-                </div>
-
-                <div className="grid-2">
-                  <div className="form-group">
-                    <label className="form-label">Father&apos;s Name</label>
-                    <input
-                      type="text"
-                      className="form-control"
-                      value={contactForm.father_name}
-                      onChange={e => setContactForm({ ...contactForm, father_name: e.target.value })}
-                    />
-                  </div>
-                  <div className="form-group">
-                    <label className="form-label">Mother&apos;s Name</label>
-                    <input
-                      type="text"
-                      className="form-control"
-                      value={contactForm.mother_name}
-                      onChange={e => setContactForm({ ...contactForm, mother_name: e.target.value })}
-                    />
-                  </div>
-                </div>
-
-                <div className="form-group">
-                  <label className="form-label">Permanent Address</label>
-                  <input
-                    type="text"
-                    className="form-control"
-                    placeholder="Permanent residential address"
-                    value={contactForm.permanent_address}
-                    onChange={e => setContactForm({ ...contactForm, permanent_address: e.target.value })}
-                  />
-                </div>
-              </div>
-              <div className="modal-footer">
-                <button type="button" className="btn btn-secondary" onClick={() => setShowAddContactModal(false)}>
-                  Cancel
-                </button>
-                <button type="submit" className="btn btn-primary">
-                  <Check size={14} /> Add Contact Person
+                <button type="submit" className="btn btn-primary" disabled={submitting}>
+                  {submitting ? <Loader2 size={14} className="animate-spin" /> : <Check size={14} />}
+                  <span>{editingCentre ? 'Update Centre' : 'Save Centre'}</span>
                 </button>
               </div>
             </form>

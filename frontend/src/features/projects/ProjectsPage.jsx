@@ -1,14 +1,16 @@
-import { useState } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import {
   FolderOpen, Plus, Search, Calendar, Users, Building2, CheckCircle2,
-  Clock, Edit, Trash2, X, Check, RefreshCw, Briefcase, ChevronRight,
-  TrendingUp, Award, Layers
+  Clock, Edit, Trash2, X, Check, RefreshCw, Briefcase, Award,
+  AlertCircle, Loader2
 } from 'lucide-react';
-import { ProjectStore, ClientStore, appendAuditLog } from '@/services/dataService';
+import { apiClient } from '@/services/apiClient';
+import { ENDPOINTS } from '@/services/endpoints';
 import { useAuth } from '@/context/AuthContext';
 import { StatusBadge } from '@/components/common';
 
 const STAGES = [
+  'Setup',
   'Booking',
   'Document Verification',
   'Audit & Compliance',
@@ -20,175 +22,219 @@ const STAGES = [
 
 export default function ProjectsPage() {
   const { user } = useAuth();
-  const [projects, setProjects] = useState(() => ProjectStore.getAll());
-  const [clients, setClients] = useState(() => ClientStore.getAll());
+  const [projects, setProjects] = useState([]);
+  const [clients, setClients] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(null);
   const [activeTab, setActiveTab] = useState('projects'); // projects | clients
   const [search, setSearch] = useState('');
   const [stageFilter, setStageFilter] = useState('');
 
-  // Modals
+  // Modals & Action States
   const [showProjectModal, setShowProjectModal] = useState(false);
   const [editingProject, setEditingProject] = useState(null);
   const [showClientModal, setShowClientModal] = useState(false);
-  const [toastMessage, setToastMessage] = useState(null);
+  const [submitting, setSubmitting] = useState(false);
+  const [toast, setToast] = useState(null); // { message: string, type: 'success' | 'error' }
 
   const initialProjectForm = {
-    project_code: `PRJ-${String(projects.length + 1).padStart(3, '0')}`,
+    projectCode: '',
     name: '',
-    client_id: clients[0]?.id || 'cl001',
-    client_name: clients[0]?.name || 'NTA',
-    exam_type: 'CBT Exam',
-    stage: 'Booking',
+    clientId: '',
+    examType: 'CBT Exam',
+    stage: 'Setup',
     status: 'Active',
-    exam_date: '',
-    cities: 10,
-    candidate_target: 25000,
-    centre_target: 75,
+    examDate: '',
+    citiesCount: 1,
+    candidateTarget: 5000,
+    centreTarget: 10,
+    slaHealth: 'OnTrack',
   };
   const [projectForm, setProjectForm] = useState(initialProjectForm);
 
   const initialClientForm = {
+    code: '',
     name: '',
-    full_name: '',
-    contact: '',
+    fullName: '',
+    contactEmail: '',
     status: 'Active',
   };
   const [clientForm, setClientForm] = useState(initialClientForm);
 
-  const showToast = (msg) => {
-    setToastMessage(msg);
-    setTimeout(() => setToastMessage(null), 3500);
+  const showToast = (message, type = 'success') => {
+    setToast({ message, type });
+    setTimeout(() => setToast(null), 3500);
   };
 
-  const reloadData = () => {
-    setProjects(ProjectStore.getAll());
-    setClients(ClientStore.getAll());
-  };
+  const loadData = useCallback(async () => {
+    setLoading(true);
+    setError(null);
+    try {
+      const [projRes, clientRes] = await Promise.allSettled([
+        apiClient.get(ENDPOINTS.ADMIN.PROJECTS, {
+          params: {
+            search: search || undefined,
+            stage: stageFilter || undefined,
+            limit: 100,
+          },
+        }),
+        apiClient.get(ENDPOINTS.ADMIN.CLIENTS, { params: { limit: 100 } }),
+      ]);
 
-  const filteredProjects = projects.filter(p => {
-    if (search) {
-      const q = search.toLowerCase();
-      const match = p.name?.toLowerCase().includes(q) ||
-                    p.project_code?.toLowerCase().includes(q) ||
-                    p.client_name?.toLowerCase().includes(q) ||
-                    p.exam_type?.toLowerCase().includes(q);
-      if (!match) return false;
+      if (projRes.status === 'fulfilled' && projRes.value?.success && Array.isArray(projRes.value.data)) {
+        setProjects(projRes.value.data);
+      } else {
+        setProjects([]);
+      }
+
+      if (clientRes.status === 'fulfilled' && clientRes.value?.success && Array.isArray(clientRes.value.data)) {
+        setClients(clientRes.value.data);
+      } else {
+        setClients([]);
+      }
+    } catch (err) {
+      console.error('Failed to load project records:', err);
+      setError(err.message || 'Unable to retrieve project database');
+    } finally {
+      setLoading(false);
     }
-    if (stageFilter && p.stage !== stageFilter) return false;
-    return true;
-  });
+  }, [search, stageFilter]);
+
+  useEffect(() => {
+    loadData();
+  }, [loadData]);
 
   const handleOpenAddProject = () => {
     setEditingProject(null);
+    const nextCode = `PRJ-${String(projects.length + 1).padStart(3, '0')}`;
     setProjectForm({
       ...initialProjectForm,
-      project_code: `PRJ-${String(projects.length + 1).padStart(3, '0')}`,
-      client_id: clients[0]?.id || 'cl001',
-      client_name: clients[0]?.name || 'NTA',
+      projectCode: nextCode,
+      clientId: clients[0]?.id || '',
     });
     setShowProjectModal(true);
   };
 
   const handleOpenEditProject = (p) => {
     setEditingProject(p);
-    setProjectForm({ ...p });
+    setProjectForm({
+      projectCode: p.projectCode || '',
+      name: p.name || '',
+      clientId: p.clientId || clients[0]?.id || '',
+      examType: p.examType || 'CBT Exam',
+      stage: p.stage || 'Setup',
+      status: p.status || 'Active',
+      examDate: p.examDate ? new Date(p.examDate).toISOString().split('T')[0] : '',
+      citiesCount: p.citiesCount || 1,
+      candidateTarget: p.candidateTarget || 0,
+      centreTarget: p.centreTarget || 0,
+      slaHealth: p.slaHealth || 'OnTrack',
+    });
     setShowProjectModal(true);
   };
 
-  const handleSaveProject = (e) => {
+  const handleSaveProject = async (e) => {
     e.preventDefault();
-    if (!projectForm.name) return;
-
-    const selectedClient = clients.find(c => c.id === projectForm.client_id);
-    const dataToSave = {
-      ...projectForm,
-      client_name: selectedClient ? selectedClient.name : projectForm.client_name,
-    };
-
-    if (editingProject) {
-      ProjectStore.update(editingProject.id, dataToSave);
-      appendAuditLog({
-        user: user?.name || 'Admin',
-        role: user?.role || 'admin',
-        action: 'UPDATE_PROJECT',
-        entity: `Project: ${dataToSave.name} (${dataToSave.project_code})`,
-        details: `Updated stage to ${dataToSave.stage}`,
-      });
-      showToast(`Project "${dataToSave.name}" updated!`);
-    } else {
-      ProjectStore.create(dataToSave);
-      appendAuditLog({
-        user: user?.name || 'Admin',
-        role: user?.role || 'admin',
-        action: 'CREATE_PROJECT',
-        entity: `Project: ${dataToSave.name} (${dataToSave.project_code})`,
-        details: `Created new project under client ${dataToSave.client_name}`,
-      });
-      showToast(`Project "${dataToSave.name}" created!`);
+    if (!projectForm.name?.trim() || !projectForm.projectCode?.trim() || !projectForm.clientId) {
+      showToast('Please complete required fields: Project Code, Name, and Client Agency', 'error');
+      return;
     }
 
-    reloadData();
-    setShowProjectModal(false);
-  };
+    setSubmitting(true);
+    try {
+      const payload = {
+        projectCode: projectForm.projectCode.trim(),
+        name: projectForm.name.trim(),
+        clientId: projectForm.clientId,
+        examType: projectForm.examType.trim(),
+        stage: projectForm.stage,
+        status: projectForm.status,
+        examDate: projectForm.examDate ? new Date(projectForm.examDate).toISOString() : undefined,
+        citiesCount: Number(projectForm.citiesCount) || 0,
+        candidateTarget: Number(projectForm.candidateTarget) || 0,
+        centreTarget: Number(projectForm.centreTarget) || 0,
+        slaHealth: projectForm.slaHealth || 'OnTrack',
+      };
 
-  const handleDeleteProject = (p) => {
-    if (confirm(`Are you sure you want to delete project "${p.name}"?`)) {
-      ProjectStore.delete(p.id);
-      appendAuditLog({
-        user: user?.name || 'Admin',
-        role: user?.role || 'admin',
-        action: 'DELETE_PROJECT',
-        entity: `Project: ${p.name}`,
-        details: 'Project archived/deleted from active pipeline',
-      });
-      reloadData();
-      showToast(`Project "${p.name}" deleted.`);
+      if (editingProject) {
+        const res = await apiClient.put(`${ENDPOINTS.ADMIN.PROJECTS}/${editingProject.id}`, payload);
+        if (res && res.success) {
+          showToast(`Project "${projectForm.name}" updated successfully!`, 'success');
+          setShowProjectModal(false);
+          await loadData();
+        }
+      } else {
+        const res = await apiClient.post(ENDPOINTS.ADMIN.PROJECTS, payload);
+        if (res && res.success) {
+          showToast(`Project "${projectForm.name}" created and persisted in database!`, 'success');
+          setShowProjectModal(false);
+          await loadData();
+        }
+      }
+    } catch (err) {
+      const msg = err.data?.error?.message || err.message || 'Failed to save project';
+      showToast(msg, 'error');
+    } finally {
+      setSubmitting(false);
     }
   };
 
-  const handleSaveClient = (e) => {
+  const handleSaveClient = async (e) => {
     e.preventDefault();
-    if (!clientForm.name) return;
+    if (!clientForm.name?.trim() || !clientForm.fullName?.trim() || !clientForm.contactEmail?.trim()) {
+      showToast('Please provide Client Code, Full Name, and Contact Email', 'error');
+      return;
+    }
 
-    ClientStore.create(clientForm);
-    appendAuditLog({
-      user: user?.name || 'Admin',
-      role: 'admin',
-      action: 'CREATE_CLIENT',
-      entity: `Client: ${clientForm.name}`,
-      details: `Added new testing client organization ${clientForm.full_name}`,
-    });
-    reloadData();
-    setShowClientModal(false);
-    setClientForm(initialClientForm);
-    showToast(`Client "${clientForm.name}" created!`);
+    setSubmitting(true);
+    try {
+      const payload = {
+        code: clientForm.code?.trim() || clientForm.name.trim().toUpperCase(),
+        name: clientForm.name.trim(),
+        fullName: clientForm.fullName.trim(),
+        contactEmail: clientForm.contactEmail.trim().toLowerCase(),
+        status: clientForm.status || 'Active',
+      };
+      const res = await apiClient.post(ENDPOINTS.ADMIN.CLIENTS, payload);
+      if (res && res.success) {
+        showToast(`Client "${clientForm.name}" registered successfully!`, 'success');
+        setShowClientModal(false);
+        setClientForm(initialClientForm);
+        await loadData();
+      }
+    } catch (err) {
+      const msg = err.data?.error?.message || err.message || 'Failed to create client';
+      showToast(msg, 'error');
+    } finally {
+      setSubmitting(false);
+    }
   };
 
-  const totalCandidates = projects.reduce((acc, p) => acc + (Number(p.candidate_target) || 0), 0);
-  const totalCentresTarget = projects.reduce((acc, p) => acc + (Number(p.centre_target) || 0), 0);
+  const totalCandidates = projects.reduce((acc, p) => acc + (Number(p.candidateTarget) || 0), 0);
+  const totalCentresTarget = projects.reduce((acc, p) => acc + (Number(p.centreTarget) || 0), 0);
   const activeProjectsCount = projects.filter(p => p.status === 'Active').length;
 
   return (
     <div>
       {/* Toast Alert */}
-      {toastMessage && (
+      {toast && (
         <div style={{
           position: 'fixed',
           top: 24,
           right: 24,
-          background: 'var(--color-primary-dark)',
+          background: toast.type === 'error' ? '#b91c1c' : 'var(--color-primary-dark, #1e3a8a)',
           color: '#fff',
           padding: '12px 20px',
-          borderRadius: 'var(--radius-lg)',
-          boxShadow: 'var(--shadow-xl)',
+          borderRadius: 'var(--radius-lg, 12px)',
+          boxShadow: 'var(--shadow-xl, 0 20px 25px -5px rgba(0, 0, 0, 0.1))',
           zIndex: 9999,
           display: 'flex',
           alignItems: 'center',
           gap: 10,
           fontWeight: 600
         }}>
-          <CheckCircle2 size={18} color="#4ade80" />
-          <span>{toastMessage}</span>
+          {toast.type === 'error' ? <AlertCircle size={18} /> : <CheckCircle2 size={18} color="#4ade80" />}
+          <span>{toast.message}</span>
         </div>
       )}
 
@@ -199,24 +245,21 @@ export default function ProjectsPage() {
             <div className="breadcrumb">
               <span>Admin</span>
               <span className="breadcrumb-sep">/</span>
-              <span className="breadcrumb-current">Client & Project Management</span>
+              <span className="breadcrumb-current">Client &amp; Project Management</span>
             </div>
-            <h1 className="page-header__title" style={{ marginTop: 6 }}>Client & Examination Projects</h1>
+            <h1 className="page-header__title" style={{ marginTop: 6 }}>Client &amp; Examination Projects</h1>
             <p className="page-header__subtitle">
-              Manage client organizations, examination timelines, candidate targets, and stage progression
+              Live database records: client organizations, examination timelines, and candidate targets
             </p>
           </div>
           <div className="page-header__actions">
             <button
               className="btn btn-secondary"
-              onClick={() => {
-                ProjectStore.reset();
-                ClientStore.reset();
-                reloadData();
-                showToast('Reset projects and clients to default seed data');
-              }}
+              onClick={loadData}
+              disabled={loading}
+              title="Refresh from Database"
             >
-              <RefreshCw size={14} /> Reset Data
+              <RefreshCw size={14} className={loading ? 'animate-spin' : ''} /> Refresh
             </button>
             {activeTab === 'projects' ? (
               <button className="btn btn-primary" onClick={handleOpenAddProject}>
@@ -230,6 +273,35 @@ export default function ProjectsPage() {
           </div>
         </div>
       </div>
+
+      {/* Error Banner */}
+      {error && (
+        <div style={{
+          background: '#fee2e2',
+          border: '1px solid #ef4444',
+          borderRadius: 'var(--radius-md, 8px)',
+          padding: '12px 16px',
+          marginBottom: 20,
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'space-between',
+          color: '#991b1b',
+        }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+            <AlertCircle size={20} />
+            <div>
+              <strong>Failed to query project records:</strong> {error}
+            </div>
+          </div>
+          <button
+            className="btn btn-sm btn-secondary"
+            onClick={loadData}
+            style={{ background: '#fff', borderColor: '#f87171', color: '#991b1b' }}
+          >
+            Retry
+          </button>
+        </div>
+      )}
 
       {/* Tabs */}
       <div className="tabs">
@@ -258,7 +330,7 @@ export default function ProjectsPage() {
                   <FolderOpen size={16} color="#1e40af" />
                 </div>
               </div>
-              <div className="kpi-card__value">{activeProjectsCount}</div>
+              <div className="kpi-card__value">{loading ? '...' : activeProjectsCount}</div>
               <div className="kpi-card__sub">Out of {projects.length} total projects</div>
             </div>
 
@@ -269,8 +341,8 @@ export default function ProjectsPage() {
                   <Users size={16} color="#16a34a" />
                 </div>
               </div>
-              <div className="kpi-card__value" style={{ color: 'var(--color-success)' }}>
-                {totalCandidates.toLocaleString()}
+              <div className="kpi-card__value" style={{ color: 'var(--color-success, #16a34a)' }}>
+                {loading ? '...' : totalCandidates.toLocaleString('en-IN')}
               </div>
               <div className="kpi-card__sub">Cumulative all active exams</div>
             </div>
@@ -282,8 +354,8 @@ export default function ProjectsPage() {
                   <Building2 size={16} color="#7c3aed" />
                 </div>
               </div>
-              <div className="kpi-card__value" style={{ color: 'var(--color-purple)' }}>
-                {totalCentresTarget}
+              <div className="kpi-card__value" style={{ color: 'var(--color-purple, #7c3aed)' }}>
+                {loading ? '...' : totalCentresTarget}
               </div>
               <div className="kpi-card__sub">Target venue capacity needed</div>
             </div>
@@ -295,10 +367,10 @@ export default function ProjectsPage() {
                   <Award size={16} color="#d97706" />
                 </div>
               </div>
-              <div className="kpi-card__value" style={{ color: 'var(--color-warning)' }}>
-                {clients.length}
+              <div className="kpi-card__value" style={{ color: 'var(--color-warning, #d97706)' }}>
+                {loading ? '...' : clients.length}
               </div>
-              <div className="kpi-card__sub">Government & premier boards</div>
+              <div className="kpi-card__sub">Government &amp; institutional clients</div>
             </div>
           </div>
 
@@ -310,7 +382,7 @@ export default function ProjectsPage() {
                 <input
                   type="text"
                   className="form-control"
-                  placeholder="Search project name, code, client..."
+                  placeholder="Search project name, code..."
                   value={search}
                   onChange={e => setSearch(e.target.value)}
                   style={{ paddingLeft: 30, fontSize: '0.8125rem' }}
@@ -333,10 +405,10 @@ export default function ProjectsPage() {
                 <thead>
                   <tr>
                     <th>Project Code</th>
-                    <th>Project Name & Client</th>
+                    <th>Project Name &amp; Client</th>
                     <th>Exam Type</th>
                     <th>Exam Date</th>
-                    <th>Coverage (Cities / Centres)</th>
+                    <th>Coverage</th>
                     <th>Candidates</th>
                     <th>Lifecycle Stage</th>
                     <th>Status</th>
@@ -344,43 +416,52 @@ export default function ProjectsPage() {
                   </tr>
                 </thead>
                 <tbody>
-                  {filteredProjects.length === 0 ? (
+                  {loading ? (
                     <tr>
                       <td colSpan={9} style={{ textAlign: 'center', padding: '36px', color: 'var(--text-muted)' }}>
-                        No projects found.
+                        <Loader2 className="animate-spin" size={24} style={{ margin: '0 auto 8px', display: 'block' }} />
+                        Querying projects from MySQL database...
+                      </td>
+                    </tr>
+                  ) : projects.length === 0 ? (
+                    <tr>
+                      <td colSpan={9} style={{ textAlign: 'center', padding: '36px', color: 'var(--text-muted)' }}>
+                        No examination projects found in database. Click &quot;Setup New Project&quot; to initialize one.
                       </td>
                     </tr>
                   ) : (
-                    filteredProjects.map(p => (
+                    projects.map(p => (
                       <tr key={p.id}>
                         <td>
                           <span style={{ fontFamily: 'monospace', fontWeight: 700, color: 'var(--color-primary)' }}>
-                            {p.project_code}
+                            {p.projectCode}
                           </span>
                         </td>
                         <td>
                           <div style={{ fontWeight: 600, color: 'var(--text-primary)' }}>{p.name}</div>
                           <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)', display: 'flex', alignItems: 'center', gap: 4 }}>
-                            <span className="badge badge-purple" style={{ fontSize: '0.625rem' }}>{p.client_name}</span>
+                            <span className="badge badge-purple" style={{ fontSize: '0.625rem' }}>
+                              {p.client?.name || p.clientId || 'Client'}
+                            </span>
                           </div>
                         </td>
                         <td>
-                          <span style={{ fontSize: '0.8125rem', fontWeight: 500 }}>{p.exam_type}</span>
+                          <span style={{ fontSize: '0.8125rem', fontWeight: 500 }}>{p.examType}</span>
                         </td>
                         <td>
                           <div style={{ display: 'flex', alignItems: 'center', gap: 5, fontSize: '0.8125rem' }}>
                             <Calendar size={13} color="var(--text-muted)" />
-                            <span>{p.exam_date || 'TBD'}</span>
+                            <span>{p.examDate ? new Date(p.examDate).toLocaleDateString('en-IN') : 'TBD'}</span>
                           </div>
                         </td>
                         <td>
                           <div style={{ fontSize: '0.8125rem' }}>
-                            <strong>{p.cities || 0}</strong> cities • <strong>{p.centre_target || 0}</strong> centres
+                            <strong>{p.citiesCount || 0}</strong> cities • <strong>{p.centreTarget || 0}</strong> centres
                           </div>
                         </td>
                         <td>
                           <span style={{ fontWeight: 600, color: 'var(--color-primary)' }}>
-                            {Number(p.candidate_target || 0).toLocaleString()}
+                            {Number(p.candidateTarget || 0).toLocaleString('en-IN')}
                           </span>
                         </td>
                         <td>
@@ -392,23 +473,13 @@ export default function ProjectsPage() {
                           <StatusBadge status={p.status} />
                         </td>
                         <td style={{ textAlign: 'right' }}>
-                          <div style={{ display: 'inline-flex', gap: 6 }}>
-                            <button
-                              className="btn btn-secondary btn-sm"
-                              onClick={() => handleOpenEditProject(p)}
-                              title="Edit project parameters"
-                            >
-                              <Edit size={13} /> Edit
-                            </button>
-                            <button
-                              className="btn btn-ghost btn-sm"
-                              style={{ color: 'var(--color-danger)' }}
-                              onClick={() => handleDeleteProject(p)}
-                              title="Delete project"
-                            >
-                              <Trash2 size={13} />
-                            </button>
-                          </div>
+                          <button
+                            className="btn btn-secondary btn-sm"
+                            onClick={() => handleOpenEditProject(p)}
+                            title="Edit project parameters"
+                          >
+                            <Edit size={13} /> Edit
+                          </button>
                         </td>
                       </tr>
                     ))
@@ -443,36 +514,43 @@ export default function ProjectsPage() {
                   <th>Short Code</th>
                   <th>Full Institutional Name</th>
                   <th>Official Contact</th>
-                  <th>Active Projects</th>
                   <th>Status</th>
                 </tr>
               </thead>
               <tbody>
-                {clients.map(c => {
-                  const associatedProjects = projects.filter(p => p.client_id === c.id || p.client_name === c.name);
-                  return (
+                {loading ? (
+                  <tr>
+                    <td colSpan={5} style={{ textAlign: 'center', padding: '36px', color: 'var(--text-muted)' }}>
+                      Loading clients from database...
+                    </td>
+                  </tr>
+                ) : clients.length === 0 ? (
+                  <tr>
+                    <td colSpan={5} style={{ textAlign: 'center', padding: '36px', color: 'var(--text-muted)' }}>
+                      No clients found in database. Click &quot;Add Client&quot; to register one.
+                    </td>
+                  </tr>
+                ) : (
+                  clients.map(c => (
                     <tr key={c.id}>
                       <td>
-                        <span style={{ fontFamily: 'monospace', fontWeight: 600 }}>{c.id}</span>
+                        <span style={{ fontFamily: 'monospace', fontWeight: 600 }}>{c.code || c.id}</span>
                       </td>
                       <td>
                         <span style={{ fontWeight: 700, color: 'var(--color-primary)', fontSize: '0.9375rem' }}>{c.name}</span>
                       </td>
                       <td>
-                        <div style={{ fontWeight: 500 }}>{c.full_name}</div>
+                        <div style={{ fontWeight: 500 }}>{c.fullName}</div>
                       </td>
                       <td>
-                        <span style={{ fontFamily: 'monospace', fontSize: '0.8125rem' }}>{c.contact}</span>
-                      </td>
-                      <td>
-                        <span className="badge badge-purple">{associatedProjects.length} Projects</span>
+                        <span style={{ fontFamily: 'monospace', fontSize: '0.8125rem' }}>{c.contactEmail}</span>
                       </td>
                       <td>
                         <StatusBadge status={c.status} />
                       </td>
                     </tr>
-                  );
-                })}
+                  ))
+                )}
               </tbody>
             </table>
           </div>
@@ -484,7 +562,7 @@ export default function ProjectsPage() {
         <div className="modal-backdrop" onClick={() => setShowProjectModal(false)}>
           <div className="modal" onClick={e => e.stopPropagation()} style={{ maxWidth: 640 }}>
             <div className="modal-header">
-              <h3 className="modal-title">{editingProject ? `Edit Project (${projectForm.project_code})` : 'Setup Examination Project'}</h3>
+              <h3 className="modal-title">{editingProject ? `Edit Project (${projectForm.projectCode})` : 'Setup Examination Project'}</h3>
               <button className="btn-ghost" onClick={() => setShowProjectModal(false)} style={{ padding: 4 }}>
                 <X size={18} />
               </button>
@@ -498,18 +576,21 @@ export default function ProjectsPage() {
                       type="text"
                       className="form-control"
                       required
-                      value={projectForm.project_code}
-                      onChange={e => setProjectForm({ ...projectForm, project_code: e.target.value })}
+                      placeholder="e.g. PRJ-001"
+                      value={projectForm.projectCode}
+                      onChange={e => setProjectForm({ ...projectForm, projectCode: e.target.value })}
                     />
                   </div>
                   <div className="form-group">
                     <label className="form-label">Client Agency *</label>
                     <select
                       className="form-control"
-                      value={projectForm.client_id}
-                      onChange={e => setProjectForm({ ...projectForm, client_id: e.target.value })}
+                      required
+                      value={projectForm.clientId}
+                      onChange={e => setProjectForm({ ...projectForm, clientId: e.target.value })}
                     >
-                      {clients.map(c => <option key={c.id} value={c.id}>{c.name} — {c.full_name}</option>)}
+                      <option value="">Select a client agency...</option>
+                      {clients.map(c => <option key={c.id} value={c.id}>{c.name} — {c.fullName}</option>)}
                     </select>
                   </div>
                 </div>
@@ -534,17 +615,17 @@ export default function ProjectsPage() {
                       className="form-control"
                       required
                       placeholder="e.g. NEET UG, JEE Mains"
-                      value={projectForm.exam_type}
-                      onChange={e => setProjectForm({ ...projectForm, exam_type: e.target.value })}
+                      value={projectForm.examType}
+                      onChange={e => setProjectForm({ ...projectForm, examType: e.target.value })}
                     />
                   </div>
                   <div className="form-group">
-                    <label className="form-label">Exam Date *</label>
+                    <label className="form-label">Exam Date</label>
                     <input
                       type="date"
                       className="form-control"
-                      value={projectForm.exam_date}
-                      onChange={e => setProjectForm({ ...projectForm, exam_date: e.target.value })}
+                      value={projectForm.examDate}
+                      onChange={e => setProjectForm({ ...projectForm, examDate: e.target.value })}
                     />
                   </div>
                 </div>
@@ -555,8 +636,8 @@ export default function ProjectsPage() {
                     <input
                       type="number"
                       className="form-control"
-                      value={projectForm.candidate_target}
-                      onChange={e => setProjectForm({ ...projectForm, candidate_target: e.target.value })}
+                      value={projectForm.candidateTarget}
+                      onChange={e => setProjectForm({ ...projectForm, candidateTarget: e.target.value })}
                     />
                   </div>
                   <div className="form-group">
@@ -564,8 +645,8 @@ export default function ProjectsPage() {
                     <input
                       type="number"
                       className="form-control"
-                      value={projectForm.centre_target}
-                      onChange={e => setProjectForm({ ...projectForm, centre_target: e.target.value })}
+                      value={projectForm.centreTarget}
+                      onChange={e => setProjectForm({ ...projectForm, centreTarget: e.target.value })}
                     />
                   </div>
                   <div className="form-group">
@@ -573,8 +654,8 @@ export default function ProjectsPage() {
                     <input
                       type="number"
                       className="form-control"
-                      value={projectForm.cities}
-                      onChange={e => setProjectForm({ ...projectForm, cities: e.target.value })}
+                      value={projectForm.citiesCount}
+                      onChange={e => setProjectForm({ ...projectForm, citiesCount: e.target.value })}
                     />
                   </div>
                 </div>
@@ -598,7 +679,8 @@ export default function ProjectsPage() {
                       onChange={e => setProjectForm({ ...projectForm, status: e.target.value })}
                     >
                       <option value="Active">Active</option>
-                      <option value="On Hold">On Hold</option>
+                      <option value="OnHold">On Hold</option>
+                      <option value="Completed">Completed</option>
                       <option value="Closed">Closed</option>
                     </select>
                   </div>
@@ -609,8 +691,9 @@ export default function ProjectsPage() {
                 <button type="button" className="btn btn-secondary" onClick={() => setShowProjectModal(false)}>
                   Cancel
                 </button>
-                <button type="submit" className="btn btn-primary">
-                  <Check size={14} /> {editingProject ? 'Save Project' : 'Launch Project'}
+                <button type="submit" className="btn btn-primary" disabled={submitting}>
+                  {submitting ? <Loader2 size={14} className="animate-spin" /> : <Check size={14} />}
+                  <span>{editingProject ? 'Save Project' : 'Launch Project'}</span>
                 </button>
               </div>
             </form>
@@ -648,18 +731,19 @@ export default function ProjectsPage() {
                     className="form-control"
                     required
                     placeholder="e.g. National Testing Agency"
-                    value={clientForm.full_name}
-                    onChange={e => setClientForm({ ...clientForm, full_name: e.target.value })}
+                    value={clientForm.fullName}
+                    onChange={e => setClientForm({ ...clientForm, fullName: e.target.value })}
                   />
                 </div>
                 <div className="form-group">
-                  <label className="form-label">Official Contact / Email</label>
+                  <label className="form-label">Official Contact Email *</label>
                   <input
                     type="email"
                     className="form-control"
+                    required
                     placeholder="official@agency.gov.in"
-                    value={clientForm.contact}
-                    onChange={e => setClientForm({ ...clientForm, contact: e.target.value })}
+                    value={clientForm.contactEmail}
+                    onChange={e => setClientForm({ ...clientForm, contactEmail: e.target.value })}
                   />
                 </div>
               </div>
@@ -667,8 +751,9 @@ export default function ProjectsPage() {
                 <button type="button" className="btn btn-secondary" onClick={() => setShowClientModal(false)}>
                   Cancel
                 </button>
-                <button type="submit" className="btn btn-primary">
-                  <Check size={14} /> Save Client
+                <button type="submit" className="btn btn-primary" disabled={submitting}>
+                  {submitting ? <Loader2 size={14} className="animate-spin" /> : <Check size={14} />}
+                  <span>Save Client</span>
                 </button>
               </div>
             </form>

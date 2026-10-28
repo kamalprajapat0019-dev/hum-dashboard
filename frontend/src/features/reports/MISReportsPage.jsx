@@ -15,11 +15,7 @@ import {
   BookingStore, AuditStore, AllocationStore,
   InvoiceStore, PaymentStore
 } from '@/services/dataService';
-import {
-  PROJECTS, PROJECT_STATUS_DATA, CENTRE_STATUS_DATA,
-  BOOKING_FUNNEL_DATA, CONSENT_STATUS_DATA,
-  INVOICE_STATUS_DATA, INVOICE_AMOUNT_DATA
-} from '@/data/mockData';
+
 
 // Chart Tooltip Component
 const CustomTooltip = ({ active, payload, label }) => {

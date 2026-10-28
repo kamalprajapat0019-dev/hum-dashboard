@@ -1,249 +1,163 @@
+import { useState, useEffect, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { CheckCircle, Upload, Bell, Clock, AlertTriangle, ArrowRight, Building2, FileText } from 'lucide-react';
+import { CheckCircle, Upload, Bell, Clock, AlertTriangle, ArrowRight, Building2, FileText, Loader2, AlertCircle, RefreshCw } from 'lucide-react';
 import { KpiCard, StatusBadge, LastUpdated } from '@/components/common';
-import { CENTRE_KPIS, CENTRE_PENDING_ACTIONS } from '@/data/mockData';
-import { DocStore, DOC_TYPES, CentreStore } from '@/services/dataService';
-
-const priorityColor = (p) =>
-  p === 'High' ? 'var(--color-danger)' :
-  p === 'Medium' ? 'var(--color-warning)' : 'var(--color-info)';
-
-const priorityBg = (p) =>
-  p === 'High' ? 'var(--color-danger-bg)' :
-  p === 'Medium' ? 'var(--color-warning-bg)' : 'var(--color-info-bg)';
+import { apiClient } from '@/services/apiClient';
+import { ENDPOINTS } from '@/services/endpoints';
+import { useAuth } from '@/context/AuthContext';
 
 export default function CentreDashboard() {
   const navigate = useNavigate();
-  const liveDocs = DocStore.getAll().filter(d => d.centre_id === 'cn001');
-  const centreProfile = CentreStore.getById('cn001') || {
-    centre_name: 'Lotus Computer Education',
-    edu_code: 'EDU-DL-2041',
-    tc_code: 'TC-DL-1082',
-    organization_type: 'Trust',
-    centre_status: 'Approved',
-  };
+  const { user } = useAuth();
+  const [centreProfile, setCentreProfile] = useState(null);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(null);
 
-  // Combine liveDocs with full 20 DOC_TYPES
-  const docRows = DOC_TYPES.map(dt => {
-    const matched = liveDocs.find(d => d.doc_type === dt.key);
-    return {
-      key: dt.key,
-      name: dt.label,
-      mandatory: dt.mandatory,
-      status: matched ? matched.status : 'Pending',
-      date: matched ? matched.uploaded_at || '—' : '—',
-      file: matched ? matched.file_name : null,
-    };
-  });
+  const loadProfile = useCallback(async () => {
+    setLoading(true);
+    setError(null);
+    try {
+      const res = await apiClient.get(ENDPOINTS.ADMIN.CENTRES, { params: { limit: 1 } });
+      if (res && res.success && Array.isArray(res.data) && res.data.length > 0) {
+        setCentreProfile(res.data[0]);
+      } else {
+        setCentreProfile(null);
+      }
+    } catch (err) {
+      console.error('Failed to query centre profile:', err);
+      setError(err.message || 'Unable to retrieve centre record');
+    } finally {
+      setLoading(false);
+    }
+  }, []);
 
-  const approvedCount = docRows.filter(d => d.status === 'Approved').length;
-  const totalCount    = docRows.length;
-  const pct           = Math.round((approvedCount / totalCount) * 100);
-  const pendingTCA    = docRows.find(d => d.key === 'tca_police_verification')?.status === 'Pending';
+  useEffect(() => {
+    loadProfile();
+  }, [loadProfile]);
 
   return (
     <div>
       <div className="page-header">
         <div className="page-header__top">
           <div>
-            <h1 className="page-header__title">Centre Dashboard</h1>
-            <p className="page-header__subtitle">Your pending actions, document checklist and centre status</p>
+            <h1 className="page-header__title">Centre User Dashboard</h1>
+            <p className="page-header__subtitle">
+              {centreProfile
+                ? `${centreProfile.centreName || centreProfile.centre_name} (${centreProfile.centreCode || centreProfile.centre_id})`
+                : 'Centre profile and document checklist'}
+            </p>
           </div>
           <div className="page-header__actions">
+            <button className="btn btn-secondary btn-sm" onClick={loadProfile} disabled={loading}>
+              <RefreshCw size={13} className={loading ? 'animate-spin' : ''} />
+            </button>
             <LastUpdated />
-            <button className="btn btn-secondary btn-sm" onClick={() => navigate('/centre/profile')}>
-              <Building2 size={13} /> My Centre Profile
-            </button>
-            <button className="btn btn-primary btn-sm" onClick={() => navigate('/centre/documents')}>
-              <FileText size={13} /> Document Checklist
-            </button>
           </div>
         </div>
       </div>
 
-      {/* Alert Banner */}
-      {pendingTCA && (
-        <div className="alert alert-warning" style={{ marginBottom: 20 }}>
-          <AlertTriangle size={16} style={{ flexShrink: 0 }} />
-          <div>
-            <strong>Action Required:</strong> TCA Police Verification is pending upload.
-            Please submit before the verification deadline of <strong>25 Oct 2026</strong>.
+      {/* Error Banner */}
+      {error && (
+        <div style={{
+          background: '#fee2e2',
+          border: '1px solid #ef4444',
+          borderRadius: 'var(--radius-md, 8px)',
+          padding: '12px 16px',
+          marginBottom: 20,
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'space-between',
+          color: '#991b1b',
+        }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+            <AlertCircle size={20} />
+            <div>
+              <strong>Database Connection Error:</strong> {error}
+            </div>
           </div>
+          <button
+            className="btn btn-sm btn-secondary"
+            onClick={loadProfile}
+            style={{ background: '#fff', borderColor: '#f87171', color: '#991b1b' }}
+          >
+            Retry
+          </button>
         </div>
       )}
 
       {/* KPI Cards */}
       <div className="kpi-grid" style={{ marginBottom: 24 }}>
         <KpiCard
-          label="Pending Actions"
-          value={CENTRE_PENDING_ACTIONS.length}
-          icon="Bell"
-          iconBg="#fffbeb"
-          iconColor="#d97706"
-          onClick={() => navigate('/centre/documents')}
-        />
-        <KpiCard
-          label="Documents Uploaded"
-          value={`${approvedCount}/${totalCount}`}
-          sub={`${pct}% complete`}
-          icon="Upload"
+          label="Centre Code"
+          value={loading ? '...' : (centreProfile?.centreCode || centreProfile?.centre_id || 'N/A')}
+          sub={centreProfile ? 'Assigned venue ID' : 'Not assigned'}
+          icon="Building2"
           iconBg="#eff6ff"
           iconColor="#1e40af"
-          onClick={() => navigate('/centre/documents')}
         />
         <KpiCard
-          label="Profile & Verification"
-          value={centreProfile.centre_status || 'Approved'}
+          label="Verification Status"
+          value={loading ? '...' : (centreProfile?.centreStatus || centreProfile?.centre_status || 'Draft')}
+          sub="Governance compliance"
           icon="CheckCircle"
           iconBg="#f0fdf4"
           iconColor="#16a34a"
-          onClick={() => navigate('/centre/profile')}
         />
         <KpiCard
-          label="Readiness"
-          value="Confirmed"
-          icon="CheckSquare"
+          label="Eligibility Rating"
+          value={loading ? '...' : (centreProfile?.eligibilityStatus || 'Eligible')}
+          sub="De-paneling status"
+          icon="ShieldCheck"
           iconBg="#f0fdf4"
           iconColor="#16a34a"
         />
+        <KpiCard
+          label="Assigned Capacity"
+          value={loading ? '...' : `${centreProfile?.capacity?.examNodes || 0} nodes`}
+          sub="Verified exam nodes"
+          icon="Cpu"
+          iconBg="#faf5ff"
+          iconColor="#7c3aed"
+        />
       </div>
 
-      <div className="grid-2" style={{ marginBottom: 24 }}>
-
-        {/* Pending Actions */}
-        <div className="card">
-          <div className="card-header">
-            <span className="card-title">Pending Actions</span>
-            <span className="badge badge-warning">{CENTRE_PENDING_ACTIONS.length} pending</span>
-          </div>
-          <div style={{ padding: '8px 0' }}>
-            {CENTRE_PENDING_ACTIONS.map(a => (
-              <div key={a.id} style={{
-                padding: '12px 20px',
-                borderBottom: '1px solid var(--border-subtle)',
-                display: 'flex',
-                alignItems: 'flex-start',
-                gap: 12,
-              }}>
-                <div style={{
-                  width: 8, height: 8,
-                  borderRadius: '50%',
-                  background: priorityColor(a.priority),
-                  marginTop: 5, flexShrink: 0,
-                }} />
-                <div style={{ flex: 1, minWidth: 0 }}>
-                  <div style={{ fontWeight: 500, fontSize: '0.8125rem' }}>{a.title}</div>
-                  <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)', marginTop: 3 }}>
-                    {a.module} · Due: <strong style={{ color: 'var(--text-secondary)' }}>{a.dueDate}</strong>
-                  </div>
-                </div>
-                <span style={{
-                  fontSize: '0.6875rem', fontWeight: 600,
-                  padding: '2px 8px', borderRadius: 'var(--radius-full)',
-                  background: priorityBg(a.priority),
-                  color: priorityColor(a.priority),
-                  flexShrink: 0,
-                }}>
-                  {a.priority}
-                </span>
-              </div>
-            ))}
-            <div style={{ padding: '12px 20px' }}>
-              <button
-                className="btn btn-primary btn-sm w-full"
-                style={{ justifyContent: 'center' }}
-                onClick={() => navigate('/centre/documents')}
-              >
-                <Upload size={13} /> Upload &amp; Verify Mandatory Documents
-              </button>
-            </div>
-          </div>
-        </div>
-
-        {/* Centre Info Summary */}
-        <div className="card">
-          <div className="card-header">
-            <span className="card-title">Centre Information</span>
-            <button className="btn btn-ghost btn-sm" onClick={() => navigate('/centre/profile')}>
-              Edit Profile
-            </button>
-          </div>
-          <div style={{ padding: '16px 20px', display: 'flex', flexDirection: 'column', gap: 14 }}>
-            {[
-              { label: 'Centre Name',     value: centreProfile.centre_name },
-              { label: 'EDU Code',         value: centreProfile.edu_code },
-              { label: 'TC Code',          value: centreProfile.tc_code },
-              { label: 'City / State',     value: 'New Delhi, Delhi' },
-              { label: 'Organisation',     value: centreProfile.organization_type },
-              { label: 'Total Systems',    value: '45 (Nodes: 40, Buffer: 5)' },
-              { label: 'Assigned Project', value: 'NEET UG 2026 – Season 1' },
-              { label: 'Status',           value: centreProfile.centre_status },
-            ].map(r => (
-              <div key={r.label} style={{ display: 'flex', justifyContent: 'space-between', gap: 12, fontSize: '0.8125rem' }}>
-                <span style={{ color: 'var(--text-muted)' }}>{r.label}</span>
-                <span style={{ fontWeight: 500, textAlign: 'right' }}>{r.value}</span>
-              </div>
-            ))}
-          </div>
-        </div>
-      </div>
-
-      {/* Document Checklist */}
+      {/* Details Card */}
       <div className="card">
         <div className="card-header">
-          <div style={{ display: 'flex', alignItems: 'center', gap: 12, flex: 1 }}>
-            <span className="card-title">Document Checklist</span>
-            <div style={{ flex: 1, maxWidth: 200 }}>
-              <div className="progress-bar">
-                <div className="progress-fill" style={{ width: `${pct}%`, background: 'var(--color-primary)' }} />
+          <span className="card-title">Centre Profile Details — Live Records</span>
+        </div>
+        <div className="card-body">
+          {loading ? (
+            <div style={{ textAlign: 'center', padding: '36px', color: 'var(--text-muted)' }}>
+              <Loader2 className="animate-spin" size={24} style={{ margin: '0 auto 8px', display: 'block' }} />
+              Loading centre records from MySQL database...
+            </div>
+          ) : centreProfile ? (
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(240px, 1fr))', gap: 16 }}>
+              <div>
+                <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>Registered Venue Name</div>
+                <div style={{ fontSize: '0.9375rem', fontWeight: 600, marginTop: 2 }}>{centreProfile.centreName || centreProfile.centre_name}</div>
+              </div>
+              <div>
+                <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>Postal Address</div>
+                <div style={{ fontSize: '0.875rem', marginTop: 2 }}>{centreProfile.centreAddress || centreProfile.centre_address}</div>
+              </div>
+              <div>
+                <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>Jurisdiction</div>
+                <div style={{ fontSize: '0.875rem', marginTop: 2 }}>
+                  {centreProfile.cityName || '—'}, {centreProfile.stateName || '—'} (PIN: {centreProfile.pincode})
+                </div>
+              </div>
+              <div>
+                <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>Official Email</div>
+                <div style={{ fontSize: '0.875rem', marginTop: 2 }}>{centreProfile.officialEmail || '—'}</div>
               </div>
             </div>
-            <span style={{ fontSize: '0.75rem', fontWeight: 600, color: 'var(--text-secondary)' }}>
-              {approvedCount}/{totalCount} ({pct}%)
-            </span>
-          </div>
-          <button className="btn btn-ghost btn-sm" style={{ gap: 4 }} onClick={() => navigate('/centre/documents')}>
-            All 20 Docs <ArrowRight size={12} />
-          </button>
-        </div>
-        <div className="table-wrapper" style={{ border: 'none', borderRadius: 0 }}>
-          <table>
-            <thead>
-              <tr>
-                <th>Document</th>
-                <th>Requirement</th>
-                <th>Status</th>
-                <th>Uploaded On</th>
-                <th style={{ textAlign: 'right' }}>Action</th>
-              </tr>
-            </thead>
-            <tbody>
-              {docRows.slice(0, 8).map((d, i) => (
-                <tr key={i}>
-                  <td style={{ fontWeight: 500 }}>{d.name}</td>
-                  <td>
-                    {d.mandatory ? (
-                      <span className="badge badge-danger" style={{ fontSize: '0.625rem' }}>MANDATORY</span>
-                    ) : (
-                      <span className="badge badge-neutral" style={{ fontSize: '0.625rem' }}>OPTIONAL</span>
-                    )}
-                  </td>
-                  <td>
-                    <StatusBadge status={d.status === 'Approved' ? 'Approved' : 'Pending'} />
-                  </td>
-                  <td style={{ color: 'var(--text-muted)', fontSize: '0.8125rem' }}>{d.date}</td>
-                  <td style={{ textAlign: 'right' }}>
-                    <button
-                      className={`btn ${d.status === 'Pending' ? 'btn-primary' : 'btn-secondary'} btn-sm`}
-                      onClick={() => navigate('/centre/documents')}
-                    >
-                      {d.status === 'Pending' ? <><Upload size={11} /> Upload</> : 'View & Manage'}
-                    </button>
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
+          ) : (
+            <div style={{ textAlign: 'center', padding: '36px', color: 'var(--text-muted)' }}>
+              No examination centre assigned to this user in MySQL database.
+            </div>
+          )}
         </div>
       </div>
     </div>

@@ -1,18 +1,20 @@
-import { useState } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import {
   ShieldCheck, ShieldAlert, AlertTriangle, Search, Filter, CheckCircle2,
-  XCircle, Check, X, RefreshCw, Eye, Lock, Unlock, AlertOctagon, History,
-  Building2, BatteryCharging, Video, Info
+  XCircle, Check, X, RefreshCw, Eye, Lock, AlertOctagon,
+  Building2, Loader2, AlertCircle
 } from 'lucide-react';
-import { EligibilityStore, ProjectStore, appendAuditLog } from '@/services/dataService';
+import { apiClient } from '@/services/apiClient';
+import { ENDPOINTS } from '@/services/endpoints';
 import { useAuth } from '@/context/AuthContext';
 import { StatusBadge } from '@/components/common';
 
 export default function EligibilityPage() {
   const { user } = useAuth();
-  const [eligibilityList, setEligibilityList] = useState(() => EligibilityStore.getAll());
-  const [projects] = useState(() => ProjectStore.getAll());
-  const [selectedProject, setSelectedProject] = useState(projects[0]?.id || 'p001');
+  const [centres, setCentres] = useState([]);
+  const [projects, setProjects] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(null);
   const [search, setSearch] = useState('');
   const [statusFilter, setStatusFilter] = useState('All');
 
@@ -22,180 +24,195 @@ export default function EligibilityPage() {
   const [overrideReason, setOverrideReason] = useState('');
   const [showBlacklistModal, setShowBlacklistModal] = useState(false);
   const [blacklistReason, setBlacklistReason] = useState('');
-  const [toastMessage, setToastMessage] = useState(null);
+  const [submitting, setSubmitting] = useState(false);
+  const [toast, setToast] = useState(null);
 
-  const showToast = (msg) => {
-    setToastMessage(msg);
-    setTimeout(() => setToastMessage(null), 3500);
+  const showToast = (message, type = 'success') => {
+    setToast({ message, type });
+    setTimeout(() => setToast(null), 3500);
   };
 
-  const reloadData = () => setEligibilityList(EligibilityStore.getAll());
+  const loadData = useCallback(async () => {
+    setLoading(true);
+    setError(null);
+    try {
+      const [centresRes, projectsRes] = await Promise.allSettled([
+        apiClient.get(ENDPOINTS.ADMIN.CENTRES, { params: { limit: 100 } }),
+        apiClient.get(ENDPOINTS.ADMIN.PROJECTS, { params: { limit: 100 } }),
+      ]);
 
-  const currentProject = projects.find(p => p.id === selectedProject) || projects[0];
+      if (centresRes.status === 'fulfilled' && centresRes.value?.success && Array.isArray(centresRes.value.data)) {
+        setCentres(centresRes.value.data);
+      } else {
+        setCentres([]);
+      }
 
-  const filteredCentres = eligibilityList.filter(c => {
+      if (projectsRes.status === 'fulfilled' && projectsRes.value?.success && Array.isArray(projectsRes.value.data)) {
+        setProjects(projectsRes.value.data);
+      } else {
+        setProjects([]);
+      }
+    } catch (err) {
+      console.error('Failed to load eligibility data:', err);
+      setError(err.message || 'Unable to retrieve eligibility records');
+    } finally {
+      setLoading(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    loadData();
+  }, [loadData]);
+
+  const filteredCentres = centres.filter(c => {
+    const name = c.centreName || c.centre_name || '';
+    const city = c.cityName || '';
+    const state = c.stateName || '';
+    const eligibility = c.eligibilityStatus || 'Eligible';
+
     if (search) {
       const q = search.toLowerCase();
-      const match = c.centre_name?.toLowerCase().includes(q) ||
-                    c.city?.toLowerCase().includes(q) ||
-                    c.state?.toLowerCase().includes(q);
+      const match = name.toLowerCase().includes(q) ||
+                    city.toLowerCase().includes(q) ||
+                    state.toLowerCase().includes(q);
       if (!match) return false;
     }
-    if (statusFilter !== 'All' && c.eligibility_status !== statusFilter) return false;
+    if (statusFilter !== 'All' && eligibility !== statusFilter) return false;
     return true;
   });
 
-  const eligibleCount = eligibilityList.filter(c => c.eligibility_status === 'Eligible').length;
-  const conditionalCount = eligibilityList.filter(c => c.eligibility_status === 'Conditional').length;
-  const blacklistedCount = eligibilityList.filter(c => c.eligibility_status === 'Blacklisted').length;
+  const eligibleCount = centres.filter(c => (c.eligibilityStatus || 'Eligible') === 'Eligible').length;
+  const conditionalCount = centres.filter(c => c.eligibilityStatus === 'ConditionallyEligible' || c.eligibilityStatus === 'Conditional').length;
+  const blacklistedCount = centres.filter(c => c.eligibilityStatus === 'Blacklisted').length;
 
-  const handleBlacklistSubmit = (e) => {
+  const handleBlacklistSubmit = async (e) => {
     e.preventDefault();
-    if (!activeCentre || !blacklistReason) return;
+    if (!activeCentre || !blacklistReason.trim()) return;
 
-    EligibilityStore.update(activeCentre.id, {
-      eligibility_status: 'Blacklisted',
-      is_blacklisted: true,
-      blacklist_reason: blacklistReason,
-      blacklist_date: new Date().toISOString().split('T')[0],
-      score: Math.min(activeCentre.score, 40),
-    });
-
-    appendAuditLog({
-      user: user?.name || 'Admin',
-      role: user?.role || 'admin',
-      action: 'CENTRE_BLACKLISTED',
-      entity: `Centre: ${activeCentre.centre_name}`,
-      details: `Blacklisted with reason: ${blacklistReason}`,
-    });
-
-    reloadData();
-    setShowBlacklistModal(false);
-    setActiveCentre(null);
-    setBlacklistReason('');
-    showToast(`Centre "${activeCentre.centre_name}" has been de-paneled & blacklisted.`);
+    setSubmitting(true);
+    try {
+      const res = await apiClient.post(ENDPOINTS.ADMIN.BLACKLIST, {
+        centreId: activeCentre.id,
+        reason: blacklistReason.trim(),
+      });
+      if (res && res.success) {
+        showToast(`Centre "${activeCentre.centreName || activeCentre.centre_name}" has been de-paneled & blacklisted in database.`);
+        setShowBlacklistModal(false);
+        setActiveCentre(null);
+        setBlacklistReason('');
+        await loadData();
+      }
+    } catch (err) {
+      const msg = err.data?.error?.message || err.message || 'Failed to blacklist centre';
+      showToast(msg, 'error');
+    } finally {
+      setSubmitting(false);
+    }
   };
 
-  const handleOverrideSubmit = (e) => {
+  const handleOverrideSubmit = async (e) => {
     e.preventDefault();
-    if (!activeCentre || !overrideReason) return;
+    if (!activeCentre || !overrideReason.trim()) return;
 
-    const newHistory = [
-      ...(activeCentre.overrule_history || []),
-      {
-        date: new Date().toISOString().split('T')[0],
-        authorized_by: `${user?.name || 'Authorized Lead'} (${user?.role || 'admin'})`,
-        justification: overrideReason,
+    setSubmitting(true);
+    try {
+      const res = await apiClient.post(ENDPOINTS.ADMIN.OVERRIDE_ELIGIBILITY, {
+        centreId: activeCentre.id,
+        eligibilityStatus: 'Eligible',
+        overrideReason: overrideReason.trim(),
+      });
+      if (res && res.success) {
+        showToast(`Executive override granted for "${activeCentre.centreName || activeCentre.centre_name}".`);
+        setShowOverrideModal(false);
+        setActiveCentre(null);
+        setOverrideReason('');
+        await loadData();
       }
-    ];
-
-    EligibilityStore.update(activeCentre.id, {
-      eligibility_status: 'Eligible',
-      is_blacklisted: false,
-      blacklist_reason: '',
-      score: Math.max(activeCentre.score, 80),
-      overrule_history: newHistory,
-    });
-
-    appendAuditLog({
-      user: user?.name || 'Admin',
-      role: user?.role || 'admin',
-      action: 'BLACKLIST_OVERRULED',
-      entity: `Centre: ${activeCentre.centre_name}`,
-      details: `Exception granted. Reason: ${overrideReason}`,
-    });
-
-    reloadData();
-    setShowOverrideModal(false);
-    setActiveCentre(null);
-    setOverrideReason('');
-    showToast(`Exception granted for "${activeCentre.centre_name}". Status set to Eligible.`);
+    } catch (err) {
+      const msg = err.data?.error?.message || err.message || 'Failed to override eligibility';
+      showToast(msg, 'error');
+    } finally {
+      setSubmitting(false);
+    }
   };
 
   return (
     <div>
       {/* Toast Alert */}
-      {toastMessage && (
+      {toast && (
         <div style={{
           position: 'fixed',
           top: 24,
           right: 24,
-          background: 'var(--color-primary-dark)',
+          background: toast.type === 'error' ? '#b91c1c' : 'var(--color-primary-dark, #1e3a8a)',
           color: '#fff',
           padding: '12px 20px',
-          borderRadius: 'var(--radius-lg)',
-          boxShadow: 'var(--shadow-xl)',
+          borderRadius: 'var(--radius-lg, 12px)',
+          boxShadow: 'var(--shadow-xl, 0 20px 25px -5px rgba(0, 0, 0, 0.1))',
           zIndex: 9999,
           display: 'flex',
           alignItems: 'center',
           gap: 10,
           fontWeight: 600
         }}>
-          <CheckCircle2 size={18} color="#4ade80" />
-          <span>{toastMessage}</span>
+          {toast.type === 'error' ? <AlertCircle size={18} /> : <CheckCircle2 size={18} color="#4ade80" />}
+          <span>{toast.message}</span>
         </div>
       )}
 
-      {/* Header */}
+      {/* Page Header */}
       <div className="page-header">
         <div className="page-header__top">
           <div>
             <div className="breadcrumb">
-              <span>Operations</span>
+              <span>Admin</span>
               <span className="breadcrumb-sep">/</span>
-              <span className="breadcrumb-current">Eligibility & Blacklist Engine</span>
+              <span className="breadcrumb-current">Eligibility &amp; Blacklist</span>
             </div>
-            <h1 className="page-header__title" style={{ marginTop: 6 }}>Venue Eligibility & Compliance Scoring</h1>
+            <h1 className="page-header__title" style={{ marginTop: 6 }}>Centre Eligibility &amp; Blacklist Oversight</h1>
             <p className="page-header__subtitle">
-              Module 3A — Automated multi-factor eligibility verification, power/CCTV thresholds, and de-panelment security controls
+              Live automated eligibility scoring, de-paneling controls, and dual-authorized executive overrides
             </p>
           </div>
           <div className="page-header__actions">
-            <button
-              className="btn btn-secondary"
-              onClick={() => {
-                EligibilityStore.reset();
-                reloadData();
-                showToast('Reset eligibility dataset to default');
-              }}
-            >
-              <RefreshCw size={14} /> Reset Rules
+            <button className="btn btn-secondary" onClick={loadData} disabled={loading}>
+              <RefreshCw size={14} className={loading ? 'animate-spin' : ''} /> Refresh
             </button>
           </div>
         </div>
       </div>
 
-      {/* Project Selector Bar */}
-      <div className="card" style={{ padding: '16px 20px', marginBottom: 20, background: '#f8fafc', border: '1px solid var(--border-default)' }}>
-        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: 14 }}>
+      {/* Error Banner */}
+      {error && (
+        <div style={{
+          background: '#fee2e2',
+          border: '1px solid #ef4444',
+          borderRadius: 'var(--radius-md, 8px)',
+          padding: '12px 16px',
+          marginBottom: 20,
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'space-between',
+          color: '#991b1b',
+        }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-            <span style={{ fontSize: '0.8125rem', fontWeight: 600, color: 'var(--text-primary)' }}>
-              Evaluate Against Project:
-            </span>
-            <select
-              className="form-control"
-              value={selectedProject}
-              onChange={e => setSelectedProject(e.target.value)}
-              style={{ width: 280, fontSize: '0.8125rem', fontWeight: 600 }}
-            >
-              {projects.map(p => (
-                <option key={p.id} value={p.id}>
-                  {p.project_code} — {p.name}
-                </option>
-              ))}
-            </select>
+            <AlertCircle size={20} />
+            <div>
+              <strong>Failed to query eligibility database:</strong> {error}
+            </div>
           </div>
-
-          <div style={{ display: 'flex', alignItems: 'center', gap: 16, fontSize: '0.75rem', color: 'var(--text-secondary)' }}>
-            <div>Client: <strong style={{ color: 'var(--color-primary)' }}>{currentProject?.client_name || 'NTA'}</strong></div>
-            <div>Target Candidates: <strong>{Number(currentProject?.candidate_target || 0).toLocaleString()}</strong></div>
-            <div>Exam Date: <strong>{currentProject?.exam_date || 'Upcoming'}</strong></div>
-          </div>
+          <button
+            className="btn btn-sm btn-secondary"
+            onClick={loadData}
+            style={{ background: '#fff', borderColor: '#f87171', color: '#991b1b' }}
+          >
+            Retry
+          </button>
         </div>
-      </div>
+      )}
 
-      {/* KPI Stats */}
-      <div className="kpi-grid" style={{ marginBottom: 24 }}>
+      {/* KPI Cards */}
+      <div className="kpi-grid" style={{ marginBottom: 20 }}>
         <div className="kpi-card">
           <div className="kpi-card__header">
             <span className="kpi-card__label">Eligible Venues</span>
@@ -203,42 +220,48 @@ export default function EligibilityPage() {
               <ShieldCheck size={16} color="#16a34a" />
             </div>
           </div>
-          <div className="kpi-card__value" style={{ color: 'var(--color-success)' }}>{eligibleCount}</div>
-          <div className="kpi-card__sub">All security &amp; power criteria met</div>
+          <div className="kpi-card__value" style={{ color: 'var(--color-success, #16a34a)' }}>
+            {loading ? '...' : eligibleCount}
+          </div>
+          <div className="kpi-card__sub">Clear compliance record in DB</div>
         </div>
 
         <div className="kpi-card">
           <div className="kpi-card__header">
-            <span className="kpi-card__label">Conditional Clearance</span>
+            <span className="kpi-card__label">Conditional / Under Review</span>
             <div className="kpi-card__icon" style={{ background: '#fffbeb' }}>
               <AlertTriangle size={16} color="#d97706" />
             </div>
           </div>
-          <div className="kpi-card__value" style={{ color: 'var(--color-warning)' }}>{conditionalCount}</div>
-          <div className="kpi-card__sub">Pending secondary generator / audit fix</div>
+          <div className="kpi-card__value" style={{ color: 'var(--color-warning, #d97706)' }}>
+            {loading ? '...' : conditionalCount}
+          </div>
+          <div className="kpi-card__sub">Subject to rework or verification</div>
         </div>
 
         <div className="kpi-card">
           <div className="kpi-card__header">
-            <span className="kpi-card__label">De-Paneled / Blacklisted</span>
+            <span className="kpi-card__label">Blacklisted Venues</span>
             <div className="kpi-card__icon" style={{ background: '#fef2f2' }}>
-              <ShieldAlert size={16} color="#dc2626" />
+              <AlertOctagon size={16} color="#dc2626" />
             </div>
           </div>
-          <div className="kpi-card__value" style={{ color: 'var(--color-danger)' }}>{blacklistedCount}</div>
-          <div className="kpi-card__sub">Blocked from exam booking invitations</div>
+          <div className="kpi-card__value" style={{ color: 'var(--color-danger, #dc2626)' }}>
+            {loading ? '...' : blacklistedCount}
+          </div>
+          <div className="kpi-card__sub">De-paneled from examination drives</div>
         </div>
       </div>
 
       {/* Main Table Card */}
       <div className="card">
         <div className="card-header" style={{ flexWrap: 'wrap', gap: 12 }}>
-          <div style={{ position: 'relative', width: 280 }}>
+          <div style={{ position: 'relative', width: 'min(100%, 300px)' }}>
             <Search size={14} style={{ position: 'absolute', left: 10, top: 10, color: 'var(--text-muted)' }} />
             <input
               type="text"
               className="form-control"
-              placeholder="Search centre, city, state..."
+              placeholder="Search venue name, city, state..."
               value={search}
               onChange={e => setSearch(e.target.value)}
               style={{ paddingLeft: 30, fontSize: '0.8125rem' }}
@@ -246,25 +269,24 @@ export default function EligibilityPage() {
           </div>
 
           <div style={{ display: 'flex', gap: 8 }}>
-            {['All', 'Eligible', 'Conditional', 'Blacklisted'].map(st => (
-              <button
-                key={st}
-                onClick={() => setStatusFilter(st)}
-                style={{
-                  padding: '5px 12px',
-                  borderRadius: 'var(--radius-full)',
-                  fontSize: '0.75rem',
-                  fontWeight: 600,
-                  border: '1px solid',
-                  borderColor: statusFilter === st ? 'var(--color-primary)' : 'var(--border-default)',
-                  background: statusFilter === st ? '#eff6ff' : 'var(--bg-surface)',
-                  color: statusFilter === st ? 'var(--color-primary)' : 'var(--text-secondary)',
-                  cursor: 'pointer'
-                }}
-              >
-                {st}
-              </button>
-            ))}
+            <button
+              className={`btn btn-sm ${statusFilter === 'All' ? 'btn-primary' : 'btn-secondary'}`}
+              onClick={() => setStatusFilter('All')}
+            >
+              All Venues ({centres.length})
+            </button>
+            <button
+              className={`btn btn-sm ${statusFilter === 'Eligible' ? 'btn-primary' : 'btn-secondary'}`}
+              onClick={() => setStatusFilter('Eligible')}
+            >
+              Eligible ({eligibleCount})
+            </button>
+            <button
+              className={`btn btn-sm ${statusFilter === 'Blacklisted' ? 'btn-primary' : 'btn-secondary'}`}
+              onClick={() => setStatusFilter('Blacklisted')}
+            >
+              Blacklisted ({blacklistedCount})
+            </button>
           </div>
         </div>
 
@@ -272,123 +294,86 @@ export default function EligibilityPage() {
           <table>
             <thead>
               <tr>
-                <th>Centre &amp; Location</th>
-                <th>Capacity</th>
-                <th>Power &amp; Generator Spec</th>
-                <th>CCTV / Surveillance</th>
-                <th>Audit History</th>
-                <th>Eligibility Score</th>
-                <th>Status</th>
-                <th style={{ textAlign: 'right' }}>Actions</th>
+                <th>Centre Code</th>
+                <th>Centre Name</th>
+                <th>Location</th>
+                <th>Eligibility Status</th>
+                <th>Venue Status</th>
+                <th style={{ textAlign: 'right' }}>Governance Actions</th>
               </tr>
             </thead>
             <tbody>
-              {filteredCentres.map(centre => {
-                const isBlacklisted = centre.eligibility_status === 'Blacklisted';
-                const isConditional = centre.eligibility_status === 'Conditional';
-
-                return (
-                  <tr key={centre.id} style={{ background: isBlacklisted ? '#fef2f220' : 'transparent' }}>
-                    <td>
-                      <div style={{ fontWeight: 600, color: isBlacklisted ? 'var(--color-danger)' : 'var(--text-primary)' }}>
-                        {centre.centre_name}
-                      </div>
-                      <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>
-                        {centre.city}, {centre.state}
-                      </div>
-                      {isBlacklisted && (
-                        <div style={{ fontSize: '0.6875rem', color: 'var(--color-danger)', marginTop: 2, fontWeight: 500 }}>
-                          Reason: {centre.blacklist_reason}
-                        </div>
-                      )}
-                    </td>
-                    <td>
-                      <span style={{ fontWeight: 600 }}>{centre.total_capacity}</span> nodes
-                    </td>
-                    <td>
-                      <div style={{ fontSize: '0.75rem', display: 'flex', alignItems: 'center', gap: 4 }}>
-                        <BatteryCharging size={13} color="var(--color-primary)" />
-                        <span>{centre.power_backup}</span>
-                      </div>
-                    </td>
-                    <td>
-                      <div style={{ fontSize: '0.75rem', display: 'flex', alignItems: 'center', gap: 4 }}>
-                        <Video size={13} color="var(--color-purple)" />
-                        <span className="truncate" style={{ maxWidth: 180 }} title={centre.cctv_coverage}>
-                          {centre.cctv_coverage}
+              {loading ? (
+                <tr>
+                  <td colSpan={6} style={{ textAlign: 'center', padding: '36px', color: 'var(--text-muted)' }}>
+                    <Loader2 className="animate-spin" size={24} style={{ margin: '0 auto 8px', display: 'block' }} />
+                    Querying eligibility records from MySQL...
+                  </td>
+                </tr>
+              ) : filteredCentres.length === 0 ? (
+                <tr>
+                  <td colSpan={6} style={{ textAlign: 'center', padding: '36px', color: 'var(--text-muted)' }}>
+                    No centre records found matching filter.
+                  </td>
+                </tr>
+              ) : (
+                filteredCentres.map(c => {
+                  const isBlacklisted = c.eligibilityStatus === 'Blacklisted';
+                  return (
+                    <tr key={c.id}>
+                      <td>
+                        <span style={{ fontFamily: 'monospace', fontWeight: 700, color: 'var(--color-primary)' }}>
+                          {c.centreCode || c.centre_id}
                         </span>
-                      </div>
-                    </td>
-                    <td>
-                      <StatusBadge status={centre.audit_status} />
-                    </td>
-                    <td>
-                      <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                        <div style={{ width: 44, fontWeight: 700, fontSize: '0.875rem', color: centre.score >= 80 ? 'var(--color-success)' : centre.score >= 60 ? 'var(--color-warning)' : 'var(--color-danger)' }}>
-                          {centre.score}%
+                      </td>
+                      <td>
+                        <div style={{ fontWeight: 600 }}>{c.centreName || c.centre_name}</div>
+                        <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>
+                          {c.centreAddress || c.centre_address}
                         </div>
-                        <div style={{ width: 60 }}>
-                          <div className="progress-bar">
-                            <div
-                              className="progress-fill"
-                              style={{
-                                width: `${centre.score}%`,
-                                background: centre.score >= 80 ? 'var(--color-success)' : centre.score >= 60 ? 'var(--color-warning)' : 'var(--color-danger)'
-                              }}
-                            />
-                          </div>
-                        </div>
-                      </div>
-                    </td>
-                    <td>
-                      <span className={`badge ${centre.eligibility_status === 'Eligible' ? 'badge-success' : centre.eligibility_status === 'Conditional' ? 'badge-warning' : 'badge-danger'}`}>
-                        {centre.eligibility_status}
-                      </span>
-                    </td>
-                    <td style={{ textAlign: 'right' }}>
-                      <div style={{ display: 'inline-flex', gap: 6 }}>
-                        {isBlacklisted ? (
-                          <button
-                            className="btn btn-primary btn-sm"
-                            title="Grant Administrative Whitelist Overrule"
-                            onClick={() => {
-                              setActiveCentre(centre);
-                              setShowOverrideModal(true);
-                            }}
-                          >
-                            <Unlock size={13} /> Overrule &amp; Clear
-                          </button>
-                        ) : (
-                          <>
-                            {centre.overrule_history?.length > 0 && (
-                              <button
-                                className="btn btn-secondary btn-sm"
-                                title="View override history"
-                                onClick={() => {
-                                  setActiveCentre(centre);
-                                }}
-                              >
-                                <History size={13} />
-                              </button>
-                            )}
+                      </td>
+                      <td>
+                        <div style={{ fontWeight: 500 }}>{c.cityName || '—'}, {c.stateName || '—'}</div>
+                      </td>
+                      <td>
+                        <StatusBadge status={c.eligibilityStatus || 'Eligible'} />
+                      </td>
+                      <td>
+                        <span className={`badge ${c.venueStatus === 'Old' ? 'badge-info' : 'badge-neutral'}`}>
+                          {c.venueStatus || 'Old'}
+                        </span>
+                      </td>
+                      <td style={{ textAlign: 'right' }}>
+                        <div style={{ display: 'inline-flex', gap: 6 }}>
+                          {isBlacklisted ? (
                             <button
-                              className="btn btn-ghost btn-sm"
-                              style={{ color: 'var(--color-danger)' }}
-                              title="De-panel / Blacklist Centre"
+                              className="btn btn-secondary btn-sm"
+                              style={{ color: 'var(--color-success, #16a34a)' }}
                               onClick={() => {
-                                setActiveCentre(centre);
+                                setActiveCentre(c);
+                                setShowOverrideModal(true);
+                              }}
+                            >
+                              <ShieldCheck size={13} /> Override
+                            </button>
+                          ) : (
+                            <button
+                              className="btn btn-secondary btn-sm"
+                              style={{ color: 'var(--color-danger, #dc2626)' }}
+                              onClick={() => {
+                                setActiveCentre(c);
                                 setShowBlacklistModal(true);
                               }}
                             >
-                              <Lock size={13} /> Blacklist
+                              <AlertOctagon size={13} /> Blacklist
                             </button>
-                          </>
-                        )}
-                      </div>
-                    </td>
-                  </tr>
-                );
-              })}
+                          )}
+                        </div>
+                      </td>
+                    </tr>
+                  );
+                })
+              )}
             </tbody>
           </table>
         </div>
@@ -397,29 +382,28 @@ export default function EligibilityPage() {
       {/* Blacklist Modal */}
       {showBlacklistModal && activeCentre && (
         <div className="modal-backdrop" onClick={() => setShowBlacklistModal(false)}>
-          <div className="modal" onClick={e => e.stopPropagation()} style={{ maxWidth: 500 }}>
+          <div className="modal" onClick={e => e.stopPropagation()} style={{ maxWidth: 480 }}>
             <div className="modal-header">
-              <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                <AlertOctagon size={20} color="var(--color-danger)" />
-                <h3 className="modal-title" style={{ color: 'var(--color-danger)' }}>De-panel &amp; Blacklist Venue</h3>
-              </div>
+              <h3 className="modal-title" style={{ color: 'var(--color-danger, #dc2626)' }}>
+                De-panel &amp; Blacklist Testing Centre
+              </h3>
               <button className="btn-ghost" onClick={() => setShowBlacklistModal(false)} style={{ padding: 4 }}>
                 <X size={18} />
               </button>
             </div>
             <form onSubmit={handleBlacklistSubmit}>
               <div className="modal-body" style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
-                <div style={{ background: '#fef2f2', border: '1px solid #fecaca', borderRadius: 'var(--radius-md)', padding: '12px 16px', fontSize: '0.8125rem', color: '#991b1b' }}>
-                  <strong>Security Warning:</strong> Blacklisting <strong>{activeCentre.centre_name}</strong> will instantly disqualify the venue from all ongoing and future project booking pipelines across NTA, UGC, and AICTE drives.
-                </div>
-
+                <p style={{ fontSize: '0.8125rem', color: 'var(--text-secondary)' }}>
+                  You are about to blacklist <strong>{activeCentre.centreName || activeCentre.centre_name}</strong>.
+                  This action is recorded in the immutable audit log and prevents the venue from booking examination drives.
+                </p>
                 <div className="form-group">
-                  <label className="form-label">Confidential De-panelment Reason *</label>
+                  <label className="form-label">Mandatory Reason for Blacklisting *</label>
                   <textarea
                     className="form-control"
                     required
                     rows={3}
-                    placeholder="Enter explicit findings (e.g., Audit failure, CCTV tampering, power breakdown during live exam, integrity issue)..."
+                    placeholder="Provide specific legal, technical or security justification..."
                     value={blacklistReason}
                     onChange={e => setBlacklistReason(e.target.value)}
                   />
@@ -429,8 +413,9 @@ export default function EligibilityPage() {
                 <button type="button" className="btn btn-secondary" onClick={() => setShowBlacklistModal(false)}>
                   Cancel
                 </button>
-                <button type="submit" className="btn btn-danger">
-                  <Lock size={14} /> Confirm Blacklist
+                <button type="submit" className="btn btn-danger" disabled={submitting}>
+                  {submitting ? <Loader2 size={14} className="animate-spin" /> : <AlertOctagon size={14} />}
+                  <span>Confirm Blacklist</span>
                 </button>
               </div>
             </form>
@@ -438,32 +423,29 @@ export default function EligibilityPage() {
         </div>
       )}
 
-      {/* Whitelist / Override Modal */}
+      {/* Override Modal */}
       {showOverrideModal && activeCentre && (
         <div className="modal-backdrop" onClick={() => setShowOverrideModal(false)}>
-          <div className="modal" onClick={e => e.stopPropagation()} style={{ maxWidth: 520 }}>
+          <div className="modal" onClick={e => e.stopPropagation()} style={{ maxWidth: 480 }}>
             <div className="modal-header">
-              <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                <Unlock size={20} color="var(--color-primary)" />
-                <h3 className="modal-title">Administrative Whitelist Overrule</h3>
-              </div>
+              <h3 className="modal-title">Executive Eligibility Override</h3>
               <button className="btn-ghost" onClick={() => setShowOverrideModal(false)} style={{ padding: 4 }}>
                 <X size={18} />
               </button>
             </div>
             <form onSubmit={handleOverrideSubmit}>
               <div className="modal-body" style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
-                <div style={{ background: '#f0fdf4', border: '1px solid #bbf7d0', borderRadius: 'var(--radius-md)', padding: '12px 16px', fontSize: '0.8125rem', color: '#166534' }}>
-                  Overruling blacklist for <strong>{activeCentre.centre_name}</strong>. An immutable authorization log with your digital stamp will be recorded.
-                </div>
-
+                <p style={{ fontSize: '0.8125rem', color: 'var(--text-secondary)' }}>
+                  Authorizing executive override for <strong>{activeCentre.centreName || activeCentre.centre_name}</strong> restores
+                  venue eligibility status to Eligible.
+                </p>
                 <div className="form-group">
-                  <label className="form-label">Mandatory Re-activation Justification *</label>
+                  <label className="form-label">Authorization Justification *</label>
                   <textarea
                     className="form-control"
                     required
                     rows={3}
-                    placeholder="Specify corrective actions completed (e.g. Lab equipment replaced, re-audit cleared, DG set installed and tested)..."
+                    placeholder="Enter board sanction, re-audit clearance, or legal approval details..."
                     value={overrideReason}
                     onChange={e => setOverrideReason(e.target.value)}
                   />
@@ -473,8 +455,9 @@ export default function EligibilityPage() {
                 <button type="button" className="btn btn-secondary" onClick={() => setShowOverrideModal(false)}>
                   Cancel
                 </button>
-                <button type="submit" className="btn btn-primary">
-                  <Check size={14} /> Authorize Clearance
+                <button type="submit" className="btn btn-primary" disabled={submitting}>
+                  {submitting ? <Loader2 size={14} className="animate-spin" /> : <ShieldCheck size={14} />}
+                  <span>Authorize Override</span>
                 </button>
               </div>
             </form>

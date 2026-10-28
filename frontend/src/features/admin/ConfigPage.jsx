@@ -1,62 +1,68 @@
-import { useState } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import {
   FileText, Shield, Bell, CheckCircle2, Clock, Search, Filter,
-  RefreshCw, AlertTriangle, ToggleLeft, ToggleRight, Info, Check
+  RefreshCw, AlertTriangle, ToggleLeft, ToggleRight, Info, Check,
+  AlertCircle, Loader2
 } from 'lucide-react';
-import { getAuditLogs, appendAuditLog } from '@/services/dataService';
+import { apiClient } from '@/services/apiClient';
+import { ENDPOINTS } from '@/services/endpoints';
 import { useAuth } from '@/context/AuthContext';
-
-const DEFAULT_EVENT_RULES = [
-  { id: 'ev1', code: 'SCAN_DUPLICATE_MAC', name: 'Technical Scan Duplicate MAC Alert', category: 'Compliance', severity: 'Critical', enabled: true, desc: 'Triggers high-priority security alert when duplicate hardware MAC addresses are detected at a venue.' },
-  { id: 'ev2', code: 'AUDIT_CRITICAL_FINDING', name: 'Audit Critical Finding Escalation', category: 'Compliance', severity: 'Critical', enabled: true, desc: 'Immediately notifies PM and Ops Lead when a centre fails critical audit parameters.' },
-  { id: 'ev3', code: 'DOC_REJECTED', name: 'Document Rejection Notification', category: 'Operations', severity: 'Medium', enabled: true, desc: 'Dispatches instant re-upload notification with mandatory rejection remarks to Centre User.' },
-  { id: 'ev4', code: 'BOOKING_CONFLICT', name: 'Concurrent Booking Overlap Warning', category: 'Operations', severity: 'High', enabled: true, desc: 'Alerts Ops executive if a centre is allocated to overlapping exam dates across different projects.' },
-  { id: 'ev5', code: 'MOCK_TEST_FAILED', name: 'Mock Examination Failure Alert', category: 'Execution', severity: 'Critical', enabled: true, desc: 'Automates rapid escalation ticket to IT Field Team when mock exam completion is marked Failed.' },
-  { id: 'ev6', code: 'COMMERCIAL_RATE_DISCREPANCY', name: 'Cost Sheet Rate Deviation', category: 'Finance', severity: 'Medium', enabled: true, desc: 'Notifies Accounts team if agreed centre per-node payout exceeds client sanction limit.' },
-];
 
 export default function ConfigPage() {
   const { user } = useAuth();
-  const [logs, setLogs] = useState(() => getAuditLogs());
+  const [logs, setLogs] = useState([]);
+  const [configs, setConfigs] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(null);
   const [activeTab, setActiveTab] = useState('audit'); // audit | rules
   const [search, setSearch] = useState('');
   const [actionFilter, setActionFilter] = useState('');
-  const [rules, setRules] = useState(DEFAULT_EVENT_RULES);
-  const [toastMessage, setToastMessage] = useState(null);
+  const [toast, setToast] = useState(null);
 
-  const showToast = (msg) => {
-    setToastMessage(msg);
-    setTimeout(() => setToastMessage(null), 3000);
+  const showToast = (message, type = 'success') => {
+    setToast({ message, type });
+    setTimeout(() => setToast(null), 3200);
   };
 
-  const reloadLogs = () => setLogs(getAuditLogs());
+  const loadData = useCallback(async () => {
+    setLoading(true);
+    setError(null);
+    try {
+      const [logsRes, configsRes] = await Promise.allSettled([
+        apiClient.get(ENDPOINTS.ADMIN.AUDIT_LOGS, { params: { limit: 100 } }),
+        apiClient.get(ENDPOINTS.ADMIN.CONFIG),
+      ]);
 
-  const handleToggleRule = (ruleId) => {
-    setRules(prev => prev.map(r => {
-      if (r.id === ruleId) {
-        const nextState = !r.enabled;
-        appendAuditLog({
-          user: user?.name || 'Admin',
-          role: 'admin',
-          action: 'CONFIG_CHANGE',
-          entity: `Rule: ${r.name}`,
-          details: `Toggled notification rule to ${nextState ? 'ENABLED' : 'DISABLED'}`,
-        });
-        showToast(`${r.name} is now ${nextState ? 'Enabled' : 'Disabled'}`);
-        return { ...r, enabled: nextState };
+      if (logsRes.status === 'fulfilled' && logsRes.value?.success && Array.isArray(logsRes.value.data)) {
+        setLogs(logsRes.value.data);
+      } else {
+        setLogs([]);
       }
-      return r;
-    }));
-    reloadLogs();
-  };
+
+      if (configsRes.status === 'fulfilled' && configsRes.value?.success && Array.isArray(configsRes.value.data)) {
+        setConfigs(configsRes.value.data);
+      } else {
+        setConfigs([]);
+      }
+    } catch (err) {
+      console.error('Failed to load audit logs / configs:', err);
+      setError(err.message || 'Unable to load system configuration');
+    } finally {
+      setLoading(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    loadData();
+  }, [loadData]);
 
   const filteredLogs = logs.filter(l => {
     if (search) {
       const q = search.toLowerCase();
-      const match = l.user?.toLowerCase().includes(q) ||
+      const match = (l.userEmail || l.user?.name || '')?.toLowerCase().includes(q) ||
                     l.entity?.toLowerCase().includes(q) ||
-                    l.details?.toLowerCase().includes(q) ||
-                    l.action?.toLowerCase().includes(q);
+                    l.action?.toLowerCase().includes(q) ||
+                    JSON.stringify(l.details || {})?.toLowerCase().includes(q);
       if (!match) return false;
     }
     if (actionFilter && l.action !== actionFilter) return false;
@@ -68,26 +74,24 @@ export default function ConfigPage() {
   return (
     <div>
       {/* Toast Alert */}
-      {toastMessage && (
+      {toast && (
         <div style={{
           position: 'fixed',
           top: 24,
           right: 24,
-          maxWidth: 'calc(100vw - 32px)',
-          boxSizing: 'border-box',
-          background: 'var(--color-primary-dark)',
+          background: toast.type === 'error' ? '#b91c1c' : 'var(--color-primary-dark, #1e3a8a)',
           color: '#fff',
           padding: '12px 20px',
-          borderRadius: 'var(--radius-lg)',
-          boxShadow: 'var(--shadow-xl)',
+          borderRadius: 'var(--radius-lg, 12px)',
+          boxShadow: 'var(--shadow-xl, 0 20px 25px -5px rgba(0, 0, 0, 0.1))',
           zIndex: 9999,
           display: 'flex',
           alignItems: 'center',
           gap: 10,
           fontWeight: 600
         }}>
-          <CheckCircle2 size={18} color="#4ade80" />
-          <span>{toastMessage}</span>
+          {toast.type === 'error' ? <AlertCircle size={18} /> : <CheckCircle2 size={18} color="#4ade80" />}
+          <span>{toast.message}</span>
         </div>
       )}
 
@@ -98,36 +102,49 @@ export default function ConfigPage() {
             <div className="breadcrumb">
               <span>Admin</span>
               <span className="breadcrumb-sep">/</span>
-              <span className="breadcrumb-current">Audit Trail & Configuration</span>
+              <span className="breadcrumb-current">Audit Trail &amp; Configuration</span>
             </div>
-            <h1 className="page-header__title" style={{ marginTop: 6 }}>System Configuration & Security Audit Trail</h1>
+            <h1 className="page-header__title" style={{ marginTop: 6 }}>System Configuration &amp; Security Audit Trail</h1>
             <p className="page-header__subtitle">
-              Module 1 — Platform Foundation, immutable system logs, and automated event notification triggers
+              Immutable audit logs and system configuration stored in MySQL
             </p>
           </div>
           <div className="page-header__actions">
-            <button className="btn btn-secondary" onClick={reloadLogs}>
-              <RefreshCw size={14} /> Refresh Logs
-            </button>
-            <button
-              className="btn btn-primary"
-              onClick={() => {
-                appendAuditLog({
-                  user: user?.name || 'Admin',
-                  role: user?.role || 'admin',
-                  action: 'MANUAL_AUDIT_STAMP',
-                  entity: 'Security Checkpoint',
-                  details: 'Manual verification stamp generated by system administrator',
-                });
-                reloadLogs();
-                showToast('Audit timestamp generated!');
-              }}
-            >
-              <Shield size={14} /> Generate Checkpoint Stamp
+            <button className="btn btn-secondary" onClick={loadData} disabled={loading}>
+              <RefreshCw size={14} className={loading ? 'animate-spin' : ''} /> Refresh Logs
             </button>
           </div>
         </div>
       </div>
+
+      {/* Error Banner */}
+      {error && (
+        <div style={{
+          background: '#fee2e2',
+          border: '1px solid #ef4444',
+          borderRadius: 'var(--radius-md, 8px)',
+          padding: '12px 16px',
+          marginBottom: 20,
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'space-between',
+          color: '#991b1b',
+        }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+            <AlertCircle size={20} />
+            <div>
+              <strong>Failed to query audit trail:</strong> {error}
+            </div>
+          </div>
+          <button
+            className="btn btn-sm btn-secondary"
+            onClick={loadData}
+            style={{ background: '#fff', borderColor: '#f87171', color: '#991b1b' }}
+          >
+            Retry
+          </button>
+        </div>
+      )}
 
       {/* Tabs */}
       <div className="tabs">
@@ -141,19 +158,20 @@ export default function ConfigPage() {
           className={`tab-btn ${activeTab === 'rules' ? 'active' : ''}`}
           onClick={() => setActiveTab('rules')}
         >
-          Event Notification Rules ({rules.length})
+          System Parameters &amp; Config ({configs.length})
         </button>
       </div>
 
+      {/* Audit Log Tab */}
       {activeTab === 'audit' && (
         <div className="card">
           <div className="card-header" style={{ flexWrap: 'wrap', gap: 12 }}>
-            <div style={{ position: 'relative', width: 'min(100%, 280px)' }}>
+            <div style={{ position: 'relative', width: 'min(100%, 300px)' }}>
               <Search size={14} style={{ position: 'absolute', left: 10, top: 10, color: 'var(--text-muted)' }} />
               <input
                 type="text"
                 className="form-control"
-                placeholder="Filter logs by user, action, entity..."
+                placeholder="Search audit trail..."
                 value={search}
                 onChange={e => setSearch(e.target.value)}
                 style={{ paddingLeft: 30, fontSize: '0.8125rem' }}
@@ -167,7 +185,7 @@ export default function ConfigPage() {
               style={{ width: 200, fontSize: '0.75rem' }}
             >
               <option value="">All Action Types</option>
-              {uniqueActions.map(act => <option key={act} value={act}>{act}</option>)}
+              {uniqueActions.map(a => <option key={a} value={a}>{a}</option>)}
             </select>
           </div>
 
@@ -175,51 +193,57 @@ export default function ConfigPage() {
             <table>
               <thead>
                 <tr>
-                  <th style={{ width: '170px' }}>Timestamp (UTC/IST)</th>
-                  <th>Actor / Role</th>
-                  <th>Action Event</th>
+                  <th>Timestamp</th>
+                  <th>Actor / User</th>
+                  <th>Action Type</th>
                   <th>Target Entity</th>
-                  <th>Audit Details</th>
-                  <th>Integrity</th>
+                  <th>Operation Details</th>
                 </tr>
               </thead>
               <tbody>
-                {filteredLogs.length === 0 ? (
+                {loading ? (
                   <tr>
-                    <td colSpan={6} style={{ textAlign: 'center', padding: '36px', color: 'var(--text-muted)' }}>
-                      No audit events recorded matching criteria.
+                    <td colSpan={5} style={{ textAlign: 'center', padding: '36px', color: 'var(--text-muted)' }}>
+                      <Loader2 className="animate-spin" size={24} style={{ margin: '0 auto 8px', display: 'block' }} />
+                      Loading immutable audit records from MySQL...
+                    </td>
+                  </tr>
+                ) : filteredLogs.length === 0 ? (
+                  <tr>
+                    <td colSpan={5} style={{ textAlign: 'center', padding: '36px', color: 'var(--text-muted)' }}>
+                      No audit trail records match the specified query.
                     </td>
                   </tr>
                 ) : (
-                  filteredLogs.map(log => (
-                    <tr key={log.id}>
-                      <td>
-                        <div style={{ display: 'flex', alignItems: 'center', gap: 5, fontSize: '0.75rem', fontFamily: 'monospace' }}>
-                          <Clock size={12} color="var(--text-muted)" />
-                          <span>{log.ts ? new Date(log.ts).toLocaleString() : 'Just now'}</span>
+                  filteredLogs.map(l => (
+                    <tr key={l.id}>
+                      <td style={{ whiteSpace: 'nowrap', fontSize: '0.75rem', color: 'var(--text-muted)' }}>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
+                          <Clock size={12} />
+                          <span>{new Date(l.createdAt).toLocaleString('en-IN')}</span>
                         </div>
                       </td>
                       <td>
-                        <div style={{ fontWeight: 600, color: 'var(--text-primary)' }}>{log.user}</div>
-                        <div style={{ fontSize: '0.6875rem', color: 'var(--text-muted)' }}>role: {log.role}</div>
+                        <div style={{ fontWeight: 600 }}>{l.user?.name || l.userEmail || 'System'}</div>
+                        <div style={{ fontSize: '0.6875rem', color: 'var(--text-muted)' }}>
+                          {l.user?.role || 'SYSTEM'} {l.ipAddress ? `· ${l.ipAddress}` : ''}
+                        </div>
                       </td>
                       <td>
-                        <span className="badge badge-info" style={{ fontFamily: 'monospace', fontSize: '0.6875rem' }}>
-                          {log.action}
+                        <span className="badge badge-primary" style={{ fontSize: '0.6875rem' }}>
+                          {l.action}
                         </span>
                       </td>
                       <td>
-                        <span style={{ fontWeight: 500, fontSize: '0.8125rem' }}>{log.entity}</span>
+                        <span style={{ fontWeight: 500 }}>{l.entity}</span>
+                        {l.entityId && <span style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}> ({l.entityId})</span>}
                       </td>
                       <td>
-                        <span style={{ fontSize: '0.8125rem', color: 'var(--text-secondary)' }}>
-                          {log.details}
-                        </span>
-                      </td>
-                      <td>
-                        <span className="badge badge-success" style={{ fontSize: '0.625rem' }}>
-                          VERIFIED
-                        </span>
+                        <div style={{ fontSize: '0.75rem', color: 'var(--text-secondary)' }}>
+                          {typeof l.details === 'object' && l.details !== null
+                            ? JSON.stringify(l.details)
+                            : String(l.details || '—')}
+                        </div>
                       </td>
                     </tr>
                   ))
@@ -230,84 +254,65 @@ export default function ConfigPage() {
         </div>
       )}
 
-      {/* Event Notification Rules */}
+      {/* Config Tab */}
       {activeTab === 'rules' && (
         <div className="card">
           <div className="card-header">
             <div>
-              <h3 className="card-title">Automated Event Rules & Notification Triggers</h3>
+              <h3 className="card-title">Persisted System Configurations</h3>
               <p style={{ fontSize: '0.75rem', color: 'var(--text-muted)', marginTop: 2 }}>
-                Rules configuring automated escalation messages, emails, and in-app alerts on critical operational milestones
+                Global configuration parameters stored in table <code>oecm_system_configs</code>
               </p>
             </div>
-            <span className="badge badge-success">Engine Active</span>
           </div>
 
-          <div style={{ padding: 20, display: 'flex', flexDirection: 'column', gap: 14 }}>
-            {rules.map(rule => (
-              <div
-                key={rule.id}
-                style={{
-                  border: '1px solid var(--border-default)',
-                  borderRadius: 'var(--radius-lg)',
-                  padding: '16px 20px',
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'space-between',
-                  gap: 16,
-                  background: rule.enabled ? 'var(--bg-surface)' : 'var(--bg-subtle)',
-                  transition: 'background var(--transition-fast)'
-                }}
-              >
-                <div style={{ flex: 1 }}>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-                    <span style={{ fontWeight: 700, fontSize: '0.9375rem', color: 'var(--text-primary)' }}>
-                      {rule.name}
-                    </span>
-                    <span className={`badge ${rule.severity === 'Critical' ? 'badge-danger' : rule.severity === 'High' ? 'badge-warning' : 'badge-info'}`}>
-                      {rule.severity}
-                    </span>
-                    <span className="badge badge-purple">{rule.category}</span>
-                  </div>
-                  <div style={{ fontSize: '0.8125rem', color: 'var(--text-secondary)', marginTop: 4 }}>
-                    {rule.desc}
-                  </div>
-                  <div style={{ fontSize: '0.6875rem', color: 'var(--text-muted)', fontFamily: 'monospace', marginTop: 4 }}>
-                    Event Key: {rule.code}
-                  </div>
-                </div>
-
-                <button
-                  onClick={() => handleToggleRule(rule.id)}
-                  style={{
-                    display: 'flex',
-                    alignItems: 'center',
-                    gap: 8,
-                    padding: '8px 16px',
-                    borderRadius: 'var(--radius-full)',
-                    border: '1px solid var(--border-default)',
-                    background: rule.enabled ? '#eff6ff' : 'var(--bg-surface)',
-                    color: rule.enabled ? 'var(--color-primary)' : 'var(--text-muted)',
-                    cursor: 'pointer',
-                    fontWeight: 600,
-                    fontSize: '0.8125rem',
-                    transition: 'all 0.2s ease'
-                  }}
-                >
-                  {rule.enabled ? (
-                    <>
-                      <CheckCircle2 size={16} color="var(--color-primary)" />
-                      <span>Enabled</span>
-                    </>
-                  ) : (
-                    <>
-                      <Clock size={16} color="var(--text-muted)" />
-                      <span>Disabled</span>
-                    </>
-                  )}
-                </button>
-              </div>
-            ))}
+          <div className="table-wrapper">
+            <table>
+              <thead>
+                <tr>
+                  <th>Config Key</th>
+                  <th>Category</th>
+                  <th>Persisted JSON Value</th>
+                  <th>Last Updated</th>
+                </tr>
+              </thead>
+              <tbody>
+                {loading ? (
+                  <tr>
+                    <td colSpan={4} style={{ textAlign: 'center', padding: '36px', color: 'var(--text-muted)' }}>
+                      Loading system configurations from MySQL...
+                    </td>
+                  </tr>
+                ) : configs.length === 0 ? (
+                  <tr>
+                    <td colSpan={4} style={{ textAlign: 'center', padding: '36px', color: 'var(--text-muted)' }}>
+                      No system configurations found in database.
+                    </td>
+                  </tr>
+                ) : (
+                  configs.map(c => (
+                    <tr key={c.id}>
+                      <td>
+                        <span style={{ fontFamily: 'monospace', fontWeight: 700, color: 'var(--color-primary)' }}>
+                          {c.key}
+                        </span>
+                      </td>
+                      <td>
+                        <span className="badge badge-info">{c.category}</span>
+                      </td>
+                      <td>
+                        <pre style={{ margin: 0, fontSize: '0.75rem', background: 'var(--bg-subtle, #f8fafc)', padding: '6px 10px', borderRadius: 6, maxWidth: 450, overflowX: 'auto' }}>
+                          {JSON.stringify(c.value, null, 2)}
+                        </pre>
+                      </td>
+                      <td style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>
+                        {c.updatedAt ? new Date(c.updatedAt).toLocaleString('en-IN') : '—'}
+                      </td>
+                    </tr>
+                  ))
+                )}
+              </tbody>
+            </table>
           </div>
         </div>
       )}

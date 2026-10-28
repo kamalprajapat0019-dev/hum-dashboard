@@ -1,135 +1,199 @@
-import { PieChart, Pie, Cell, BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, Legend } from 'recharts';
-import { ArrowRight, AlertOctagon, RefreshCw } from 'lucide-react';
+import { useState, useEffect, useCallback } from 'react';
+import { useNavigate } from 'react-router-dom';
+import { ArrowRight, AlertOctagon, RefreshCw, ClipboardCheck, ShieldCheck, AlertCircle, Loader2, Building2 } from 'lucide-react';
 import { KpiCard, StatusBadge, LastUpdated } from '@/components/common';
-import { AUDITOR_KPIS, AUDIT_FINDINGS_DATA, MOCK_STATUS_DATA, CENTRES } from '@/data/mockData';
-
-const CustomTooltip = ({ active, payload }) => {
-  if (!active || !payload?.length) return null;
-  return (
-    <div style={{ background: 'var(--bg-surface)', border: '1px solid var(--border-default)', borderRadius: 'var(--radius-md)', padding: '8px 12px', fontSize: '0.75rem', boxShadow: 'var(--shadow-md)' }}>
-      {payload.map(p => (
-        <div key={p.name} style={{ display: 'flex', gap: 6, alignItems: 'center', color: 'var(--text-primary)' }}>
-          <span style={{ width: 8, height: 8, borderRadius: '50%', background: p.fill, display: 'inline-block' }} />
-          {p.name}: <strong>{p.value}</strong>
-        </div>
-      ))}
-    </div>
-  );
-};
-
-const ASSIGNED_AUDITS = [
-  { centre: 'Lotus Computer Education', city: 'Delhi',    status: 'Passed',            findings: 2, mockStatus: 'Passed',        lastAudit: '2026-10-20' },
-  { centre: 'Sunrise IT Academy',       city: 'Mumbai',   status: 'Passed',            findings: 0, mockStatus: 'Passed',        lastAudit: '2026-10-19' },
-  { centre: 'Tech Valley Institute',    city: 'Bangalore',status: 'Re-audit Required', findings: 5, mockStatus: 'Failed',        lastAudit: '2026-10-18' },
-  { centre: 'Saraswati Computers',      city: 'Hyderabad',status: 'Pending',           findings: 0, mockStatus: 'Not Conducted', lastAudit: '—' },
-  { centre: 'Pioneer Academy',          city: 'Kolkata',  status: 'Passed',            findings: 1, mockStatus: 'Passed',        lastAudit: '2026-10-17' },
-];
+import { apiClient } from '@/services/apiClient';
+import { ENDPOINTS } from '@/services/endpoints';
 
 export default function AuditorDashboard() {
+  const navigate = useNavigate();
+  const [centres, setCentres] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(null);
+
+  const loadData = useCallback(async () => {
+    setLoading(true);
+    setError(null);
+    try {
+      const res = await apiClient.get(ENDPOINTS.ADMIN.CENTRES, { params: { limit: 100 } });
+      if (res && res.success && Array.isArray(res.data)) {
+        setCentres(res.data);
+      } else {
+        setCentres([]);
+      }
+    } catch (err) {
+      console.error('Failed to query auditor centres:', err);
+      setError(err.message || 'Unable to retrieve assigned centres');
+    } finally {
+      setLoading(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    loadData();
+  }, [loadData]);
+
+  const approvedCentres = centres.filter(c => (c.centreStatus || c.centre_status) === 'Approved');
+  const pendingReview = centres.filter(c => (c.centreStatus || c.centre_status) === 'Draft');
+  const blacklistedCentres = centres.filter(c => c.eligibilityStatus === 'Blacklisted');
+
   return (
     <div>
       <div className="page-header">
         <div className="page-header__top">
           <div>
-            <h1 className="page-header__title">My Audits</h1>
-            <p className="page-header__subtitle">Assigned audits, findings, technical scans and mock status</p>
+            <h1 className="page-header__title">Auditor Portal</h1>
+            <p className="page-header__subtitle">Assigned venue audits, compliance status, and security checkpoints</p>
           </div>
           <div className="page-header__actions">
+            <button className="btn btn-secondary btn-sm" onClick={loadData} disabled={loading}>
+              <RefreshCw size={13} className={loading ? 'animate-spin' : ''} />
+            </button>
             <LastUpdated />
-            <button className="btn btn-primary btn-sm"><AlertOctagon size={13} /> Record Finding</button>
+            <button className="btn btn-primary btn-sm" onClick={() => navigate('/auditor/audits')}>
+              <AlertOctagon size={13} /> Record Finding
+            </button>
           </div>
         </div>
       </div>
+
+      {/* Error Banner */}
+      {error && (
+        <div style={{
+          background: '#fee2e2',
+          border: '1px solid #ef4444',
+          borderRadius: 'var(--radius-md, 8px)',
+          padding: '12px 16px',
+          marginBottom: 20,
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'space-between',
+          color: '#991b1b',
+        }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+            <AlertCircle size={20} />
+            <div>
+              <strong>Failed to query audit database:</strong> {error}
+            </div>
+          </div>
+          <button
+            className="btn btn-sm btn-secondary"
+            onClick={loadData}
+            style={{ background: '#fff', borderColor: '#f87171', color: '#991b1b' }}
+          >
+            Retry
+          </button>
+        </div>
+      )}
 
       {/* KPI Cards */}
       <div className="kpi-grid" style={{ marginBottom: 24 }}>
-        <KpiCard label="Assigned Audits" value={AUDITOR_KPIS.assignedAudits.value} sub={`${AUDITOR_KPIS.assignedAudits.pending} pending`} icon="ClipboardCheck" iconBg="#eff6ff" iconColor="#1e40af" />
-        <KpiCard label="Critical Findings" value={AUDITOR_KPIS.critical.value} icon="AlertOctagon" iconBg="#fef2f2" iconColor="#dc2626" />
-        <KpiCard label="Failed Mocks" value={AUDITOR_KPIS.mockFailed.value} icon="XCircle" iconBg="#fffbeb" iconColor="#d97706" />
-        <KpiCard label="Re-audit Pending" value={AUDITOR_KPIS.reAuditPending.value} icon="RefreshCw" iconBg="#faf5ff" iconColor="#7c3aed" />
-      </div>
-
-      {/* Charts */}
-      <div className="grid-cols-chart" style={{ marginBottom: 24 }}>
-        <div className="card">
-          <div className="card-header">
-            <span className="card-title">Audit Findings by Severity</span>
-            <span className="badge badge-danger">{AUDIT_FINDINGS_DATA.reduce((s,d) => s+d.value, 0)} total</span>
-          </div>
-          <div className="card-body" style={{ paddingTop: 12 }}>
-            <ResponsiveContainer width="100%" height={200}>
-              <BarChart data={AUDIT_FINDINGS_DATA} barSize={44} margin={{ left: -10 }}>
-                <XAxis dataKey="name" tick={{ fontSize: 11 }} axisLine={false} tickLine={false} />
-                <YAxis tick={{ fontSize: 11 }} axisLine={false} tickLine={false} />
-                <Tooltip content={<CustomTooltip />} cursor={{ fill: 'var(--bg-subtle)' }} />
-                <Bar dataKey="value" name="Findings" radius={[4,4,0,0]}>
-                  {AUDIT_FINDINGS_DATA.map((e, i) => <Cell key={i} fill={e.color} />)}
-                </Bar>
-              </BarChart>
-            </ResponsiveContainer>
-          </div>
-        </div>
-
-        <div className="card">
-          <div className="card-header">
-            <span className="card-title">Mock Status Distribution</span>
-            <span className="badge badge-neutral">{MOCK_STATUS_DATA.reduce((s,d) => s+d.value, 0)} centres</span>
-          </div>
-          <div className="card-body" style={{ paddingTop: 12 }}>
-            <ResponsiveContainer width="100%" height={200}>
-              <PieChart>
-                <Pie data={MOCK_STATUS_DATA} cx="50%" cy="50%" innerRadius={50} outerRadius={85} dataKey="value" labelLine={false}>
-                  {MOCK_STATUS_DATA.map((e,i) => <Cell key={i} fill={e.color} />)}
-                </Pie>
-                <Tooltip content={<CustomTooltip />} />
-                <Legend iconType="circle" iconSize={8} formatter={v => <span style={{ fontSize: '0.75rem', color: 'var(--text-primary)' }}>{v}</span>} />
-              </PieChart>
-            </ResponsiveContainer>
-          </div>
-        </div>
+        <KpiCard
+          label="Registered Venues"
+          value={loading ? '...' : centres.length}
+          sub={`${pendingReview.length} pending review`}
+          icon="ClipboardCheck"
+          iconBg="#eff6ff"
+          iconColor="#1e40af"
+        />
+        <KpiCard
+          label="Compliant / Approved"
+          value={loading ? '...' : approvedCentres.length}
+          sub="Passed verification"
+          icon="ShieldCheck"
+          iconBg="#f0fdf4"
+          iconColor="#16a34a"
+        />
+        <KpiCard
+          label="De-paneled / Blacklisted"
+          value={loading ? '...' : blacklistedCentres.length}
+          sub="Critical compliance breach"
+          icon="AlertOctagon"
+          iconBg="#fef2f2"
+          iconColor="#dc2626"
+        />
+        <KpiCard
+          label="Pending Review"
+          value={loading ? '...' : pendingReview.length}
+          sub="Awaiting audit signoff"
+          icon="RefreshCw"
+          iconBg="#faf5ff"
+          iconColor="#7c3aed"
+        />
       </div>
 
       {/* Audit Table */}
       <div className="card">
         <div className="card-header">
-          <span className="card-title">Assigned Audit Queue</span>
-          <button className="btn btn-ghost btn-sm" style={{ gap: 4 }}>All Audits <ArrowRight size={12} /></button>
+          <span className="card-title">Centre Audit Master Registry</span>
+          <button className="btn btn-ghost btn-sm" style={{ gap: 4 }} onClick={() => navigate('/auditor/audits')}>
+            All Audits <ArrowRight size={12} />
+          </button>
         </div>
         <div className="table-wrapper" style={{ border: 'none', borderRadius: 0 }}>
           <table>
             <thead>
               <tr>
-                <th>Centre</th>
-                <th>Audit Status</th>
-                <th>Findings</th>
-                <th>Mock Status</th>
-                <th>Last Audit</th>
+                <th>Centre Code</th>
+                <th>Centre Name &amp; Address</th>
+                <th>Location</th>
+                <th>Audit / Onboarding Status</th>
+                <th>Eligibility Status</th>
+                <th>Capacity</th>
                 <th>Action</th>
               </tr>
             </thead>
             <tbody>
-              {ASSIGNED_AUDITS.map((a, i) => (
-                <tr key={i}>
-                  <td>
-                    <div style={{ fontWeight: 500 }}>{a.centre}</div>
-                    <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>{a.city}</div>
-                  </td>
-                  <td><StatusBadge status={a.status === 'Passed' ? 'Approved' : a.status === 'Pending' ? 'Pending' : 'Under Review'} /></td>
-                  <td>
-                    {a.findings > 0
-                      ? <span className="badge badge-danger">{a.findings} finding{a.findings > 1 ? 's' : ''}</span>
-                      : <span className="badge badge-success">None</span>
-                    }
-                  </td>
-                  <td><StatusBadge status={a.mockStatus === 'Passed' ? 'Active' : a.mockStatus === 'Failed' ? 'Rejected' : 'Draft'} /></td>
-                  <td style={{ fontSize: '0.8125rem', color: 'var(--text-secondary)' }}>{a.lastAudit}</td>
-                  <td>
-                    <button className="btn btn-secondary btn-sm">
-                      {a.status === 'Pending' ? 'Start Audit' : a.status === 'Re-audit Required' ? 'Re-audit' : 'View'}
-                    </button>
+              {loading ? (
+                <tr>
+                  <td colSpan={7} style={{ textAlign: 'center', padding: '36px', color: 'var(--text-muted)' }}>
+                    <Loader2 className="animate-spin" size={22} style={{ margin: '0 auto 8px', display: 'block' }} />
+                    Loading assigned centres from database...
                   </td>
                 </tr>
-              ))}
+              ) : centres.length === 0 ? (
+                <tr>
+                  <td colSpan={7} style={{ textAlign: 'center', padding: '36px', color: 'var(--text-muted)' }}>
+                    No audit records or venues found in MySQL database.
+                  </td>
+                </tr>
+              ) : (
+                centres.map(c => (
+                  <tr key={c.id}>
+                    <td>
+                      <span style={{ fontFamily: 'monospace', fontWeight: 700, color: 'var(--color-primary)' }}>
+                        {c.centreCode || c.centre_id}
+                      </span>
+                    </td>
+                    <td>
+                      <div style={{ fontWeight: 600 }}>{c.centreName || c.centre_name}</div>
+                      <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>
+                        {c.centreAddress || c.centre_address}
+                      </div>
+                    </td>
+                    <td style={{ fontSize: '0.8125rem' }}>
+                      {c.cityName || '—'}, {c.stateName || '—'}
+                    </td>
+                    <td>
+                      <StatusBadge status={c.centreStatus || c.centre_status || 'Draft'} />
+                    </td>
+                    <td>
+                      <StatusBadge status={c.eligibilityStatus || 'Eligible'} />
+                    </td>
+                    <td style={{ fontSize: '0.8125rem' }}>
+                      <strong>{c.capacity?.examNodes || 0}</strong> nodes
+                    </td>
+                    <td>
+                      <button
+                        className="btn btn-secondary btn-sm"
+                        onClick={() => navigate('/auditor/audits')}
+                      >
+                        Inspect
+                      </button>
+                    </td>
+                  </tr>
+                ))
+              )}
             </tbody>
           </table>
         </div>
