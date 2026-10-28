@@ -17,6 +17,12 @@ export const ROLE_LABELS = {
   [ROLES.OPERATIONS]: 'Operations Executive',
   [ROLES.FINANCE]:    'Accounts / Finance',
   [ROLES.CENTRE]:     'Centre User',
+  ADMIN:              'Admin',
+  PM:                 'Project Manager',
+  AUDITOR:            'Auditor / IT',
+  OPERATIONS:         'Operations Executive',
+  FINANCE:            'Accounts / Finance',
+  CENTRE:             'Centre User',
 };
 
 export const ROLE_COLORS = {
@@ -26,6 +32,12 @@ export const ROLE_COLORS = {
   [ROLES.OPERATIONS]: '#16a34a',
   [ROLES.FINANCE]:    '#d97706',
   [ROLES.CENTRE]:     '#dc2626',
+  ADMIN:              '#1e40af',
+  PM:                 '#7c3aed',
+  AUDITOR:            '#0891b2',
+  OPERATIONS:         '#16a34a',
+  FINANCE:            '#d97706',
+  CENTRE:             '#dc2626',
 };
 
 export const DEFAULT_ROLE_ROUTES = {

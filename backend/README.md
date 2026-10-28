@@ -1,16 +1,16 @@
 # 🏛️ OEM Portal — Admin Dashboard Backend
 
-Enterprise Node.js + Express + TypeScript backend providing role-scoped REST APIs for the Operations & Examination Management Portal (OEM Portal), connecting to **Neon Cloud PostgreSQL** via **Prisma ORM**.
+Enterprise Node.js + Express + TypeScript backend providing role-scoped REST APIs for the Operations & Examination Management Portal (OEM Portal), connecting to a remote **MySQL** database via **Prisma ORM**.
 
 ---
 
 ## 1. Architecture & Tech Stack
 
-- **Runtime:** Node.js (v18+ / v20+ / v22+)
+- **Runtime:** Node.js (v18+ / v20+ / v22+ / v24+)
 - **Language:** TypeScript 5.8 (ES2022 / NodeNext)
 - **Framework:** Express.js 4.21
-- **Database ORM:** Prisma 6.4
-- **Database Engine:** Neon Cloud Serverless PostgreSQL (`org-aged-sound-47497246` / `ancient-king-29412478`)
+- **Database ORM:** Prisma 6.4 (MySQL Provider)
+- **Database Engine:** Remote MySQL Server (`82.29.160.161:3306`, Database: `metabase`)
 - **Authentication & Security:**
   - Bearer JWT tokens with configurable expiration (`JWT_SECRET`, `JWT_EXPIRES_IN`)
   - Salted password hashing with `bcryptjs` (Cost factor: 12)
@@ -29,7 +29,7 @@ Enterprise Node.js + Express + TypeScript backend providing role-scoped REST API
 ```
 backend/
 ├── prisma/
-│   ├── schema.prisma           # Normalized PostgreSQL schema
+│   ├── schema.prisma           # Normalized MySQL schema
 │   └── seed.ts                 # Deliberate initial Admin setup script
 ├── src/
 │   ├── config/
@@ -75,16 +75,22 @@ backend/
 
 Create a `.env` file in `backend/` based on `.env.example`:
 
-```bash
+```dotenv
 # Server Configuration
 PORT=5000
 NODE_ENV=development
 API_PREFIX=/api/v1
 CORS_ORIGIN=http://localhost:5173
 
-# Neon Cloud PostgreSQL Connection
-DATABASE_URL="postgresql://<user>:<password>@<neon-pooler-endpoint>/neondb?sslmode=require"
-DIRECT_URL="postgresql://<user>:<password>@<neon-direct-endpoint>/neondb?sslmode=require"
+# Remote MySQL Connection
+DB_HOST=82.29.160.161
+DB_PORT=3306
+DB_NAME=metabase
+DB_USER=admin_user
+DB_PASSWORD=<use-the-supplied-password-locally>
+
+# Prisma Database Connection URL
+DATABASE_URL="mysql://admin_user:<password>@82.29.160.161:3306/metabase"
 
 # JWT Authentication
 JWT_SECRET="<generate-random-secret-key-at-least-32-chars>"
@@ -100,28 +106,18 @@ INITIAL_ADMIN_NAME="Rajesh Kumar"
 
 ---
 
-## 4. Neon Cloud Database & Migration Workflow
+## 4. Remote MySQL Database & Migration Workflow
 
-The project is linked to the Neon Cloud project:
-- **Organization ID:** `org-aged-sound-47497246`
-- **Project ID:** `ancient-king-29412478`
-- **Branch:** `production` (or development branch)
-- **Service:** `postgres`
+- **Host:** `82.29.160.161`
+- **Port:** `3306`
+- **User:** `admin_user`
+- **Database:** `metabase`
 
-### 4.1 Neon CLI Setup
-```bash
-# Verify Neon CLI
-neon --version
-
-# Log in via browser
-neon login
-
-# Initialize project binding (if needed)
-neon init -y --org-id org-aged-sound-47497246 --project-id ancient-king-29412478 --branch production --services postgres
-```
-
-### 4.2 Safe Migration Review Rule
-Per project policy, **migrations must not be applied to the production branch without prior review and explicit user approval**.
+### 4.1 Safe Schema & Migration Policy
+Per project safety policy:
+- Do not run destructive migrations, database resets, or drop tables on the remote database.
+- Confirm whether `metabase` contains existing application metadata before running any migrations.
+- Validate and inspect the database with non-destructive, read-only queries.
 
 ```bash
 # Validate schema without database side-effects
@@ -129,13 +125,10 @@ npm run prisma:validate
 
 # Generate Prisma Client
 npm run prisma:generate
-
-# Apply migrations (after review/approval)
-npm run prisma:deploy
 ```
 
-### 4.3 Seeding the Admin User
-To seed the initial Admin account and default configuration:
+### 4.2 Seeding the Admin User
+To seed the initial Admin account and default configuration (only after database safety verification):
 ```bash
 npm run seed
 ```

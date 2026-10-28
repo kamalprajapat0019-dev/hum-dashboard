@@ -82,6 +82,15 @@ describe('Admin Protected Routes & Security Guards', () => {
     expect(data.error.code).toBe('UNAUTHORIZED');
   });
 
+  it('GET /api/v1/admin/clients should reject unauthenticated requests with 401', async () => {
+    const res = await fetch(`${baseUrl}/admin/clients`);
+    expect(res.status).toBe(401);
+
+    const data = await res.json();
+    expect(data.success).toBe(false);
+    expect(data.error.code).toBe('UNAUTHORIZED');
+  });
+
   it('GET /api/v1/admin/centres should reject unauthenticated requests with 401', async () => {
     const res = await fetch(`${baseUrl}/admin/centres`);
     expect(res.status).toBe(401);

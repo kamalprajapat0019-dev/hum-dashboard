@@ -122,6 +122,125 @@ body {
 .btn-lg { padding: 10px 22px; font-size: 0.9375rem; border-radius: var(--radius-lg); }
 .btn:disabled { opacity: 0.5; cursor: not-allowed; }
 
+/* ---- Animations ---- */
+@keyframes spin {
+  from { transform: rotate(0deg); }
+  to { transform: rotate(360deg); }
+}
+.animate-spin {
+  animation: spin 1s linear infinite;
+}
+
+/* ---- Table Action Icon Buttons (Enterprise SaaS Polish) ---- */
+.actions-cell-wrapper {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+}
+
+.btn-table-action {
+  width: 36px;
+  height: 36px;
+  min-width: 36px;
+  min-height: 36px;
+  padding: 0;
+  margin: 0;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: var(--radius-md);
+  border: 1px solid var(--border-default);
+  background: rgba(255, 255, 255, 0.88);
+  backdrop-filter: var(--glass-blur-sm);
+  -webkit-backdrop-filter: var(--glass-blur-sm);
+  box-shadow: 0 1px 2px rgba(15, 23, 42, 0.04), inset 0 1px 0 #ffffff;
+  cursor: pointer;
+  transition: all 180ms cubic-bezier(0.16, 1, 0.3, 1);
+  outline: none;
+  position: relative;
+}
+
+.btn-table-action:focus-visible {
+  outline: 2px solid var(--color-primary-light);
+  outline-offset: 2px;
+}
+
+.btn-table-action:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+  pointer-events: none;
+  transform: none !important;
+}
+
+/* Edit action — Blue */
+.btn-table-action-edit {
+  color: #2563eb;
+  border-color: rgba(226, 232, 240, 0.95);
+}
+.btn-table-action-edit:hover:not(:disabled) {
+  background: #eff6ff;
+  border-color: #bfdbfe;
+  color: #1d4ed8;
+  box-shadow: 0 4px 12px rgba(37, 99, 235, 0.15), inset 0 1px 0 #ffffff;
+  transform: translateY(-1px);
+}
+.btn-table-action-edit:active:not(:disabled) {
+  transform: translateY(0);
+  background: #dbeafe;
+}
+
+/* Deactivate action — Amber / Warning */
+.btn-table-action-warning {
+  color: #d97706;
+  border-color: rgba(226, 232, 240, 0.95);
+}
+.btn-table-action-warning:hover:not(:disabled) {
+  background: #fffbeb;
+  border-color: #fde68a;
+  color: #b45309;
+  box-shadow: 0 4px 12px rgba(217, 119, 6, 0.15), inset 0 1px 0 #ffffff;
+  transform: translateY(-1px);
+}
+.btn-table-action-warning:active:not(:disabled) {
+  transform: translateY(0);
+  background: #fef3c7;
+}
+
+/* Activate action — Emerald / Success */
+.btn-table-action-success {
+  color: #16a34a;
+  border-color: rgba(226, 232, 240, 0.95);
+}
+.btn-table-action-success:hover:not(:disabled) {
+  background: #f0fdf4;
+  border-color: #bbf7d0;
+  color: #15803d;
+  box-shadow: 0 4px 12px rgba(22, 163, 74, 0.15), inset 0 1px 0 #ffffff;
+  transform: translateY(-1px);
+}
+.btn-table-action-success:active:not(:disabled) {
+  transform: translateY(0);
+  background: #dcfce7;
+}
+
+/* Delete action — Crimson / Danger */
+.btn-table-action-danger {
+  color: #dc2626;
+  border-color: rgba(226, 232, 240, 0.95);
+}
+.btn-table-action-danger:hover:not(:disabled) {
+  background: #fef2f2;
+  border-color: #fecaca;
+  color: #b91c1c;
+  box-shadow: 0 4px 12px rgba(220, 38, 38, 0.15), inset 0 1px 0 #ffffff;
+  transform: translateY(-1px);
+}
+.btn-table-action-danger:active:not(:disabled) {
+  transform: translateY(0);
+  background: #fee2e2;
+}
+
 /* ---- Cards (Glassmorphism V2 — Reference Matched) ---- */
 .glass-card,
 .card {

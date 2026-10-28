@@ -8,6 +8,9 @@ import {
   userQuerySchema,
   createUserSchema,
   updateUserSchema,
+  clientQuerySchema,
+  createClientSchema,
+  updateClientSchema,
   projectQuerySchema,
   createProjectSchema,
   updateProjectSchema,
@@ -28,6 +31,12 @@ router.use(requireRole(Role.ADMIN));
 
 // Executive Analytics
 router.get('/analytics', AdminController.getAnalytics);
+
+// Client Management
+router.get('/clients', validateRequest({ query: clientQuerySchema }), AdminController.listClients);
+router.post('/clients', validateRequest({ body: createClientSchema }), AdminController.createClient);
+router.get('/clients/:id', AdminController.getClientById);
+router.put('/clients/:id', validateRequest({ body: updateClientSchema }), AdminController.updateClient);
 
 // User Management
 router.get('/users', validateRequest({ query: userQuerySchema }), AdminController.listUsers);

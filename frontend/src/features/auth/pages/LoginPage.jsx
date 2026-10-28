@@ -163,12 +163,15 @@ export default function LoginPage() {
     if (!email.trim()) { setError('Please enter your username or email.'); return; }
     if (!password)     { setError('Please enter your password.'); return; }
     setLoading(true);
-    await new Promise(r => setTimeout(r, 500));
-    const result = login(email.trim(), password);
+    await new Promise(r => setTimeout(r, 400));
+    const result = await login(email.trim(), password);
     setLoading(false);
-    if (!result.success) { setError(result.error); return; }
-    const user = DEMO_USERS.find(u => u.email.toLowerCase() === email.toLowerCase());
-    navigate(ROLE_ROOTS[user?.role] || '/admin', { replace: true });
+    if (!result.success) {
+      setError(result.error || 'Invalid credentials');
+      return;
+    }
+    const roleKey = result.user?.role || 'admin';
+    navigate(ROLE_ROOTS[roleKey] || '/admin', { replace: true });
   }
 
   return (

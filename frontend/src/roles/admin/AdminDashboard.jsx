@@ -140,7 +140,7 @@ export default function AdminDashboard() {
                   display: 'inline-block',
                 }}
               />
-              {isBackendConnected ? 'Connected (Neon API)' : 'Local Cache'}
+              {isBackendConnected ? 'Connected (API)' : 'Local Cache'}
             </span>
             <LastUpdated />
             <button className="btn btn-secondary btn-sm" onClick={() => navigate('/admin/centres')}>

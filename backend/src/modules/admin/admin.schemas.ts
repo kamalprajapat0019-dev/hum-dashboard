@@ -7,16 +7,47 @@ export const paginationSchema = z.object({
   search: z.string().optional(),
 });
 
+export const roleSchema = z.preprocess((val) => {
+  if (typeof val === 'string') {
+    const map: Record<string, Role> = {
+      admin: Role.ADMIN,
+      ADMIN: Role.ADMIN,
+      project_manager: Role.PM,
+      pm: Role.PM,
+      PM: Role.PM,
+      auditor_it: Role.AUDITOR,
+      auditor: Role.AUDITOR,
+      AUDITOR: Role.AUDITOR,
+      operations_executive: Role.OPERATIONS,
+      operations: Role.OPERATIONS,
+      ops: Role.OPERATIONS,
+      OPERATIONS: Role.OPERATIONS,
+      accounts_finance: Role.FINANCE,
+      finance: Role.FINANCE,
+      FINANCE: Role.FINANCE,
+      centre_user: Role.CENTRE,
+      centre: Role.CENTRE,
+      CENTRE: Role.CENTRE,
+    };
+    return map[val] || val;
+  }
+  return val;
+}, z.nativeEnum(Role));
+
 export const userQuerySchema = paginationSchema.extend({
-  role: z.nativeEnum(Role).optional(),
+  role: roleSchema.optional(),
   status: z.nativeEnum(UserStatus).optional(),
 });
 
 export const createUserSchema = z.object({
   email: z.string().email(),
-  password: z.string().min(8, 'Password must be at least 8 characters long'),
+  password: z
+    .string()
+    .min(8, 'Password must be at least 8 characters long')
+    .optional()
+    .default('TempPass@2026'),
   name: z.string().min(2, 'Name must be at least 2 characters long'),
-  role: z.nativeEnum(Role),
+  role: roleSchema,
   status: z.nativeEnum(UserStatus).default(UserStatus.Active),
   scope: z
     .object({
@@ -29,7 +60,7 @@ export const createUserSchema = z.object({
 
 export const updateUserSchema = z.object({
   name: z.string().min(2).optional(),
-  role: z.nativeEnum(Role).optional(),
+  role: roleSchema.optional(),
   status: z.nativeEnum(UserStatus).optional(),
   password: z.string().min(8).optional(),
   scope: z
@@ -40,6 +71,20 @@ export const updateUserSchema = z.object({
     })
     .optional(),
 });
+
+export const clientQuerySchema = paginationSchema.extend({
+  status: z.string().optional(),
+});
+
+export const createClientSchema = z.object({
+  code: z.string().min(2).optional(),
+  name: z.string().min(2, 'Client name must be at least 2 characters'),
+  fullName: z.string().min(2, 'Full name must be at least 2 characters'),
+  contactEmail: z.string().email(),
+  status: z.enum(['Active', 'Inactive']).default('Active'),
+});
+
+export const updateClientSchema = createClientSchema.partial();
 
 export const projectQuerySchema = paginationSchema.extend({
   status: z.string().optional(),

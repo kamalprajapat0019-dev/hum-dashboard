@@ -294,4 +294,60 @@ export class AdminController {
       sendError(res, 400, 'CONFIG_UPDATE_FAILED', msg);
     }
   }
+
+  // ── Client Management ───────────────────────────────────────────────────
+  static async listClients(req: AuthenticatedRequest, res: Response): Promise<void> {
+    try {
+      const { page, limit, search, status } = req.query as any;
+      const result = await AdminService.listClients({
+        page: page ? parseInt(page, 10) : 1,
+        limit: limit ? parseInt(limit, 10) : 20,
+        search,
+        status,
+      });
+      sendSuccess(res, result.data, 200, result.pagination);
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : 'Failed to list clients';
+      sendError(res, 500, 'CLIENTS_FETCH_ERROR', msg);
+    }
+  }
+
+  static async getClientById(req: AuthenticatedRequest, res: Response): Promise<void> {
+    try {
+      const client = await AdminService.getClientById(req.params.id as string);
+      sendSuccess(res, client);
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : 'Client not found';
+      sendError(res, 404, 'CLIENT_NOT_FOUND', msg);
+    }
+  }
+
+  static async createClient(req: AuthenticatedRequest, res: Response): Promise<void> {
+    try {
+      const client = await AdminService.createClient(
+        req.body,
+        req.user!.userId,
+        req.user!.email
+      );
+      sendSuccess(res, client, 201);
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : 'Failed to create client';
+      sendError(res, 400, 'CLIENT_CREATION_FAILED', msg);
+    }
+  }
+
+  static async updateClient(req: AuthenticatedRequest, res: Response): Promise<void> {
+    try {
+      const client = await AdminService.updateClient(
+        req.params.id as string,
+        req.body,
+        req.user!.userId,
+        req.user!.email
+      );
+      sendSuccess(res, client);
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : 'Failed to update client';
+      sendError(res, 400, 'CLIENT_UPDATE_FAILED', msg);
+    }
+  }
 }

@@ -1,14 +1,12 @@
-// Prisma schema for Operations & Examination Management Portal (OEM Portal)
-// Neon Cloud PostgreSQL Datasource
+// Remote MySQL Datasource for OECM Portal
 
 generator client {
   provider = "prisma-client-js"
 }
 
 datasource db {
-  provider  = "postgresql"
-  url       = env("DATABASE_URL")
-  directUrl = env("DIRECT_URL")
+  provider = "mysql"
+  url      = env("DATABASE_URL")
 }
 
 enum Role {
@@ -32,7 +30,7 @@ model User {
   passwordHash     String
   name             String
   role             Role              @default(ADMIN)
-  avatar           String?
+  avatar           String?           @db.Text
   status           UserStatus        @default(Active)
   scope            Json?             // { clients: string[], projects: string[], centres: string[] }
   lastLogin        DateTime?
@@ -44,7 +42,7 @@ model User {
   auditLogs        AuditLog[]
 
   @@index([role, status])
-  @@map("users")
+  @@map("oecm_users")
 }
 
 model Client {
@@ -59,7 +57,7 @@ model Client {
 
   projects     Project[]
 
-  @@map("clients")
+  @@map("oecm_clients")
 }
 
 model Project {
@@ -85,7 +83,7 @@ model Project {
   audits          AuditAssignment[]
 
   @@index([status, stage])
-  @@map("projects")
+  @@map("oecm_projects")
 }
 
 model Centre {
@@ -99,13 +97,13 @@ model Centre {
   eduCode           String?
   tcCode            String?
   centreName        String
-  centreAddress     String
+  centreAddress     String            @db.Text
   pincode           String
   venueStatus       String            @default("Old") // New, Old
   previousEduExam   String?
   officialEmail     String?
-  googleMapLink     String?
-  remarks           String?
+  googleMapLink     String?           @db.Text
+  remarks           String?           @db.Text
   centreStatus      String            @default("Draft") // Draft, Active, Approved, Rejected, Inactive
   eligibilityStatus String            @default("Eligible") // Eligible, ConditionallyEligible, Ineligible, Blacklisted
   organizationType  String            @default("Trust") // Individual, Trust, Society, Partnership, Company, Other
@@ -120,7 +118,7 @@ model Centre {
 
   @@index([centreStatus, eligibilityStatus])
   @@index([cityId, stateId])
-  @@map("centres")
+  @@map("oecm_centres")
 }
 
 model CentreContact {
@@ -134,15 +132,15 @@ model CentreContact {
   aadhaarNumber    String?
   fatherName       String?
   motherName       String?
-  permanentAddress String?
-  currentAddress   String?
+  permanentAddress String?  @db.Text
+  currentAddress   String?  @db.Text
   isPrimary        Boolean  @default(false)
   isActive         Boolean  @default(true)
   createdAt        DateTime @default(now())
   updatedAt        DateTime @updatedAt
 
   @@index([centreId, personType])
-  @@map("centre_contacts")
+  @@map("oecm_centre_contacts")
 }
 
 model CentreCapacity {
@@ -159,7 +157,7 @@ model CentreCapacity {
   createdAt        DateTime @default(now())
   updatedAt        DateTime @updatedAt
 
-  @@map("centre_capacities")
+  @@map("oecm_centre_capacities")
 }
 
 model Booking {
@@ -181,7 +179,7 @@ model Booking {
   updatedAt     DateTime  @updatedAt
 
   @@index([projectId, centreId])
-  @@map("bookings")
+  @@map("oecm_bookings")
 }
 
 model AuditAssignment {
@@ -196,29 +194,29 @@ model AuditAssignment {
   auditDate        DateTime?
   status           String    @default("Pending") // Pending, Assigned, InProgress, Completed, ReworkRequired, Failed
   complianceScore  Float?
-  findingsSummary  String?
+  findingsSummary  String?   @db.Text
   createdAt        DateTime  @default(now())
   updatedAt        DateTime  @updatedAt
 
   @@index([projectId, centreId, auditorId])
-  @@map("audit_assignments")
+  @@map("oecm_audit_assignments")
 }
 
 model BlacklistRecord {
   id             String    @id @default(cuid())
   centreId       String
   centre         Centre    @relation(fields: [centreId], references: [id], onDelete: Cascade)
-  reason         String    // Confidential reason
+  reason         String    @db.Text // Confidential reason
   flaggedBy      String
   isActive       Boolean   @default(true)
-  overrideReason String?
+  overrideReason String?   @db.Text
   overriddenBy   String?
   overriddenAt   DateTime?
   createdAt      DateTime  @default(now())
   updatedAt      DateTime  @updatedAt
 
   @@index([centreId, isActive])
-  @@map("blacklist_records")
+  @@map("oecm_blacklist_records")
 }
 
 model AuditLog {
@@ -235,7 +233,7 @@ model AuditLog {
 
   @@index([entity, entityId])
   @@index([createdAt])
-  @@map("audit_logs")
+  @@map("oecm_audit_logs")
 }
 
 model SystemConfig {
@@ -246,5 +244,5 @@ model SystemConfig {
   updatedBy String?
   updatedAt DateTime @updatedAt
 
-  @@map("system_configs")
+  @@map("oecm_system_configs")
 }

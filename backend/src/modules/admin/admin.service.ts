@@ -110,8 +110,8 @@ export class AdminService {
       ...(search
         ? {
             OR: [
-              { name: { contains: search, mode: 'insensitive' } },
-              { email: { contains: search, mode: 'insensitive' } },
+              { name: { contains: search } },
+              { email: { contains: search } },
             ],
           }
         : {}),
@@ -348,9 +348,9 @@ export class AdminService {
       ...(search
         ? {
             OR: [
-              { name: { contains: search, mode: 'insensitive' } },
-              { projectCode: { contains: search, mode: 'insensitive' } },
-              { examType: { contains: search, mode: 'insensitive' } },
+              { name: { contains: search } },
+              { projectCode: { contains: search } },
+              { examType: { contains: search } },
             ],
           }
         : {}),
@@ -487,11 +487,11 @@ export class AdminService {
       ...(search
         ? {
             OR: [
-              { centreName: { contains: search, mode: 'insensitive' } },
-              { centreCode: { contains: search, mode: 'insensitive' } },
-              { eduCode: { contains: search, mode: 'insensitive' } },
-              { tcCode: { contains: search, mode: 'insensitive' } },
-              { cityName: { contains: search, mode: 'insensitive' } },
+              { centreName: { contains: search } },
+              { centreCode: { contains: search } },
+              { eduCode: { contains: search } },
+              { tcCode: { contains: search } },
+              { cityName: { contains: search } },
             ],
           }
         : {}),
@@ -812,4 +812,138 @@ export class AdminService {
       return config;
     });
   }
+
+  // ── 7. Client Management ──────────────────────────────────────────────────
+  static async listClients(params: { page: number; limit: number; search?: string; status?: string }) {
+    const { page, limit, search, status } = params;
+    const skip = (page - 1) * limit;
+
+    const where: Prisma.ClientWhereInput = {
+      ...(status ? { status } : {}),
+      ...(search
+        ? {
+            OR: [
+              { name: { contains: search } },
+              { fullName: { contains: search } },
+              { contactEmail: { contains: search } },
+            ],
+          }
+        : {}),
+    };
+
+    const [clients, total] = await Promise.all([
+      prisma.client.findMany({
+        where,
+        skip,
+        take: limit,
+        orderBy: { createdAt: 'desc' },
+        include: {
+          _count: {
+            select: { projects: true },
+          },
+        },
+      }),
+      prisma.client.count({ where }),
+    ]);
+
+    return {
+      data: clients,
+      pagination: {
+        total,
+        page,
+        limit,
+        totalPages: Math.ceil(total / limit),
+      },
+    };
+  }
+
+  static async getClientById(id: string) {
+    const client = await prisma.client.findUnique({
+      where: { id },
+      include: {
+        projects: {
+          take: 10,
+          orderBy: { createdAt: 'desc' },
+          select: {
+            id: true,
+            projectCode: true,
+            name: true,
+            examType: true,
+            stage: true,
+            status: true,
+          },
+        },
+      },
+    });
+
+    if (!client) {
+      throw new Error('Client not found');
+    }
+
+    return client;
+  }
+
+  static async createClient(
+    data: { code?: string; name: string; fullName: string; contactEmail: string; status?: string },
+    adminUserId: string,
+    adminEmail: string
+  ) {
+    return prisma.$transaction(async (tx) => {
+      const client = await tx.client.create({
+        data: {
+          code: data.code,
+          name: data.name,
+          fullName: data.fullName,
+          contactEmail: data.contactEmail,
+          status: data.status || 'Active',
+        },
+      });
+
+      await tx.auditLog.create({
+        data: {
+          userId: adminUserId,
+          userEmail: adminEmail,
+          action: 'CLIENT_CREATED',
+          entity: 'Client',
+          entityId: client.id,
+          details: { name: client.name, fullName: client.fullName },
+        },
+      });
+
+      return client;
+    });
+  }
+
+  static async updateClient(
+    id: string,
+    data: { code?: string; name?: string; fullName?: string; contactEmail?: string; status?: string },
+    adminUserId: string,
+    adminEmail: string
+  ) {
+    return prisma.$transaction(async (tx) => {
+      const existing = await tx.client.findUnique({ where: { id } });
+      if (!existing) {
+        throw new Error('Client not found');
+      }
+
+      const updated = await tx.client.update({
+        where: { id },
+        data,
+      });
+
+      await tx.auditLog.create({
+        data: {
+          userId: adminUserId,
+          userEmail: adminEmail,
+          action: 'CLIENT_UPDATED',
+          entity: 'Client',
+          entityId: id,
+          details: { changes: data },
+        },
+      });
+
+      return updated;
+    });
+  }
 }
+
