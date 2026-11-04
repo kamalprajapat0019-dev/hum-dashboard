@@ -1,20 +1,16 @@
 import { PrismaClient } from '@prisma/client';
 import { env } from './env.js';
 
-declare global {
-  // eslint-disable-next-line no-var
-  var __prisma: PrismaClient | undefined;
-}
+const globalForPrisma = globalThis as unknown as { prisma?: PrismaClient };
 
 export const prisma =
-  global.__prisma ||
+  globalForPrisma.prisma ||
   new PrismaClient({
     log: env.NODE_ENV === 'development' ? ['warn', 'error'] : ['error'],
   });
 
-if (env.NODE_ENV !== 'production') {
-  global.__prisma = prisma;
-}
+// Always maintain connection cache across serverless warm invocations
+globalForPrisma.prisma = prisma;
 
 /**
  * Safe database connection verification without exposing credentials in logs

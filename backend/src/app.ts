@@ -3,6 +3,7 @@ import cors from 'cors';
 import helmet from 'helmet';
 import morgan from 'morgan';
 import { env } from './config/env.js';
+import { verifyDatabaseConnection } from './config/database.js';
 import routes from './routes/index.js';
 import { errorHandler } from './middleware/error.middleware.js';
 import { apiRateLimiter } from './middleware/rateLimiter.middleware.js';
@@ -59,6 +60,36 @@ export function createApp(): Express {
       },
       timestamp: new Date().toISOString(),
     });
+  });
+
+  // Direct health check route (for platform monitors hitting /health directly)
+  app.get('/health', async (_req: Request, res: Response) => {
+    try {
+      const dbStatus = await verifyDatabaseConnection();
+      res.json({
+        success: true,
+        data: {
+          status: dbStatus.connected ? 'healthy' : 'degraded',
+          service: 'oem-portal-backend',
+          version: '1.0.0',
+          database: {
+            status: dbStatus.connected ? 'connected' : 'disconnected',
+          },
+          timestamp: new Date().toISOString(),
+        },
+      });
+    } catch {
+      res.json({
+        success: true,
+        data: {
+          status: 'degraded',
+          service: 'oem-portal-backend',
+          version: '1.0.0',
+          database: { status: 'disconnected' },
+          timestamp: new Date().toISOString(),
+        },
+      });
+    }
   });
 
   // Mount API version prefix
