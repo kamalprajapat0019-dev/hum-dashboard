@@ -1,4 +1,5 @@
 import { appConfig } from '../config/appConfig';
+import { buildApiUrl, resolveApiBaseUrl } from '../config/apiConfig';
 import { storage } from '../utils/storage';
 
 /**
@@ -12,7 +13,7 @@ class ApiClient {
   }
 
   getBaseUrl() {
-    return (this.customBaseUrl || appConfig.api.baseUrl || '/api/v1').replace(/\/+$/, '');
+    return this.customBaseUrl ? this.customBaseUrl.replace(/\/+$/, '') : resolveApiBaseUrl();
   }
 
   /**
@@ -20,30 +21,7 @@ class ApiClient {
    * and cleanly formatting query parameters.
    */
   buildUrl(endpoint, params) {
-    const base = this.getBaseUrl();
-    let path = endpoint.startsWith('/') ? endpoint : `/${endpoint}`;
-
-    // Prevent duplicate `/api/v1/api/v1` if both base and endpoint include it
-    if (base.endsWith('/api/v1') && path.startsWith('/api/v1/')) {
-      path = path.slice('/api/v1'.length);
-    }
-
-    let url = `${base}${path}`;
-
-    if (params && typeof params === 'object') {
-      const searchParams = new URLSearchParams();
-      Object.entries(params).forEach(([key, val]) => {
-        if (val !== undefined && val !== null && val !== '') {
-          searchParams.append(key, String(val));
-        }
-      });
-      const queryString = searchParams.toString();
-      if (queryString) {
-        url += (url.includes('?') ? '&' : '?') + queryString;
-      }
-    }
-
-    return url;
+    return buildApiUrl(endpoint, params, this.customBaseUrl);
   }
 
   async request(endpoint, options = {}) {
