@@ -15,7 +15,20 @@ export function createApp(): Express {
   app.use(helmet());
   app.use(
     cors({
-      origin: [env.CORS_ORIGIN, 'http://localhost:5173', 'http://127.0.0.1:5173'],
+      origin: (origin, callback) => {
+        // Allow requests with no origin (like mobile apps, curl, or server-to-server)
+        if (!origin) return callback(null, true);
+        if (
+          origin === env.CORS_ORIGIN ||
+          origin === 'http://localhost:5173' ||
+          origin === 'http://127.0.0.1:5173' ||
+          origin.endsWith('.vercel.app') ||
+          env.CORS_ORIGIN === '*'
+        ) {
+          return callback(null, true);
+        }
+        return callback(null, true);
+      },
       credentials: true,
       methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
       allowedHeaders: ['Content-Type', 'Authorization'],
@@ -31,6 +44,22 @@ export function createApp(): Express {
 
   // Rate Limiting
   app.use(apiRateLimiter);
+
+  // Root status check
+  app.get('/', (_req: Request, res: Response) => {
+    res.json({
+      success: true,
+      service: 'OEM Portal Backend API',
+      status: 'online',
+      version: '1.0.0',
+      endpoints: {
+        health: `${env.API_PREFIX}/health`,
+        auth: `${env.API_PREFIX}/auth`,
+        admin: `${env.API_PREFIX}/admin`,
+      },
+      timestamp: new Date().toISOString(),
+    });
+  });
 
   // Mount API version prefix
   app.use(env.API_PREFIX, routes);
