@@ -205,6 +205,17 @@ export class AdminController {
   }
 
   // ── Centres ──────────────────────────────────────────────────────────────
+  static async getCentresSummary(req: AuthenticatedRequest, res: Response): Promise<void> {
+    try {
+      const { clientId } = req.query as { clientId?: string };
+      const summary = await AdminService.getCentresSummary(clientId);
+      sendSuccess(res, summary);
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : 'Failed to retrieve centre summary';
+      sendError(res, 500, 'CENTRE_SUMMARY_ERROR', msg);
+    }
+  }
+
   static async listCentres(req: AuthenticatedRequest, res: Response): Promise<void> {
     try {
       const { page, limit, search, regionId, stateId, cityId, status, eligibilityStatus } = req.query as any;
@@ -277,6 +288,108 @@ export class AdminController {
     } catch (err: unknown) {
       const msg = err instanceof Error ? err.message : 'Failed to update centre status';
       sendError(res, 400, 'STATUS_UPDATE_FAILED', msg);
+    }
+  }
+
+  static async getCentreProfile(req: AuthenticatedRequest, res: Response): Promise<void> {
+    try {
+      const profile = await AdminService.getCentreProfile(
+        req.params.id as string,
+        req.user!.role,
+        req.user!.userId,
+        req.user!.email
+      );
+      sendSuccess(res, profile);
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : 'Failed to retrieve centre profile';
+      sendError(res, 404, 'CENTRE_PROFILE_NOT_FOUND', msg);
+    }
+  }
+
+  static async verifyDocument(req: AuthenticatedRequest, res: Response): Promise<void> {
+    try {
+      const { documentId, status, remarks, rejectionReason } = req.body;
+      const result = await AdminService.verifyDocument(
+        req.params.id as string,
+        documentId,
+        status,
+        remarks,
+        rejectionReason,
+        req.user!.userId,
+        req.user!.email
+      );
+      sendSuccess(res, result);
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : 'Failed to verify document';
+      sendError(res, 400, 'DOCUMENT_VERIFY_ERROR', msg);
+    }
+  }
+
+  static async verifyBank(req: AuthenticatedRequest, res: Response): Promise<void> {
+    try {
+      const { status, remarks, rejectionReason } = req.body;
+      const result = await AdminService.verifyBank(
+        req.params.id as string,
+        status,
+        remarks,
+        rejectionReason,
+        req.user!.userId,
+        req.user!.email
+      );
+      sendSuccess(res, result);
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : 'Failed to verify bank account';
+      sendError(res, 400, 'BANK_VERIFY_ERROR', msg);
+    }
+  }
+
+  static async approveApplication(req: AuthenticatedRequest, res: Response): Promise<void> {
+    try {
+      const { remarks } = req.body;
+      const result = await AdminService.approveApplication(
+        req.params.id as string,
+        remarks,
+        req.user!.userId,
+        req.user!.email
+      );
+      sendSuccess(res, result);
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : 'Failed to approve centre application';
+      sendError(res, 400, 'APPROVE_FAILED', msg);
+    }
+  }
+
+  static async rejectApplication(req: AuthenticatedRequest, res: Response): Promise<void> {
+    try {
+      const { reason } = req.body;
+      const result = await AdminService.rejectApplication(
+        req.params.id as string,
+        reason,
+        req.user!.userId,
+        req.user!.email
+      );
+      sendSuccess(res, result);
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : 'Failed to reject centre application';
+      sendError(res, 400, 'REJECT_FAILED', msg);
+    }
+  }
+
+  static async assignAuditor(req: AuthenticatedRequest, res: Response): Promise<void> {
+    try {
+      const { auditorId, auditDate, remarks } = req.body;
+      const result = await AdminService.assignAuditor(
+        req.params.id as string,
+        auditorId,
+        auditDate,
+        remarks,
+        req.user!.userId,
+        req.user!.email
+      );
+      sendSuccess(res, result);
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : 'Failed to assign auditor';
+      sendError(res, 400, 'ASSIGN_AUDITOR_FAILED', msg);
     }
   }
 

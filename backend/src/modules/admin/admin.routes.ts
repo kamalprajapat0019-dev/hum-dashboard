@@ -95,16 +95,23 @@ router.get('/exams/dates/:dateId/shifts', AdminController.listExamShifts);
 router.post('/exams/dates/:dateId/shifts', validateRequest({ body: createExamShiftSchema }), AdminController.createExamShift);
 router.delete('/exams/shifts/:shiftId', AdminController.deleteExamShift);
 
-// Centre Management
+// Centre Management (Overview & Lifecycle per OEMP PDF)
+router.get('/centres/summary', AdminController.getCentresSummary);
 router.get('/centres', validateRequest({ query: centreQuerySchema }), AdminController.listCentres);
 router.post('/centres', validateRequest({ body: createCentreSchema }), AdminController.createCentre);
 router.get('/centres/:id', AdminController.getCentreById);
+router.get('/centres/:id/profile', AdminController.getCentreProfile);
 router.put('/centres/:id', validateRequest({ body: updateCentreSchema }), AdminController.updateCentre);
 router.patch(
   '/centres/:id/status',
   validateRequest({ body: updateCentreStatusSchema }),
   AdminController.updateCentreStatus
 );
+router.post('/centres/:id/verify-document', AdminController.verifyDocument);
+router.post('/centres/:id/verify-bank', AdminController.verifyBank);
+router.post('/centres/:id/approve', AdminController.approveApplication);
+router.post('/centres/:id/reject', AdminController.rejectApplication);
+router.post('/centres/:id/assign-auditor', AdminController.assignAuditor);
 
 // Eligibility & Blacklist Oversight
 router.post(

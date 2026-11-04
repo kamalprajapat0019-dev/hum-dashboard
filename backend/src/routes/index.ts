@@ -1,6 +1,7 @@
 import { Router, Request, Response } from 'express';
 import authRoutes from '../modules/auth/auth.routes.js';
 import adminRoutes from '../modules/admin/admin.routes.js';
+import centreRoutes from '../modules/centre/centre.routes.js';
 import { verifyDatabaseConnection } from '../config/database.js';
 import { sendSuccess } from '../utils/response.js';
 
@@ -16,6 +17,7 @@ router.get('/', (_req: Request, res: Response) => {
       health: '/health',
       auth: '/auth',
       admin: '/admin',
+      centre: '/centre',
     },
     timestamp: new Date().toISOString(),
   });
@@ -38,5 +40,6 @@ router.get('/health', async (_req: Request, res: Response) => {
 // ── Module Mounts ──────────────────────────────────────────────────────────
 router.use('/auth', authRoutes);
 router.use('/admin', adminRoutes);
+router.use('/centre', centreRoutes);
 
 export default router;

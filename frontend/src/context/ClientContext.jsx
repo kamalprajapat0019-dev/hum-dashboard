@@ -150,4 +150,6 @@ export function useClientFilter() {
   return ctx;
 }
 
+export const useClient = useClientFilter;
+
 export default ClientContext;

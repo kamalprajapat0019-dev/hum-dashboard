@@ -186,38 +186,187 @@ model ExamShift {
 }
 
 model Centre {
-  id                String            @id @default(cuid())
-  centreCode        String            @unique // CN-001
-  regionId          String?
-  stateId           String?
-  cityId            String?
-  stateName         String?
-  cityName          String?
-  eduCode           String?
-  tcCode            String?
-  centreName        String
-  centreAddress     String            @db.Text
-  pincode           String
-  venueStatus       String            @default("Old") // New, Old
-  previousEduExam   String?
-  officialEmail     String?
-  googleMapLink     String?           @db.Text
-  remarks           String?           @db.Text
-  centreStatus      String            @default("Draft") // Draft, Active, Approved, Rejected, Inactive
-  eligibilityStatus String            @default("Eligible") // Eligible, ConditionallyEligible, Ineligible, Blacklisted
-  organizationType  String            @default("Trust") // Individual, Trust, Society, Partnership, Company, Other
-  createdAt         DateTime          @default(now())
-  updatedAt         DateTime          @updatedAt
+  id                    String                @id @default(cuid())
+  centreCode            String                @unique // CTR-2026-0001
+  userId                String?
+  regionId              String?
+  stateId               String?
+  cityId                String?
+  stateName             String?
+  cityName              String?
+  taluka                String?
+  eduCode               String?
+  tcCode                String?
+  centreName            String
+  centreCategory        String?               // School, College, University, Government Institution, etc.
+  centreAddress         String                @db.Text
+  pincode               String
+  venueStatus           String                @default("Old") // New, Old
+  previousExamConducted Boolean               @default(false)
+  previousEduExam       String?               @db.Text
+  officialEmail         String?
+  officialMobile        String?
+  alternateMobile       String?
+  phoneStd              String?
+  googleMapLink         String?               @db.Text
+  remarks               String?               @db.Text
+  centreStatus          String                @default("Draft") // Draft, Registered, Ready to Book, Invited, Booked, Auditor Assigned, Audited, Allocated, Rejected, Blacklisted
+  eligibilityStatus     String                @default("Eligible") // Eligible, ConditionallyEligible, Ineligible, Blacklisted
+  organizationType      String                @default("Trust") // Individual, Trust, Society, Partnership, Company, Other
+  rejectionReason       String?               @db.Text
+  createdAt             DateTime              @default(now())
+  updatedAt             DateTime              @updatedAt
 
-  contacts          CentreContact[]
-  capacity          CentreCapacity?
-  bookings          Booking[]
-  audits            AuditAssignment[]
-  blacklists        BlacklistRecord[]
+  contacts              CentreContact[]
+  capacity              CentreCapacity?
+  documents             CentreDocument[]
+  infrastructure        CentreInfrastructure?
+  bankAccount           CentreBankAccount?
+  bookings              Booking[]
+  audits                AuditAssignment[]
+  blacklists            BlacklistRecord[]
 
   @@index([centreStatus, eligibilityStatus])
   @@index([cityId, stateId])
+  @@index([userId])
   @@map("oecm_centres")
+}
+
+model CentreDocument {
+  id              String    @id @default(cuid())
+  centreId        String
+  centre          Centre    @relation(fields: [centreId], references: [id], onDelete: Cascade)
+  documentType    String    // owner_id_proof, mou, nda, pan, gst, etc.
+  documentName    String
+  fileName        String
+  fileUrl         String    @db.LongText
+  fileSize        Int       @default(0)
+  mimeType        String    @default("application/pdf")
+  status          String    @default("Pending") // Pending, Verified, Rejected
+  rejectionReason String?   @db.Text
+  remarks         String?   @db.Text
+  version         Int       @default(1)
+  verifiedAt      DateTime?
+  verifiedBy      String?
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
+
+  @@index([centreId, documentType])
+  @@map("oecm_centre_documents")
+}
+
+model CentreInfrastructure {
+  id                       String   @id @default(cuid())
+  centreId                 String   @unique
+  centre                   Centre   @relation(fields: [centreId], references: [id], onDelete: Cascade)
+
+  // Transport & Accessibility (Step 1 & 4)
+  busStandNearby           Boolean  @default(false)
+  busStandName             String?
+  metroNearby              Boolean  @default(false)
+  metroStationName         String?
+  distanceFromMainRoad     Float?
+  signBoards               Boolean  @default(false)
+  printerAvailable         Boolean  @default(false)
+  jammerAvailable          Boolean  @default(false)
+  phFriendly               Boolean  @default(false)
+  phCandidateCount         Int?
+  elevatorAvailable        Boolean  @default(false)
+  wheelchairAvailable      Boolean  @default(false)
+
+  // Building & Facilities (Step 4)
+  noOfFloors               Int      @default(1)
+  buildingType             String?
+  specifiedBuildingType    String?
+  noOfLifts                Int      @default(0)
+  noOfEntryGates           Int      @default(1)
+  noOfExitGates            Int      @default(1)
+  buildingNameWing         String?
+  floorBuildingDetails     String?  @db.Text
+  washroomsEachFloor       Int      @default(1)
+  maleWashroomsEachFloor   Int      @default(1)
+  femaleWashroomsEachFloor Int      @default(1)
+  noOfCctvCameras          Int      @default(0)
+  cctvAreas                Json?
+  drinkingWaterArea        String?
+  parkingAvailable         Boolean  @default(false)
+  candidateParkingInside   Boolean  @default(false)
+  receptionArea            Boolean  @default(false)
+  waitingArea              Boolean  @default(false)
+  maleWashroom             Boolean  @default(false)
+  femaleWashroom           Boolean  @default(false)
+  separateWashrooms        Boolean  @default(false)
+  drinkingWater            Boolean  @default(false)
+  acAvailable              Boolean  @default(false)
+  lockerFacility           Boolean  @default(false)
+  separateEntryExit        Boolean  @default(false)
+  suitablePwd              Boolean  @default(false)
+  rampFacility             Boolean  @default(false)
+  railingSupport           Boolean  @default(false)
+  cctvLobby                Boolean  @default(false)
+  serverRoomAvailable      Boolean  @default(false)
+  acInServerRoom           Boolean  @default(false)
+  serverRoomUpsNetwork     Boolean  @default(false)
+  dedicatedServerRoom      Boolean  @default(false)
+
+  // Power & Network (Step 5)
+  upsAvailable             Boolean  @default(false)
+  upsCapacityKva           Float?
+  gensetAvailable          Boolean  @default(false)
+  gensetCapacityKva        Float?
+  backupGensetAvailable    Boolean  @default(false)
+  backupGensetCapacityKva  Float?
+  coreSwitch1Gbps          Boolean  @default(false)
+  primaryInternet          Boolean  @default(false)
+  backupInternet           Boolean  @default(false)
+  ipScanningAvailable      Boolean  @default(false)
+  networkDiagramAvailable  Boolean  @default(false)
+  lanType                  String?
+
+  // Safety & Security (Step 6)
+  noOfFireExtinguishers    Int      @default(0)
+  fireSafetyClearanceDate  DateTime?
+  fireExtinguisherRefillDate DateTime?
+  firstAidKit              Boolean  @default(false)
+  fireExtinguisherEachFloor Boolean @default(false)
+  fireEmergencyAccessible  Boolean  @default(false)
+  assemblyArea             Boolean  @default(false)
+  safetySignage            Boolean  @default(false)
+  safeArea                 Boolean  @default(false)
+  safeLateHours            Boolean  @default(false)
+  adequateHygiene          Boolean  @default(false)
+  insuranceCoverage        Boolean  @default(false)
+
+  createdAt                DateTime @default(now())
+  updatedAt                DateTime @updatedAt
+
+  @@map("oecm_centre_infrastructures")
+}
+
+model CentreBankAccount {
+  id                 String    @id @default(cuid())
+  centreId           String    @unique
+  centre             Centre    @relation(fields: [centreId], references: [id], onDelete: Cascade)
+  accountName        String
+  bankName           String
+  branchName         String
+  accountNumber      String
+  ifscCode           String
+  accountType        String    @default("Current Account")
+  branchAddress      String?   @db.Text
+  cancelledChequeUrl String?   @db.LongText
+  passbookUrl        String?   @db.LongText
+  verificationStatus String    @default("Submitted") // Not Submitted, Submitted, Pending Verification, Verified, Rejected, Re-verification Required
+  rejectionReason    String?   @db.Text
+  remarks            String?   @db.Text
+  isPaymentEligible  Boolean   @default(false)
+  beneficiaryMatched Boolean   @default(false)
+  verifiedAt         DateTime?
+  verifiedBy         String?
+  createdAt          DateTime  @default(now())
+  updatedAt          DateTime  @updatedAt
+
+  @@map("oecm_centre_bank_accounts")
 }
 
 model CentreContact {

@@ -19,6 +19,7 @@ import CentreDashboard from '../roles/centre-user/CentreDashboard';
 // Feature Pages
 import ProjectsPage from '../features/projects/ProjectsPage';
 import CentresPage from '../features/centres/CentresPage';
+import CentreRegistrationPage from '../features/centres/CentreRegistrationPage';
 import CentreDocuments from '../features/centres/CentreDocuments';
 import CentreConsentPage from '../features/centres/CentreConsentPage';
 import UsersPage from '../features/users/UsersPage';
@@ -178,7 +179,16 @@ export function AppRouter() {
           <DashboardLayout><CentreDashboard /></DashboardLayout>
         </ProtectedRoute>
       } />
-      <Route path={ROUTES.CENTRE.PROFILE} element={<ProtectedRoute allowedRoles={[ROLES.CENTRE, ROLES.ADMIN]}><DashboardLayout><CentresPage /></DashboardLayout></ProtectedRoute>} />
+      <Route path={ROUTES.CENTRE.REGISTRATION} element={
+        <ProtectedRoute allowedRoles={[ROLES.CENTRE, ROLES.ADMIN]}>
+          <DashboardLayout><CentreRegistrationPage /></DashboardLayout>
+        </ProtectedRoute>
+      } />
+      <Route path={ROUTES.CENTRE.PROFILE} element={
+        <ProtectedRoute allowedRoles={[ROLES.CENTRE, ROLES.ADMIN]}>
+          <DashboardLayout><CentreRegistrationPage /></DashboardLayout>
+        </ProtectedRoute>
+      } />
       <Route path={ROUTES.CENTRE.BOOKING} element={<ProtectedRoute allowedRoles={[ROLES.CENTRE, ROLES.ADMIN]}><DashboardLayout><BookingLockingPage /></DashboardLayout></ProtectedRoute>} />
       <Route path={ROUTES.CENTRE.CONSENT} element={<ProtectedRoute allowedRoles={[ROLES.CENTRE, ROLES.ADMIN]}><DashboardLayout><CentreConsentPage /></DashboardLayout></ProtectedRoute>} />
       <Route path={ROUTES.CENTRE.DOCUMENTS} element={<ProtectedRoute allowedRoles={[ROLES.CENTRE, ROLES.ADMIN]}><DashboardLayout><CentreDocuments /></DashboardLayout></ProtectedRoute>} />

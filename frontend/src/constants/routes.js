@@ -72,6 +72,7 @@ export const ROUTES = {
 
   CENTRE: {
     DASHBOARD: '/centre',
+    REGISTRATION: '/centre/registration',
     PROFILE: '/centre/profile',
     BOOKING: '/centre/booking',
     CONSENT: '/centre/consent',

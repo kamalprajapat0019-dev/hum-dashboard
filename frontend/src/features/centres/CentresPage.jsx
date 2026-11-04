@@ -1,312 +1,469 @@
-import { useState, useEffect, useCallback, useRef } from 'react';
+import { useState, useEffect, useCallback, useRef, useMemo } from 'react';
 import {
-  Building2, Plus, Search, Filter, Edit, Trash2, Eye, MapPin,
-  Mail, Phone, ShieldCheck, UserCheck, CheckCircle2, AlertTriangle,
-  X, Check, ExternalLink, RefreshCw, Users, FileText, Cpu, Download,
-  AlertCircle, Loader2
+  Building2, Search, Filter, Eye, MapPin, RefreshCw, Download,
+  CheckCircle2, Clock, AlertTriangle, ShieldCheck, X, Check,
+  AlertCircle, Loader2, ChevronLeft, ChevronRight, UserCheck, Ban
 } from 'lucide-react';
-import {
-  REGIONS, STATES, CITIES, ORG_TYPES, VENUE_STATUS_OPTS, CENTRE_STATUSES,
-  CONTACT_TYPES, DOC_TYPES
-} from '@/services/dataService';
 import { apiClient } from '@/services/apiClient';
 import { ENDPOINTS } from '@/services/endpoints';
 import { useAuth } from '@/context/AuthContext';
+import { useClient } from '@/context/ClientContext';
 import { StatusBadge } from '@/components/common';
+import CentreProfileModal from './components/CentreProfileModal';
+
+const STATUS_OPTIONS = [
+  'All',
+  'Draft',
+  'Registered',
+  'Ready to Book',
+  'Invited',
+  'Booked',
+  'Auditor Assigned',
+  'Audited',
+  'Allocated',
+  'Rejected',
+  'Blacklisted',
+];
+
+const REGION_OPTIONS = ['All', 'North', 'South', 'East', 'West', 'Central', 'North-East'];
 
 export default function CentresPage() {
   const { user } = useAuth();
+  const { selectedClientId, selectedClient } = useClient();
+
   const [centres, setCentres] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
 
+  // Pagination state
+  const [page, setPage] = useState(1);
+  const [limit, setLimit] = useState(10);
+  const [totalPages, setTotalPages] = useState(1);
+  const [totalRecords, setTotalRecords] = useState(0);
+
   // Search & Filter state
   const [search, setSearch] = useState('');
-  const [regionFilter, setRegionFilter] = useState('');
-  const [statusFilter, setStatusFilter] = useState('');
-  const [venueFilter, setVenueFilter] = useState('');
+  const [debouncedSearch, setDebouncedSearch] = useState('');
+  const [regionFilter, setRegionFilter] = useState('All');
+  const [statusFilter, setStatusFilter] = useState('All');
+  const [stateFilter, setStateFilter] = useState('');
+  const [cityFilter, setCityFilter] = useState('');
 
-  // Modals & Drawers
-  const [showAddModal, setShowAddModal] = useState(false);
-  const [editingCentre, setEditingCentre] = useState(null);
-  const [activeCentreDrawer, setActiveCentreDrawer] = useState(null);
-  const [drawerTab, setDrawerTab] = useState('overview'); // overview | contacts | capacity | docs
-  const [showAddContactModal, setShowAddContactModal] = useState(false);
-  const [submitting, setSubmitting] = useState(false);
-  const [toast, setToast] = useState(null); // { message: string, type: 'success' | 'error' }
+  // Status Summary Cards (PDF Section 1.1)
+  const [summary, setSummary] = useState({
+    card1: { all: 0, readyForBooking: 0 },
+    card2: { invited: 0, booked: 0 },
+    card3: { auditorAssigned: 0, audited: 0 },
+    card4: { rejected: 0, blacklisted: 0 },
+  });
+  const [loadingSummary, setLoadingSummary] = useState(false);
 
-  // Form State for Centre
-  const initialForm = {
-    centreCode: '',
-    regionId: 'r1',
-    stateId: 'st1',
-    cityId: 'c1',
-    stateName: 'Delhi',
-    cityName: 'Delhi',
-    eduCode: '',
-    tcCode: '',
-    centreName: '',
-    centreAddress: '',
-    pincode: '',
-    venueStatus: 'Old',
-    previousEduExam: '',
-    officialEmail: '',
-    googleMapLink: '',
-    organizationType: 'Trust',
-    centreStatus: 'Draft',
-    remarks: '',
-  };
-  const [formData, setFormData] = useState(initialForm);
+  // Centre Profile Modal
+  const [selectedCentreProfile, setSelectedCentreProfile] = useState(null);
+  const [loadingProfile, setLoadingProfile] = useState(false);
 
-  // Form State for Contact
-  const initialContact = {
-    personType: 'Owner',
-    fullName: '',
-    contactNumber: '',
-    email: '',
-    aadhaarNumber: '',
-    fatherName: '',
-    motherName: '',
-    permanentAddress: '',
-    isPrimary: true,
-  };
-  const [contactForm, setContactForm] = useState(initialContact);
-
-  const [debouncedSearch, setDebouncedSearch] = useState(search);
+  // Debounce search input
   const searchTimerRef = useRef(null);
-
   useEffect(() => {
     if (searchTimerRef.current) clearTimeout(searchTimerRef.current);
     searchTimerRef.current = setTimeout(() => {
       setDebouncedSearch(search);
+      setPage(1); // Reset to page 1 on new search
     }, 300);
     return () => {
       if (searchTimerRef.current) clearTimeout(searchTimerRef.current);
     };
   }, [search]);
 
-  const showToast = (message, type = 'success') => {
-    setToast({ message, type });
-    setTimeout(() => setToast(null), 3500);
-  };
+  // Load Status Summary Cards
+  const loadSummary = useCallback(async () => {
+    setLoadingSummary(true);
+    try {
+      const res = await apiClient.get(ENDPOINTS.ADMIN.CENTRES_SUMMARY, {
+        params: { clientId: selectedClientId || undefined },
+      });
+      if (res && res.success && res.data) {
+        setSummary(res.data);
+      }
+    } catch (err) {
+      console.warn('Failed to fetch centre status summary:', err);
+    } finally {
+      setLoadingSummary(false);
+    }
+  }, [selectedClientId]);
 
+  // Load Centre Master Listing Table
   const loadCentres = useCallback(async () => {
     setLoading(true);
     setError(null);
     try {
       const res = await apiClient.get(ENDPOINTS.ADMIN.CENTRES, {
         params: {
-          search: debouncedSearch || undefined,
-          status: statusFilter || undefined,
-          regionId: regionFilter || undefined,
-          limit: 100,
+          page,
+          limit,
+          search: debouncedSearch.trim() || undefined,
+          regionId: regionFilter !== 'All' ? regionFilter : undefined,
+          status: statusFilter !== 'All' ? statusFilter : undefined,
+          stateId: stateFilter.trim() || undefined,
+          cityId: cityFilter.trim() || undefined,
+          clientId: selectedClientId || undefined,
         },
       });
-      if (res && res.success && Array.isArray(res.data)) {
-        setCentres(res.data);
+
+      if (res && res.success) {
+        setCentres(Array.isArray(res.data) ? res.data : []);
+        if (res.meta) {
+          setTotalRecords(res.meta.total || 0);
+          setTotalPages(res.meta.totalPages || 1);
+        }
       } else {
         setCentres([]);
       }
     } catch (err) {
       console.error('Failed to query centre master:', err);
       setError(err.message || 'Unable to connect to centre database');
+      setCentres([]);
     } finally {
       setLoading(false);
     }
-  }, [debouncedSearch, statusFilter, regionFilter]);
+  }, [page, limit, debouncedSearch, regionFilter, statusFilter, stateFilter, cityFilter, selectedClientId]);
+
+  useEffect(() => {
+    loadSummary();
+  }, [loadSummary]);
 
   useEffect(() => {
     loadCentres();
   }, [loadCentres]);
 
-  // Dynamic state/city helpers
-  const availableStates = STATES.filter(s => !formData.regionId || s.regionId === formData.regionId);
-  const availableCities = CITIES.filter(c => !formData.stateId || c.stateId === formData.stateId);
-
-  const handleOpenAdd = () => {
-    setEditingCentre(null);
-    const nextCode = `CN-${String(centres.length + 1).padStart(3, '0')}`;
-    setFormData({
-      ...initialForm,
-      centreCode: nextCode,
-    });
-    setShowAddModal(true);
-  };
-
-  const handleOpenEdit = (c) => {
-    setEditingCentre(c);
-    setFormData({
-      centreCode: c.centreCode || c.centre_id || '',
-      regionId: c.regionId || c.region_id || 'r1',
-      stateId: c.stateId || c.state_id || 'st1',
-      cityId: c.cityId || c.city_id || 'c1',
-      stateName: c.stateName || c.actual_state_id || 'Delhi',
-      cityName: c.cityName || c.actual_city_id || 'Delhi',
-      eduCode: c.eduCode || c.edu_code || '',
-      tcCode: c.tcCode || c.tc_code || '',
-      centreName: c.centreName || c.centre_name || '',
-      centreAddress: c.centreAddress || c.centre_address || '',
-      pincode: c.pincode || '',
-      venueStatus: c.venueStatus || c.venue_status || 'Old',
-      previousEduExam: c.previousEduExam || c.previous_edu_exam || '',
-      officialEmail: c.officialEmail || c.official_email || '',
-      googleMapLink: c.googleMapLink || c.google_map_link || '',
-      organizationType: c.organizationType || c.organization_type || 'Trust',
-      centreStatus: c.centreStatus || c.centre_status || 'Draft',
-      remarks: c.remarks || '',
-    });
-    setShowAddModal(true);
-  };
-
-  const handleSaveCentre = async (e) => {
-    e.preventDefault();
-    if (!formData.centreName?.trim() || !formData.centreCode?.trim() || !formData.centreAddress?.trim()) {
-      showToast('Please provide Centre Code, Name, and Address', 'error');
-      return;
-    }
-
-    setSubmitting(true);
+  // Open Full Centre Profile Modal
+  const handleViewProfile = async (centreId) => {
+    setLoadingProfile(true);
     try {
-      const payload = {
-        centreCode: formData.centreCode.trim(),
-        centreName: formData.centreName.trim(),
-        centreAddress: formData.centreAddress.trim(),
-        pincode: String(formData.pincode).trim(),
-        regionId: formData.regionId,
-        stateId: formData.stateId,
-        cityId: formData.cityId,
-        stateName: STATES.find(s => s.id === formData.stateId)?.label || formData.stateName,
-        cityName: CITIES.find(c => c.id === formData.cityId)?.label || formData.cityName,
-        eduCode: formData.eduCode?.trim() || undefined,
-        tcCode: formData.tcCode?.trim() || undefined,
-        venueStatus: formData.venueStatus || 'Old',
-        previousEduExam: formData.previousEduExam?.trim() || undefined,
-        officialEmail: formData.officialEmail?.trim() || undefined,
-        googleMapLink: formData.googleMapLink?.trim() || undefined,
-        organizationType: formData.organizationType || 'Trust',
-        centreStatus: formData.centreStatus || 'Draft',
-        remarks: formData.remarks?.trim() || undefined,
-      };
-
-      if (editingCentre) {
-        const res = await apiClient.put(`${ENDPOINTS.ADMIN.CENTRES}/${editingCentre.id}`, payload);
-        if (res && res.success) {
-          showToast(`Centre "${formData.centreName}" updated successfully in database!`, 'success');
-          setShowAddModal(false);
-          await loadCentres();
-        }
+      const res = await apiClient.get(ENDPOINTS.ADMIN.CENTRE_PROFILE(centreId));
+      if (res && res.success && res.data) {
+        setSelectedCentreProfile(res.data);
       } else {
-        const res = await apiClient.post(ENDPOINTS.ADMIN.CENTRES, payload);
-        if (res && res.success) {
-          showToast(`Centre "${formData.centreName}" registered in database!`, 'success');
-          setShowAddModal(false);
-          await loadCentres();
-        }
+        // Fallback to basic centre data from listing
+        const found = centres.find((c) => c.id === centreId);
+        setSelectedCentreProfile(found);
       }
     } catch (err) {
-      const msg = err.data?.error?.message || err.message || 'Failed to save centre';
-      showToast(msg, 'error');
+      console.error('Failed to load full centre profile:', err);
+      const found = centres.find((c) => c.id === centreId);
+      setSelectedCentreProfile(found);
     } finally {
-      setSubmitting(false);
+      setLoadingProfile(false);
     }
   };
 
-  const handleToggleStatus = async (centre, newStatus) => {
-    try {
-      const res = await apiClient.patch(ENDPOINTS.ADMIN.CENTRE_STATUS(centre.id), {
-        status: newStatus,
-        reason: `Status changed to ${newStatus} by Administrator`,
-      });
-      if (res && res.success) {
-        showToast(`Centre status changed to ${newStatus}`, 'success');
-        await loadCentres();
-      }
-    } catch (err) {
-      const msg = err.data?.error?.message || err.message || 'Failed to update status';
-      showToast(msg, 'error');
-    }
+  // Export to CSV
+  const handleExport = () => {
+    if (centres.length === 0) return;
+    const headers = ['S. No.', 'Centre ID', 'Centre Name', 'Region', 'State', 'City', 'Total Nodes', 'Status'];
+    const rows = centres.map((c, idx) => [
+      ((page - 1) * limit) + idx + 1,
+      `"${c.centreCode || c.centre_id || ''}"`,
+      `"${c.centreName || c.centre_name || ''}"`,
+      `"${c.regionId || 'North'}"`,
+      `"${c.stateName || ''}"`,
+      `"${c.cityName || ''}"`,
+      c.capacity?.examNodes || c.totalNodes || 0,
+      `"${c.centreStatus || c.centre_status || 'Draft'}"`,
+    ]);
+
+    const csvContent = 'data:text/csv;charset=utf-8,' + [headers.join(','), ...rows.map((e) => e.join(','))].join('\n');
+    const encodedUri = encodeURI(csvContent);
+    const link = document.createElement('a');
+    link.setAttribute('href', encodedUri);
+    link.setAttribute('download', `OEMP_Centre_Master_${new Date().toISOString().split('T')[0]}.csv`);
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
   };
-
-  // Helper labels
-  const getRegionLabel = (rid) => REGIONS.find(r => r.id === rid)?.label || rid || '—';
-  const getStateLabel = (sid) => STATES.find(s => s.id === sid)?.label || sid || '—';
-  const getCityLabel = (cid) => CITIES.find(c => c.id === cid)?.label || cid || '—';
-
-  const approvedCount = centres.filter(c => (c.centreStatus || c.centre_status) === 'Approved' || (c.centreStatus || c.centre_status) === 'Active').length;
-  const draftCount = centres.filter(c => (c.centreStatus || c.centre_status) === 'Draft').length;
-  const inactiveCount = centres.filter(c => (c.centreStatus || c.centre_status) === 'Rejected' || (c.centreStatus || c.centre_status) === 'Inactive').length;
 
   return (
     <div>
-      {/* Toast Alert */}
-      {toast && (
-        <div style={{
-          position: 'fixed',
-          top: 24,
-          right: 24,
-          background: toast.type === 'error' ? '#b91c1c' : 'var(--color-primary-dark, #1e3a8a)',
-          color: '#fff',
-          padding: '12px 20px',
-          borderRadius: 'var(--radius-lg, 12px)',
-          boxShadow: 'var(--shadow-xl, 0 20px 25px -5px rgba(0,0,0,0.1))',
-          zIndex: 9999,
-          display: 'flex',
-          alignItems: 'center',
-          gap: 10,
-          fontWeight: 600
-        }}>
-          {toast.type === 'error' ? <AlertCircle size={18} /> : <CheckCircle2 size={18} color="#4ade80" />}
-          <span>{toast.message}</span>
-        </div>
-      )}
-
-      {/* Header */}
-      <div className="page-header">
+      {/* ── Page Header ── */}
+      <div className="page-header" style={{ marginBottom: 20 }}>
         <div className="page-header__top">
           <div>
-            <div className="breadcrumb">
-              <span>Admin</span>
-              <span className="breadcrumb-sep">/</span>
-              <span className="breadcrumb-current">Centre Master</span>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+              <h1 className="page-header__title">Centre Master — Examination Venues</h1>
+              {selectedClient && (
+                <span className="badge badge-subtle" style={{ background: '#eff6ff', color: '#1e40af', fontWeight: 600 }}>
+                  Client: {selectedClient.name}
+                </span>
+              )}
             </div>
-            <h1 className="page-header__title" style={{ marginTop: 6 }}>Centre Master Registry</h1>
             <p className="page-header__subtitle">
-              Live MySQL database: examination centres, venue capacity, and multi-tier contacts
+              Review, verify, audit, and approve registered examination centres across India.
             </p>
           </div>
-          <div className="page-header__actions">
+          <div className="page-header__actions" style={{ display: 'flex', gap: 8 }}>
             <button
-              className="btn btn-secondary"
-              onClick={loadCentres}
+              className="btn btn-secondary btn-sm"
+              onClick={() => {
+                loadSummary();
+                loadCentres();
+              }}
               disabled={loading}
-              title="Refresh from Database"
+              title="Refresh Records"
             >
-              <RefreshCw size={14} className={loading ? 'animate-spin' : ''} /> Refresh
+              <RefreshCw size={13} className={loading ? 'animate-spin' : ''} /> Refresh
             </button>
-            <button className="btn btn-primary" onClick={handleOpenAdd}>
-              <Plus size={14} /> Add New Centre
+            <button
+              className="btn btn-secondary btn-sm"
+              onClick={handleExport}
+              disabled={centres.length === 0}
+              title="Export Listing to CSV"
+            >
+              <Download size={13} /> Export
             </button>
           </div>
         </div>
       </div>
 
-      {/* Error Banner */}
-      {error && (
-        <div style={{
-          background: '#fee2e2',
-          border: '1px solid #ef4444',
-          borderRadius: 'var(--radius-md, 8px)',
-          padding: '12px 16px',
+      {/* ── Section 1.1: Centre Status Summary Cards (OEMP PDF Specification) ── */}
+      <div
+        style={{
+          display: 'grid',
+          gridTemplateColumns: 'repeat(auto-fit, minmax(230px, 1fr))',
+          gap: 16,
+          marginBottom: 24,
+        }}
+      >
+        {/* Card 1: All & Ready-for-Booking */}
+        <div
+          className="card"
+          style={{
+            padding: '16px 20px',
+            background: 'var(--color-bg-card, #ffffff)',
+            border: '1px solid var(--border-color, #e2e8f0)',
+            borderRadius: '10px',
+            boxShadow: '0 1px 3px rgba(0,0,0,0.05)',
+          }}
+        >
+          <div style={{ fontSize: '0.8125rem', fontWeight: 600, color: 'var(--text-muted, #64748b)', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
+            Card 1 • Onboarding & Booking
+          </div>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-end', marginTop: 12 }}>
+            <div>
+              <div style={{ fontSize: '0.8125rem', color: '#475569' }}>All Centres</div>
+              <div style={{ fontSize: '1.75rem', fontWeight: 700, color: '#0f172a', lineHeight: 1.2 }}>
+                {loadingSummary ? '...' : summary.card1.all}
+              </div>
+            </div>
+            <div style={{ textAlign: 'right' }}>
+              <div style={{ fontSize: '0.8125rem', color: '#166534', fontWeight: 500 }}>Ready-for-Booking</div>
+              <div style={{ fontSize: '1.75rem', fontWeight: 700, color: '#16a34a', lineHeight: 1.2 }}>
+                {loadingSummary ? '...' : summary.card1.readyForBooking}
+              </div>
+            </div>
+          </div>
+        </div>
+
+        {/* Card 2: Invited & Booked */}
+        <div
+          className="card"
+          style={{
+            padding: '16px 20px',
+            background: 'var(--color-bg-card, #ffffff)',
+            border: '1px solid var(--border-color, #e2e8f0)',
+            borderRadius: '10px',
+            boxShadow: '0 1px 3px rgba(0,0,0,0.05)',
+          }}
+        >
+          <div style={{ fontSize: '0.8125rem', fontWeight: 600, color: 'var(--text-muted, #64748b)', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
+            Card 2 • Demand Pipeline
+          </div>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-end', marginTop: 12 }}>
+            <div>
+              <div style={{ fontSize: '0.8125rem', color: '#475569' }}>Invited</div>
+              <div style={{ fontSize: '1.75rem', fontWeight: 700, color: '#0284c7', lineHeight: 1.2 }}>
+                {loadingSummary ? '...' : summary.card2.invited}
+              </div>
+            </div>
+            <div style={{ textAlign: 'right' }}>
+              <div style={{ fontSize: '0.8125rem', color: '#1e40af', fontWeight: 500 }}>Booked</div>
+              <div style={{ fontSize: '1.75rem', fontWeight: 700, color: '#2563eb', lineHeight: 1.2 }}>
+                {loadingSummary ? '...' : summary.card2.booked}
+              </div>
+            </div>
+          </div>
+        </div>
+
+        {/* Card 3: Auditor Assigned & Audited */}
+        <div
+          className="card"
+          style={{
+            padding: '16px 20px',
+            background: 'var(--color-bg-card, #ffffff)',
+            border: '1px solid var(--border-color, #e2e8f0)',
+            borderRadius: '10px',
+            boxShadow: '0 1px 3px rgba(0,0,0,0.05)',
+          }}
+        >
+          <div style={{ fontSize: '0.8125rem', fontWeight: 600, color: 'var(--text-muted, #64748b)', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
+            Card 3 • Verification & Audit
+          </div>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-end', marginTop: 12 }}>
+            <div>
+              <div style={{ fontSize: '0.8125rem', color: '#d97706' }}>Auditor Assigned</div>
+              <div style={{ fontSize: '1.75rem', fontWeight: 700, color: '#d97706', lineHeight: 1.2 }}>
+                {loadingSummary ? '...' : summary.card3.auditorAssigned}
+              </div>
+            </div>
+            <div style={{ textAlign: 'right' }}>
+              <div style={{ fontSize: '0.8125rem', color: '#7c3aed', fontWeight: 500 }}>Audited</div>
+              <div style={{ fontSize: '1.75rem', fontWeight: 700, color: '#7c3aed', lineHeight: 1.2 }}>
+                {loadingSummary ? '...' : summary.card3.audited}
+              </div>
+            </div>
+          </div>
+        </div>
+
+        {/* Card 4: Rejected & Blacklisted */}
+        <div
+          className="card"
+          style={{
+            padding: '16px 20px',
+            background: 'var(--color-bg-card, #ffffff)',
+            border: '1px solid var(--border-color, #e2e8f0)',
+            borderRadius: '10px',
+            boxShadow: '0 1px 3px rgba(0,0,0,0.05)',
+          }}
+        >
+          <div style={{ fontSize: '0.8125rem', fontWeight: 600, color: 'var(--text-muted, #64748b)', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
+            Card 4 • Exceptions & Risk
+          </div>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-end', marginTop: 12 }}>
+            <div>
+              <div style={{ fontSize: '0.8125rem', color: '#dc2626' }}>Rejected</div>
+              <div style={{ fontSize: '1.75rem', fontWeight: 700, color: '#dc2626', lineHeight: 1.2 }}>
+                {loadingSummary ? '...' : summary.card4.rejected}
+              </div>
+            </div>
+            <div style={{ textAlign: 'right' }}>
+              <div style={{ fontSize: '0.8125rem', color: '#991b1b', fontWeight: 500 }}>Blacklisted</div>
+              <div style={{ fontSize: '1.75rem', fontWeight: 700, color: '#991b1b', lineHeight: 1.2 }}>
+                {loadingSummary ? '...' : summary.card4.blacklisted}
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      {/* ── Search & Filters Bar (Phase 2.C) ── */}
+      <div
+        className="card"
+        style={{
+          padding: '16px 20px',
           marginBottom: 20,
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'space-between',
-          color: '#991b1b',
-        }}>
+          background: 'var(--color-bg-card, #ffffff)',
+        }}
+      >
+        <div style={{ display: 'flex', flexWrap: 'wrap', gap: 12, alignItems: 'center' }}>
+          {/* Search by Centre ID, Centre Name, City */}
+          <div style={{ flex: '1 1 240px', minWidth: 200, position: 'relative' }}>
+            <Search
+              size={15}
+              style={{
+                position: 'absolute',
+                left: 12,
+                top: '50%',
+                transform: 'translateY(-50%)',
+                color: 'var(--text-muted, #94a3b8)',
+              }}
+            />
+            <input
+              type="text"
+              className="form-control"
+              style={{ paddingLeft: 36, height: 38 }}
+              placeholder="Search by Centre ID, Name, or City..."
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+            />
+          </div>
+
+          {/* Region Filter */}
+          <div style={{ minWidth: 140 }}>
+            <select
+              className="form-control"
+              style={{ height: 38 }}
+              value={regionFilter}
+              onChange={(e) => {
+                setRegionFilter(e.target.value);
+                setPage(1);
+              }}
+            >
+              <option value="All">All Regions</option>
+              {REGION_OPTIONS.filter((r) => r !== 'All').map((r) => (
+                <option key={r} value={r}>
+                  {r}
+                </option>
+              ))}
+            </select>
+          </div>
+
+          {/* Workflow Status Filter */}
+          <div style={{ minWidth: 160 }}>
+            <select
+              className="form-control"
+              style={{ height: 38 }}
+              value={statusFilter}
+              onChange={(e) => {
+                setStatusFilter(e.target.value);
+                setPage(1);
+              }}
+            >
+              <option value="All">All Statuses</option>
+              {STATUS_OPTIONS.filter((s) => s !== 'All').map((s) => (
+                <option key={s} value={s}>
+                  {s}
+                </option>
+              ))}
+            </select>
+          </div>
+
+          {/* Reset Filters */}
+          {(search || regionFilter !== 'All' || statusFilter !== 'All') && (
+            <button
+              className="btn btn-ghost btn-sm"
+              onClick={() => {
+                setSearch('');
+                setDebouncedSearch('');
+                setRegionFilter('All');
+                setStatusFilter('All');
+                setPage(1);
+              }}
+              style={{ color: '#64748b' }}
+            >
+              <X size={14} /> Clear
+            </button>
+          )}
+        </div>
+      </div>
+
+      {/* ── Error Banner ── */}
+      {error && (
+        <div
+          style={{
+            background: '#fee2e2',
+            border: '1px solid #ef4444',
+            borderRadius: 'var(--radius-md, 8px)',
+            padding: '12px 16px',
+            marginBottom: 20,
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'space-between',
+            color: '#991b1b',
+          }}
+        >
           <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
             <AlertCircle size={20} />
             <div>
-              <strong>Failed to query centre records:</strong> {error}
+              <strong>Database Connection Error:</strong> {error}
             </div>
           </div>
           <button
@@ -319,196 +476,91 @@ export default function CentresPage() {
         </div>
       )}
 
-      {/* Summary KPI Cards */}
-      <div className="kpi-grid" style={{ marginBottom: 24 }}>
-        <div className="kpi-card">
-          <div className="kpi-card__header">
-            <span className="kpi-card__label">Total Centres</span>
-            <div className="kpi-card__icon" style={{ background: '#eff6ff' }}>
-              <Building2 size={16} color="#1e40af" />
-            </div>
-          </div>
-          <div className="kpi-card__value">{loading ? '...' : centres.length}</div>
-          <div className="kpi-card__sub">Across all database records</div>
-        </div>
-
-        <div className="kpi-card">
-          <div className="kpi-card__header">
-            <span className="kpi-card__label">Approved &amp; Active</span>
-            <div className="kpi-card__icon" style={{ background: '#f0fdf4' }}>
-              <ShieldCheck size={16} color="#16a34a" />
-            </div>
-          </div>
-          <div className="kpi-card__value" style={{ color: 'var(--color-success, #16a34a)' }}>
-            {loading ? '...' : approvedCount}
-          </div>
-          <div className="kpi-card__sub">Operational verified venues</div>
-        </div>
-
-        <div className="kpi-card">
-          <div className="kpi-card__header">
-            <span className="kpi-card__label">Draft / Pending Review</span>
-            <div className="kpi-card__icon" style={{ background: '#fffbeb' }}>
-              <AlertTriangle size={16} color="#d97706" />
-            </div>
-          </div>
-          <div className="kpi-card__value" style={{ color: 'var(--color-warning, #d97706)' }}>
-            {loading ? '...' : draftCount}
-          </div>
-          <div className="kpi-card__sub">Onboarding in progress</div>
-        </div>
-
-        <div className="kpi-card">
-          <div className="kpi-card__header">
-            <span className="kpi-card__label">Rejected / Inactive</span>
-            <div className="kpi-card__icon" style={{ background: '#fef2f2' }}>
-              <Building2 size={16} color="#dc2626" />
-            </div>
-          </div>
-          <div className="kpi-card__value" style={{ color: 'var(--color-danger, #dc2626)' }}>
-            {loading ? '...' : inactiveCount}
-          </div>
-          <div className="kpi-card__sub">Flagged or deactivated</div>
-        </div>
-      </div>
-
-      {/* Main Table Card */}
-      <div className="card">
-        {/* Filters bar */}
-        <div className="card-header" style={{ flexWrap: 'wrap', gap: 12 }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: 10, flex: 1, minWidth: 'min(100%, 220px)' }}>
-            <div style={{ position: 'relative', width: '100%', maxWidth: 320 }}>
-              <Search size={14} style={{ position: 'absolute', left: 10, top: 10, color: 'var(--text-muted)' }} />
-              <input
-                type="text"
-                className="form-control"
-                placeholder="Search by name, ID, TC Code, Edu Code..."
-                value={search}
-                onChange={e => setSearch(e.target.value)}
-                style={{ paddingLeft: 32, fontSize: '0.8125rem' }}
-              />
-            </div>
-          </div>
-
-          <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
-            <select
-              className="form-control"
-              value={statusFilter}
-              onChange={e => setStatusFilter(e.target.value)}
-              style={{ width: 140, fontSize: '0.75rem' }}
-            >
-              <option value="">All Statuses</option>
-              {CENTRE_STATUSES.map(s => <option key={s} value={s}>{s}</option>)}
-            </select>
-          </div>
-        </div>
-
-        {/* Table */}
-        <div className="table-wrapper">
-          <table>
+      {/* ── Section 1.2: Centre Master Overview Listing Table ── */}
+      <div className="card" style={{ overflow: 'hidden' }}>
+        <div className="table-responsive">
+          <table className="table">
             <thead>
               <tr>
+                <th style={{ width: 60 }}>S. No.</th>
                 <th>Centre ID</th>
-                <th>Centre Name &amp; Details</th>
-                <th>Location / Jurisdiction</th>
-                <th>Codes (Edu / TC)</th>
-                <th>Org Type</th>
-                <th>Venue Type</th>
+                <th>Centre Name</th>
+                <th>Region</th>
+                <th>State</th>
+                <th>City</th>
+                <th style={{ textAlign: 'right' }}>Total Nodes</th>
                 <th>Status</th>
-                <th style={{ textAlign: 'right' }}>Actions</th>
+                <th style={{ textAlign: 'center', width: 120 }}>Actions</th>
               </tr>
             </thead>
             <tbody>
               {loading ? (
                 <tr>
-                  <td colSpan={8} style={{ textAlign: 'center', padding: '40px', color: 'var(--text-muted)' }}>
+                  <td colSpan={9} style={{ textAlign: 'center', padding: '40px 0', color: 'var(--text-muted)' }}>
                     <Loader2 className="animate-spin" size={24} style={{ margin: '0 auto 8px', display: 'block' }} />
-                    Loading centres from database...
+                    Loading centre records from MySQL database...
                   </td>
                 </tr>
               ) : centres.length === 0 ? (
                 <tr>
-                  <td colSpan={8} style={{ textAlign: 'center', padding: '40px', color: 'var(--text-muted)' }}>
-                    No centres found in MySQL database. Click &quot;Add New Centre&quot; to register your first centre.
+                  <td colSpan={9} style={{ textAlign: 'center', padding: '48px 0', color: 'var(--text-muted)' }}>
+                    <Building2 size={36} style={{ margin: '0 auto 12px', opacity: 0.4, display: 'block' }} />
+                    <div style={{ fontWeight: 600, fontSize: '1rem', color: '#334155' }}>No Centre Records Found</div>
+                    <div style={{ fontSize: '0.875rem', marginTop: 4 }}>
+                      {debouncedSearch || statusFilter !== 'All'
+                        ? 'Try clearing search filters to see all examination centres.'
+                        : 'New centres will appear here once submitted by Centre Users through the Centre Portal.'}
+                    </div>
                   </td>
                 </tr>
               ) : (
-                centres.map(centre => {
-                  const code = centre.centreCode || centre.centre_id;
-                  const name = centre.centreName || centre.centre_name;
-                  const address = centre.centreAddress || centre.centre_address;
-                  const email = centre.officialEmail || centre.official_email;
-                  const city = centre.cityName || getCityLabel(centre.cityId || centre.city_id);
-                  const state = centre.stateName || getStateLabel(centre.stateId || centre.state_id);
-                  const status = centre.centreStatus || centre.centre_status || 'Draft';
-                  const venue = centre.venueStatus || centre.venue_status || 'Old';
-                  const orgType = centre.organizationType || centre.organization_type || 'Trust';
+                centres.map((c, idx) => {
+                  const serialNumber = (page - 1) * limit + idx + 1;
+                  const totalNodes = c.capacity?.examNodes || c.totalNodes || 0;
 
                   return (
-                    <tr key={centre.id}>
+                    <tr key={c.id || idx} style={{ transition: 'background 0.15s ease' }}>
+                      <td style={{ fontWeight: 500, color: 'var(--text-muted)' }}>{serialNumber}</td>
                       <td>
-                        <span style={{ fontFamily: 'monospace', fontWeight: 700, color: 'var(--color-primary)' }}>
-                          {code}
+                        <span
+                          style={{
+                            fontFamily: 'monospace',
+                            fontWeight: 700,
+                            color: '#1e40af',
+                            background: '#eff6ff',
+                            padding: '2px 8px',
+                            borderRadius: 4,
+                          }}
+                        >
+                          {c.centreCode || c.centre_id || '—'}
                         </span>
                       </td>
                       <td>
-                        <div style={{ fontWeight: 600, color: 'var(--text-primary)' }}>{name}</div>
-                        <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)', maxWidth: 280 }} className="truncate" title={address}>
-                          {address}
-                        </div>
-                        {email && (
-                          <div style={{ fontSize: '0.6875rem', color: 'var(--color-primary-light)', marginTop: 2 }}>
-                            {email}
+                        <div style={{ fontWeight: 600, color: '#0f172a' }}>{c.centreName || c.centre_name}</div>
+                        {c.centreAddress && (
+                          <div style={{ fontSize: '0.75rem', color: '#64748b', maxWidth: 280, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                            {c.centreAddress}
                           </div>
                         )}
                       </td>
-                      <td>
-                        <div style={{ fontWeight: 500 }}>{city}, {state}</div>
-                        <div style={{ fontSize: '0.6875rem', color: 'var(--text-muted)' }}>
-                          Pin: {centre.pincode}
-                        </div>
+                      <td>{c.regionId || 'North'}</td>
+                      <td>{c.stateName || '—'}</td>
+                      <td>{c.cityName || '—'}</td>
+                      <td style={{ textAlign: 'right', fontWeight: 600 }}>
+                        {Number(totalNodes).toLocaleString()}
                       </td>
                       <td>
-                        <div style={{ fontSize: '0.75rem', fontFamily: 'monospace' }}>
-                          <span style={{ color: 'var(--text-muted)' }}>Edu:</span> {centre.eduCode || centre.edu_code || '—'}
-                        </div>
-                        <div style={{ fontSize: '0.75rem', fontFamily: 'monospace' }}>
-                          <span style={{ color: 'var(--text-muted)' }}>TC:</span> {centre.tcCode || centre.tc_code || '—'}
-                        </div>
+                        <StatusBadge status={c.centreStatus || c.centre_status || 'Draft'} />
                       </td>
-                      <td>
-                        <span style={{ fontSize: '0.75rem', background: 'var(--bg-subtle, #f1f5f9)', padding: '2px 8px', borderRadius: 4, fontWeight: 500 }}>
-                          {orgType}
-                        </span>
-                      </td>
-                      <td>
-                        <span className={`badge ${venue === 'Old' ? 'badge-info' : 'badge-neutral'}`} style={{ fontSize: '0.6875rem' }}>
-                          {venue}
-                        </span>
-                      </td>
-                      <td>
-                        <StatusBadge status={status} />
-                      </td>
-                      <td style={{ textAlign: 'right' }}>
-                        <div style={{ display: 'inline-flex', gap: 6 }}>
-                          <button
-                            className="btn btn-secondary btn-sm"
-                            title="Manage Centre"
-                            onClick={() => {
-                              setActiveCentreDrawer(centre);
-                              setDrawerTab('overview');
-                            }}
-                          >
-                            <Eye size={13} /> Manage
-                          </button>
-                          <button
-                            className="btn btn-secondary btn-sm"
-                            title="Edit Centre"
-                            onClick={() => handleOpenEdit(centre)}
-                          >
-                            <Edit size={13} />
-                          </button>
-                        </div>
+                      <td style={{ textAlign: 'center' }}>
+                        <button
+                          className="btn btn-sm btn-secondary"
+                          onClick={() => handleViewProfile(c.id)}
+                          style={{ display: 'inline-flex', alignItems: 'center', gap: 6, fontSize: '0.8125rem', padding: '4px 10px' }}
+                          title="View Complete Centre Profile"
+                        >
+                          <Eye size={13} /> View
+                        </button>
                       </td>
                     </tr>
                   );
@@ -517,228 +569,85 @@ export default function CentresPage() {
             </tbody>
           </table>
         </div>
+
+        {/* ── Table Footer & Continuous Server-Side Pagination (Section 1.5) ── */}
+        <div
+          style={{
+            padding: '12px 20px',
+            borderTop: '1px solid var(--border-color, #e2e8f0)',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'space-between',
+            background: 'var(--color-bg-subtle, #f8fafc)',
+            fontSize: '0.8125rem',
+            color: '#64748b',
+          }}
+        >
+          <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+            <span>
+              Showing {centres.length > 0 ? (page - 1) * limit + 1 : 0} to{' '}
+              {Math.min(page * limit, totalRecords)} of {totalRecords} centres
+            </span>
+
+            <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+              <span>Show:</span>
+              <select
+                className="form-control"
+                style={{ width: 80, height: 30, padding: '2px 8px', fontSize: '0.8125rem' }}
+                value={limit}
+                onChange={(e) => {
+                  setLimit(Number(e.target.value));
+                  setPage(1);
+                }}
+              >
+                <option value={10}>10</option>
+                <option value={25}>25</option>
+                <option value={50}>50</option>
+                <option value={100}>100</option>
+              </select>
+            </div>
+          </div>
+
+          <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+            <button
+              className="btn btn-sm btn-secondary"
+              onClick={() => setPage((p) => Math.max(p - 1, 1))}
+              disabled={page <= 1 || loading}
+              style={{ padding: '4px 8px' }}
+            >
+              <ChevronLeft size={14} /> Previous
+            </button>
+
+            <span style={{ padding: '0 8px', fontWeight: 600 }}>
+              Page {page} of {totalPages || 1}
+            </span>
+
+            <button
+              className="btn btn-sm btn-secondary"
+              onClick={() => setPage((p) => Math.min(p + 1, totalPages))}
+              disabled={page >= totalPages || loading}
+              style={{ padding: '4px 8px' }}
+            >
+              Next <ChevronRight size={14} />
+            </button>
+          </div>
+        </div>
       </div>
 
-      {/* Drawer */}
-      {activeCentreDrawer && (
-        <div className="modal-backdrop" onClick={() => setActiveCentreDrawer(null)}>
-          <div className="drawer" onClick={e => e.stopPropagation()} style={{ width: 'min(100vw, 560px)', maxWidth: '100vw', background: '#fff', height: '100vh', maxHeight: '100dvh', position: 'fixed', right: 0, top: 0, overflowY: 'auto', boxShadow: 'var(--shadow-2xl, 0 25px 50px -12px rgba(0, 0, 0, 0.25))', zIndex: 9999, display: 'flex', flexDirection: 'column' }}>
-            <div style={{ padding: '20px 24px', borderBottom: '1px solid var(--border-default, #e2e8f0)', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-              <div>
-                <span className="badge badge-primary">{activeCentreDrawer.centreCode || activeCentreDrawer.centre_id}</span>
-                <h2 style={{ fontSize: '1.125rem', fontWeight: 700, marginTop: 4 }}>{activeCentreDrawer.centreName || activeCentreDrawer.centre_name}</h2>
-              </div>
-              <button className="btn-ghost" onClick={() => setActiveCentreDrawer(null)} style={{ padding: 4 }}>
-                <X size={20} />
-              </button>
-            </div>
-
-            <div style={{ padding: 24, flex: 1 }}>
-              <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
-                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '12px 16px', background: 'var(--bg-subtle, #f8fafc)', borderRadius: 8 }}>
-                  <div>
-                    <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>Current Status</div>
-                    <StatusBadge status={activeCentreDrawer.centreStatus || activeCentreDrawer.centre_status || 'Draft'} />
-                  </div>
-                  <div style={{ display: 'flex', gap: 6 }}>
-                    {(activeCentreDrawer.centreStatus || activeCentreDrawer.centre_status) !== 'Approved' && (
-                      <button
-                        className="btn btn-sm btn-primary"
-                        onClick={() => handleToggleStatus(activeCentreDrawer, 'Approved')}
-                      >
-                        Approve
-                      </button>
-                    )}
-                    {(activeCentreDrawer.centreStatus || activeCentreDrawer.centre_status) !== 'Inactive' && (
-                      <button
-                        className="btn btn-sm btn-secondary"
-                        onClick={() => handleToggleStatus(activeCentreDrawer, 'Inactive')}
-                      >
-                        Deactivate
-                      </button>
-                    )}
-                  </div>
-                </div>
-
-                <div>
-                  <h4 style={{ fontSize: '0.8125rem', fontWeight: 600, color: 'var(--text-secondary)' }}>Address &amp; Geographic Details</h4>
-                  <p style={{ fontSize: '0.875rem', marginTop: 4 }}>{activeCentreDrawer.centreAddress || activeCentreDrawer.centre_address}</p>
-                  <p style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>
-                    Pincode: {activeCentreDrawer.pincode} • State: {activeCentreDrawer.stateName || '—'}
-                  </p>
-                </div>
-
-                <div>
-                  <h4 style={{ fontSize: '0.8125rem', fontWeight: 600, color: 'var(--text-secondary)' }}>Capacity &amp; Infrastructure</h4>
-                  <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: 10, marginTop: 8 }}>
-                    <div style={{ padding: 10, background: 'var(--bg-subtle, #f8fafc)', borderRadius: 6 }}>
-                      <div style={{ fontSize: '0.6875rem', color: 'var(--text-muted)' }}>Exam Nodes</div>
-                      <div style={{ fontSize: '1.125rem', fontWeight: 700 }}>{activeCentreDrawer.capacity?.examNodes || 0}</div>
-                    </div>
-                    <div style={{ padding: 10, background: 'var(--bg-subtle, #f8fafc)', borderRadius: 6 }}>
-                      <div style={{ fontSize: '0.6875rem', color: 'var(--text-muted)' }}>Total Systems</div>
-                      <div style={{ fontSize: '1.125rem', fontWeight: 700 }}>{activeCentreDrawer.capacity?.totalSystems || 0}</div>
-                    </div>
-                  </div>
-                </div>
-              </div>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* Add / Edit Centre Modal */}
-      {showAddModal && (
-        <div className="modal-backdrop" onClick={() => setShowAddModal(false)}>
-          <div className="modal" onClick={e => e.stopPropagation()} style={{ maxWidth: 680 }}>
-            <div className="modal-header">
-              <h3 className="modal-title">{editingCentre ? `Edit Centre (${formData.centreCode})` : 'Register New Testing Centre'}</h3>
-              <button className="btn-ghost" onClick={() => setShowAddModal(false)} style={{ padding: 4 }}>
-                <X size={18} />
-              </button>
-            </div>
-            <form onSubmit={handleSaveCentre} className="modal-form" style={{ display: 'flex', flexDirection: 'column', flex: 1, minHeight: 0, overflow: 'hidden' }}>
-              <div className="modal-body" style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
-                <div className="grid-3">
-                  <div className="form-group">
-                    <label className="form-label">Centre Code *</label>
-                    <input
-                      type="text"
-                      className="form-control"
-                      required
-                      placeholder="e.g. CN-001"
-                      value={formData.centreCode}
-                      onChange={e => setFormData({ ...formData, centreCode: e.target.value })}
-                    />
-                  </div>
-                  <div className="form-group">
-                    <label className="form-label">Edu Code</label>
-                    <input
-                      type="text"
-                      className="form-control"
-                      placeholder="e.g. EDU-DL-2041"
-                      value={formData.eduCode}
-                      onChange={e => setFormData({ ...formData, eduCode: e.target.value })}
-                    />
-                  </div>
-                  <div className="form-group">
-                    <label className="form-label">TC Code</label>
-                    <input
-                      type="text"
-                      className="form-control"
-                      placeholder="e.g. TC-DL-1082"
-                      value={formData.tcCode}
-                      onChange={e => setFormData({ ...formData, tcCode: e.target.value })}
-                    />
-                  </div>
-                </div>
-
-                <div className="form-group">
-                  <label className="form-label">Centre Name *</label>
-                  <input
-                    type="text"
-                    className="form-control"
-                    required
-                    placeholder="e.g. Apex Institute of Information Technology"
-                    value={formData.centreName}
-                    onChange={e => setFormData({ ...formData, centreName: e.target.value })}
-                  />
-                </div>
-
-                <div className="grid-2">
-                  <div className="form-group">
-                    <label className="form-label">Full Address *</label>
-                    <input
-                      type="text"
-                      className="form-control"
-                      required
-                      placeholder="Plot, Street, Landmark"
-                      value={formData.centreAddress}
-                      onChange={e => setFormData({ ...formData, centreAddress: e.target.value })}
-                    />
-                  </div>
-                  <div className="form-group">
-                    <label className="form-label">Pincode *</label>
-                    <input
-                      type="text"
-                      className="form-control"
-                      required
-                      placeholder="6 digits PIN"
-                      value={formData.pincode}
-                      onChange={e => setFormData({ ...formData, pincode: e.target.value })}
-                    />
-                  </div>
-                </div>
-
-                <div className="grid-3">
-                  <div className="form-group">
-                    <label className="form-label">Organization Type</label>
-                    <select
-                      className="form-control"
-                      value={formData.organizationType}
-                      onChange={e => setFormData({ ...formData, organizationType: e.target.value })}
-                    >
-                      {ORG_TYPES.map(ot => <option key={ot} value={ot}>{ot}</option>)}
-                    </select>
-                  </div>
-                  <div className="form-group">
-                    <label className="form-label">Venue Status</label>
-                    <select
-                      className="form-control"
-                      value={formData.venueStatus}
-                      onChange={e => setFormData({ ...formData, venueStatus: e.target.value })}
-                    >
-                      {VENUE_STATUS_OPTS.map(vs => <option key={vs} value={vs}>{vs}</option>)}
-                    </select>
-                  </div>
-                  <div className="form-group">
-                    <label className="form-label">Centre Status</label>
-                    <select
-                      className="form-control"
-                      value={formData.centreStatus}
-                      onChange={e => setFormData({ ...formData, centreStatus: e.target.value })}
-                    >
-                      {CENTRE_STATUSES.map(cs => <option key={cs} value={cs}>{cs}</option>)}
-                    </select>
-                  </div>
-                </div>
-
-                <div className="grid-2">
-                  <div className="form-group">
-                    <label className="form-label">Official Email</label>
-                    <input
-                      type="email"
-                      className="form-control"
-                      placeholder="centre@org.in"
-                      value={formData.officialEmail}
-                      onChange={e => setFormData({ ...formData, officialEmail: e.target.value })}
-                    />
-                  </div>
-                  <div className="form-group">
-                    <label className="form-label">Google Map URL</label>
-                    <input
-                      type="url"
-                      className="form-control"
-                      placeholder="https://maps.google.com/..."
-                      value={formData.googleMapLink}
-                      onChange={e => setFormData({ ...formData, googleMapLink: e.target.value })}
-                    />
-                  </div>
-                </div>
-              </div>
-
-              <div className="modal-footer">
-                <button type="button" className="btn btn-secondary" onClick={() => setShowAddModal(false)}>
-                  Cancel
-                </button>
-                <button type="submit" className="btn btn-primary" disabled={submitting}>
-                  {submitting ? <Loader2 size={14} className="animate-spin" /> : <Check size={14} />}
-                  <span>{editingCentre ? 'Update Centre' : 'Save Centre'}</span>
-                </button>
-              </div>
-            </form>
-          </div>
-        </div>
+      {/* ── Centre Full Profile Modal (8-Tab Admin Review) ── */}
+      {selectedCentreProfile && (
+        <CentreProfileModal
+          centre={selectedCentreProfile}
+          onClose={() => setSelectedCentreProfile(null)}
+          onRefresh={() => {
+            loadSummary();
+            loadCentres();
+            if (selectedCentreProfile) {
+              handleViewProfile(selectedCentreProfile.id);
+            }
+          }}
+          currentUserRole={user?.role || 'ADMIN'}
+        />
       )}
     </div>
   );

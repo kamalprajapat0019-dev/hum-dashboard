@@ -80,6 +80,20 @@ export const ENDPOINTS = {
     CONFIG_DETAIL: (key) => `/admin/config/${key}`,
     CALENDAR: '/admin/calendar',
     CALENDAR_EXAMS: '/admin/calendar/exams',
+    CENTRES_SUMMARY: '/admin/centres/summary',
+    CENTRE_PROFILE: (id) => `/admin/centres/${id}/profile`,
+    VERIFY_DOC: (id) => `/admin/centres/${id}/verify-document`,
+    VERIFY_BANK: (id) => `/admin/centres/${id}/verify-bank`,
+    APPROVE_CENTRE: (id) => `/admin/centres/${id}/approve`,
+    REJECT_CENTRE: (id) => `/admin/centres/${id}/reject`,
+    ASSIGN_AUDITOR: (id) => `/admin/centres/${id}/assign-auditor`,
+  },
+  CENTRE_PORTAL: {
+    MY_CENTRE: '/centre/my-centre',
+    DRAFT: '/centre/draft',
+    SUBMIT: '/centre/submit',
+    UPLOAD_DOC: '/centre/documents/upload',
+    STATUS: '/centre/status',
   },
 };
 

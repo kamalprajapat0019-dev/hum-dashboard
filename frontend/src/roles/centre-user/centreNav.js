@@ -1,12 +1,13 @@
 import {
   Home, Building2, CalendarCheck, UserCheck, FileText,
   Settings, Calculator, FileBadge, BookMarked, CheckSquare,
-  AlertCircle, Receipt, MessageSquare, History
+  AlertCircle, Receipt, MessageSquare, History, ClipboardList
 } from 'lucide-react';
 import { ROUTES } from '../../constants/routes';
 
 export const centreNav = [
   { label: 'Centre Dashboard', path: ROUTES.CENTRE.DASHBOARD, icon: Home },
+  { label: 'Centre Registration', path: ROUTES.CENTRE.REGISTRATION, icon: ClipboardList },
   { label: 'My Centre Profile', path: ROUTES.CENTRE.PROFILE, icon: Building2 },
   { label: 'Booking Requests', path: ROUTES.CENTRE.BOOKING, icon: CalendarCheck },
   { label: 'Digital Consent', path: ROUTES.CENTRE.CONSENT, icon: UserCheck },
