@@ -70,6 +70,7 @@ describe('OEMP Centre Master & Centre Registration Workflow Audit', () => {
   afterAll(async () => {
     // Cleanup created test records
     if (testCentreId) {
+      await prisma.auditAssignment.deleteMany({ where: { centreId: testCentreId } }).catch(() => {});
       await prisma.auditLog.deleteMany({ where: { entityId: testCentreId } }).catch(() => {});
       await prisma.centre.deleteMany({ where: { id: testCentreId } }).catch(() => {});
     }
@@ -385,5 +386,121 @@ describe('OEMP Centre Master & Centre Registration Workflow Audit', () => {
     expect(okBody.success).toBe(true);
     expect(okBody.data.centreStatus).toBe('Rejected');
     expect(okBody.data.rejectionReason).toBe('Fire clearance document illegible and expired.');
+  });
+
+  it('11. Admin Centre Master: Can verify bank details and set isPaymentEligible', async () => {
+    const res = await fetch(`${baseUrl}/admin/centres/${testCentreId}/verify-bank`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        Authorization: `Bearer ${adminToken}`,
+      },
+      body: JSON.stringify({
+        status: 'Verified',
+        remarks: 'Cancelled cheque verified with IFSC matching SBI branch.',
+      }),
+    });
+
+    expect(res.status).toBe(200);
+    const body = await res.json();
+    expect(body.success).toBe(true);
+    expect(body.data.verificationStatus).toBe('Verified');
+    expect(body.data.isPaymentEligible).toBe(true);
+  });
+
+  it('12. Admin Centre Master: Can assign auditor and transition to Auditor Assigned', async () => {
+    // Find an auditor user
+    let auditor = await prisma.user.findFirst({ where: { role: 'AUDITOR' } });
+    if (!auditor) {
+      const bcrypt = await import('bcryptjs');
+      const hash = await bcrypt.default.hash('auditor_pass_123', 10);
+      auditor = await prisma.user.create({
+        data: {
+          email: `auditor.${Date.now()}@oemportal.in`,
+          passwordHash: hash,
+          name: 'Certified Auditor',
+          role: 'AUDITOR',
+          status: 'Active',
+        },
+      });
+    }
+
+    const res = await fetch(`${baseUrl}/admin/centres/${testCentreId}/assign-auditor`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        Authorization: `Bearer ${adminToken}`,
+      },
+      body: JSON.stringify({
+        auditorId: auditor.id,
+        auditDate: '2026-04-15',
+        remarks: 'Physical premises, network and fire safety audit.',
+      }),
+    });
+
+    expect(res.status).toBe(200);
+    const body = await res.json();
+    expect(body.success).toBe(true);
+    expect(body.data.centre?.centreStatus || body.data.centreStatus).toBe('Auditor Assigned');
+    expect(body.data.assignment).toBeDefined();
+  });
+
+  it('13. Workflow Transitions: Can transition through all OEMP statuses via status endpoint', async () => {
+    const statuses = ['Invited', 'Booked', 'Audited', 'Allocated', 'Ready to Book', 'Blacklisted'];
+
+    for (const st of statuses) {
+      const res = await fetch(`${baseUrl}/admin/centres/${testCentreId}/status`, {
+        method: 'PATCH',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${adminToken}`,
+        },
+        body: JSON.stringify({ status: st, reason: `Status transition test for ${st}` }),
+      });
+
+      expect(res.status).toBe(200);
+      const body = await res.json();
+      expect(body.success).toBe(true);
+      expect(body.data.centreStatus).toBe(st);
+    }
+  });
+
+  it('14. Duplicate / Illegal Submission: Submitting an already approved centre throws error', async () => {
+    // First approve
+    await fetch(`${baseUrl}/admin/centres/${testCentreId}/approve`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${adminToken}` },
+      body: JSON.stringify({ remarks: 'Approved' }),
+    });
+
+    // Centre user attempts to submit again
+    const res = await fetch(`${baseUrl}/centre/submit`, {
+      method: 'POST',
+      headers: { Authorization: `Bearer ${centreToken}` },
+    });
+
+    expect(res.status).toBe(400);
+    const body = await res.json();
+    expect(body.success).toBe(false);
+    expect(body.error?.message).toContain('already approved');
+  });
+
+  it('15. Security & RBAC: Centre User is strictly FORBIDDEN (403) from Admin Centre Master', async () => {
+    const res = await fetch(`${baseUrl}/admin/centres`, {
+      headers: { Authorization: `Bearer ${centreToken}` },
+    });
+
+    expect(res.status).toBe(403);
+    const body = await res.json();
+    expect(body.success).toBe(false);
+    expect(body.error?.code).toBe('FORBIDDEN');
+  });
+
+  it('16. Unauthenticated requests are rejected with 401 UNAUTHORIZED', async () => {
+    const res = await fetch(`${baseUrl}/admin/centres`);
+    expect(res.status).toBe(401);
+    const body = await res.json();
+    expect(body.success).toBe(false);
+    expect(body.error?.code).toBe('UNAUTHORIZED');
   });
 });

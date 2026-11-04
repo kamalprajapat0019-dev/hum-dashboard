@@ -2,7 +2,7 @@ import { useState, useEffect, useCallback, useRef, useMemo } from 'react';
 import {
   Building2, Search, Filter, Eye, MapPin, RefreshCw, Download,
   CheckCircle2, Clock, AlertTriangle, ShieldCheck, X, Check,
-  AlertCircle, Loader2, ChevronLeft, ChevronRight, UserCheck, Ban
+  AlertCircle, Loader2, ChevronLeft, ChevronRight, UserCheck, Ban, Edit
 } from 'lucide-react';
 import { apiClient } from '@/services/apiClient';
 import { ENDPOINTS } from '@/services/endpoints';
@@ -29,7 +29,7 @@ const REGION_OPTIONS = ['All', 'North', 'South', 'East', 'West', 'Central', 'Nor
 
 export default function CentresPage() {
   const { user } = useAuth();
-  const { selectedClientId, selectedClient } = useClient();
+  const { selectedClientId, setSelectedClientId, clients, selectedClient } = useClient();
 
   const [centres, setCentres] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -41,13 +41,15 @@ export default function CentresPage() {
   const [totalPages, setTotalPages] = useState(1);
   const [totalRecords, setTotalRecords] = useState(0);
 
-  // Search & Filter state
+  // Search & Filter state (5 OEMP filters: Client, Region, State, City, Status)
   const [search, setSearch] = useState('');
   const [debouncedSearch, setDebouncedSearch] = useState('');
   const [regionFilter, setRegionFilter] = useState('All');
   const [statusFilter, setStatusFilter] = useState('All');
   const [stateFilter, setStateFilter] = useState('');
+  const [debouncedState, setDebouncedState] = useState('');
   const [cityFilter, setCityFilter] = useState('');
+  const [debouncedCity, setDebouncedCity] = useState('');
 
   // Status Summary Cards (PDF Section 1.1)
   const [summary, setSummary] = useState({
@@ -60,20 +62,23 @@ export default function CentresPage() {
 
   // Centre Profile Modal
   const [selectedCentreProfile, setSelectedCentreProfile] = useState(null);
+  const [isEditMode, setIsEditMode] = useState(false);
   const [loadingProfile, setLoadingProfile] = useState(false);
 
-  // Debounce search input
+  // Debounce search, state and city inputs
   const searchTimerRef = useRef(null);
   useEffect(() => {
     if (searchTimerRef.current) clearTimeout(searchTimerRef.current);
     searchTimerRef.current = setTimeout(() => {
       setDebouncedSearch(search);
-      setPage(1); // Reset to page 1 on new search
+      setDebouncedState(stateFilter);
+      setDebouncedCity(cityFilter);
+      setPage(1); // Reset to page 1 on new search/filter
     }, 300);
     return () => {
       if (searchTimerRef.current) clearTimeout(searchTimerRef.current);
     };
-  }, [search]);
+  }, [search, stateFilter, cityFilter]);
 
   // Load Status Summary Cards
   const loadSummary = useCallback(async () => {
@@ -104,8 +109,8 @@ export default function CentresPage() {
           search: debouncedSearch.trim() || undefined,
           regionId: regionFilter !== 'All' ? regionFilter : undefined,
           status: statusFilter !== 'All' ? statusFilter : undefined,
-          stateId: stateFilter.trim() || undefined,
-          cityId: cityFilter.trim() || undefined,
+          stateId: debouncedState.trim() || undefined,
+          cityId: debouncedCity.trim() || undefined,
           clientId: selectedClientId || undefined,
         },
       });
@@ -126,7 +131,7 @@ export default function CentresPage() {
     } finally {
       setLoading(false);
     }
-  }, [page, limit, debouncedSearch, regionFilter, statusFilter, stateFilter, cityFilter, selectedClientId]);
+  }, [page, limit, debouncedSearch, regionFilter, statusFilter, debouncedState, debouncedCity, selectedClientId]);
 
   useEffect(() => {
     loadSummary();
@@ -136,15 +141,15 @@ export default function CentresPage() {
     loadCentres();
   }, [loadCentres]);
 
-  // Open Full Centre Profile Modal
-  const handleViewProfile = async (centreId) => {
+  // Open Full Centre Profile Modal (View or Edit)
+  const handleViewProfile = async (centreId, isEdit = false) => {
+    setIsEditMode(isEdit);
     setLoadingProfile(true);
     try {
       const res = await apiClient.get(ENDPOINTS.ADMIN.CENTRE_PROFILE(centreId));
       if (res && res.success && res.data) {
         setSelectedCentreProfile(res.data);
       } else {
-        // Fallback to basic centre data from listing
         const found = centres.find((c) => c.id === centreId);
         setSelectedCentreProfile(found);
       }
@@ -365,7 +370,7 @@ export default function CentresPage() {
       >
         <div style={{ display: 'flex', flexWrap: 'wrap', gap: 12, alignItems: 'center' }}>
           {/* Search by Centre ID, Centre Name, City */}
-          <div style={{ flex: '1 1 240px', minWidth: 200, position: 'relative' }}>
+          <div style={{ flex: '1 1 200px', minWidth: 180, position: 'relative' }}>
             <Search
               size={15}
               style={{
@@ -380,14 +385,34 @@ export default function CentresPage() {
               type="text"
               className="form-control"
               style={{ paddingLeft: 36, height: 38 }}
-              placeholder="Search by Centre ID, Name, or City..."
+              placeholder="Search ID, Name, City..."
               value={search}
               onChange={(e) => setSearch(e.target.value)}
             />
           </div>
 
-          {/* Region Filter */}
+          {/* Client Filter */}
           <div style={{ minWidth: 140 }}>
+            <select
+              className="form-control"
+              style={{ height: 38 }}
+              value={selectedClientId || ''}
+              onChange={(e) => {
+                if (setSelectedClientId) setSelectedClientId(e.target.value || null);
+                setPage(1);
+              }}
+            >
+              <option value="">All Clients</option>
+              {clients?.map((cl) => (
+                <option key={cl.id} value={cl.id}>
+                  {cl.name}
+                </option>
+              ))}
+            </select>
+          </div>
+
+          {/* Region Filter */}
+          <div style={{ minWidth: 120 }}>
             <select
               className="form-control"
               style={{ height: 38 }}
@@ -406,8 +431,32 @@ export default function CentresPage() {
             </select>
           </div>
 
+          {/* State Filter */}
+          <div style={{ minWidth: 120 }}>
+            <input
+              type="text"
+              className="form-control"
+              style={{ height: 38 }}
+              placeholder="Filter State..."
+              value={stateFilter}
+              onChange={(e) => setStateFilter(e.target.value)}
+            />
+          </div>
+
+          {/* City Filter */}
+          <div style={{ minWidth: 120 }}>
+            <input
+              type="text"
+              className="form-control"
+              style={{ height: 38 }}
+              placeholder="Filter City..."
+              value={cityFilter}
+              onChange={(e) => setCityFilter(e.target.value)}
+            />
+          </div>
+
           {/* Workflow Status Filter */}
-          <div style={{ minWidth: 160 }}>
+          <div style={{ minWidth: 140 }}>
             <select
               className="form-control"
               style={{ height: 38 }}
@@ -427,14 +476,19 @@ export default function CentresPage() {
           </div>
 
           {/* Reset Filters */}
-          {(search || regionFilter !== 'All' || statusFilter !== 'All') && (
+          {(search || selectedClientId || regionFilter !== 'All' || statusFilter !== 'All' || stateFilter || cityFilter) && (
             <button
               className="btn btn-ghost btn-sm"
               onClick={() => {
                 setSearch('');
                 setDebouncedSearch('');
+                if (setSelectedClientId) setSelectedClientId(null);
                 setRegionFilter('All');
                 setStatusFilter('All');
+                setStateFilter('');
+                setDebouncedState('');
+                setCityFilter('');
+                setDebouncedCity('');
                 setPage(1);
               }}
               style={{ color: '#64748b' }}
@@ -553,14 +607,26 @@ export default function CentresPage() {
                         <StatusBadge status={c.centreStatus || c.centre_status || 'Draft'} />
                       </td>
                       <td style={{ textAlign: 'center' }}>
-                        <button
-                          className="btn btn-sm btn-secondary"
-                          onClick={() => handleViewProfile(c.id)}
-                          style={{ display: 'inline-flex', alignItems: 'center', gap: 6, fontSize: '0.8125rem', padding: '4px 10px' }}
-                          title="View Complete Centre Profile"
-                        >
-                          <Eye size={13} /> View
-                        </button>
+                        <div style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}>
+                          <button
+                            className="btn btn-sm btn-secondary"
+                            onClick={() => handleViewProfile(c.id, false)}
+                            style={{ display: 'inline-flex', alignItems: 'center', gap: 4, fontSize: '0.8125rem', padding: '4px 8px' }}
+                            title="View Complete Centre Profile"
+                          >
+                            <Eye size={13} /> View
+                          </button>
+                          {(user?.role === 'ADMIN' || user?.role === 'OPERATIONS') && (
+                            <button
+                              className="btn btn-sm btn-secondary"
+                              onClick={() => handleViewProfile(c.id, true)}
+                              style={{ display: 'inline-flex', alignItems: 'center', gap: 4, fontSize: '0.8125rem', padding: '4px 8px', color: '#2563eb' }}
+                              title="Edit Centre Details"
+                            >
+                              <Edit size={13} /> Edit
+                            </button>
+                          )}
+                        </div>
                       </td>
                     </tr>
                   );
@@ -638,12 +704,16 @@ export default function CentresPage() {
       {selectedCentreProfile && (
         <CentreProfileModal
           centre={selectedCentreProfile}
-          onClose={() => setSelectedCentreProfile(null)}
+          initialEditMode={isEditMode}
+          onClose={() => {
+            setSelectedCentreProfile(null);
+            setIsEditMode(false);
+          }}
           onRefresh={() => {
             loadSummary();
             loadCentres();
             if (selectedCentreProfile) {
-              handleViewProfile(selectedCentreProfile.id);
+              handleViewProfile(selectedCentreProfile.id, isEditMode);
             }
           }}
           currentUserRole={user?.role || 'ADMIN'}

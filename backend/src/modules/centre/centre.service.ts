@@ -364,6 +364,9 @@ export class CentreService {
       // 5. Bank Account Details (Step 7)
       if (data.bankAccount) {
         const b = data.bankAccount;
+        if (b.confirmAccountNumber && b.accountNumber && b.confirmAccountNumber !== b.accountNumber) {
+          throw new Error('Step 7: Account Number and Confirm Account Number must match exactly.');
+        }
         if (b.accountName || b.accountNumber) {
           // Check if editing bank account invalidates previous approval
           const existingBank = await tx.centreBankAccount.findUnique({ where: { centreId } });

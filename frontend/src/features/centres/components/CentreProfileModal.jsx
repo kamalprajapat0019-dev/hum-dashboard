@@ -3,7 +3,7 @@ import {
   X, CheckCircle, AlertTriangle, ShieldCheck, FileText, Building2,
   Zap, Lock, CreditCard, History, UserCheck, Eye, EyeOff, Check,
   Clock, Download, RefreshCw, AlertCircle, Ban, Send, Calendar,
-  MapPin, Phone, Mail, Award, CheckCircle2
+  MapPin, Phone, Mail, Award, CheckCircle2, Edit, Save
 } from 'lucide-react';
 import { StatusBadge } from '@/components/common';
 import { apiClient } from '@/services/apiClient';
@@ -14,11 +14,25 @@ export default function CentreProfileModal({
   onClose,
   onRefresh,
   currentUserRole = 'ADMIN',
+  initialEditMode = false,
 }) {
   const [activeTab, setActiveTab] = useState('basic'); // basic | personnel | docs | building | power | safety | bank | history
+  const [isEditing, setIsEditing] = useState(initialEditMode);
+  const [savingEdit, setSavingEdit] = useState(false);
   const [showFullAccount, setShowFullAccount] = useState(false);
   const [loadingAction, setLoadingAction] = useState(false);
   const [toast, setToast] = useState(null);
+
+  // Edit form state
+  const [editForm, setEditForm] = useState({
+    centreName: centre?.centreName || '',
+    centreCategory: centre?.centreCategory || 'College',
+    centreAddress: centre?.centreAddress || '',
+    stateName: centre?.stateName || '',
+    cityName: centre?.cityName || '',
+    pincode: centre?.pincode || '',
+    organizationType: centre?.organizationType || 'Trust',
+  });
 
   // Modals for admin actions
   const [showApproveModal, setShowApproveModal] = useState(false);
@@ -169,6 +183,29 @@ export default function CentreProfileModal({
     }
   };
 
+  // Handle Save Centre Edits (Admin / Operations)
+  const handleSaveEdit = async () => {
+    setSavingEdit(true);
+    try {
+      await apiClient.put(ENDPOINTS.ADMIN.CENTRE_DETAIL(centre.id), {
+        centreName: editForm.centreName,
+        centreCategory: editForm.centreCategory,
+        centreAddress: editForm.centreAddress,
+        stateName: editForm.stateName,
+        cityName: editForm.cityName,
+        pincode: editForm.pincode,
+        organizationType: editForm.organizationType,
+      });
+      showNotification('Centre details updated successfully.', 'success');
+      setIsEditing(false);
+      if (onRefresh) onRefresh();
+    } catch (err) {
+      showNotification(err.message || 'Failed to update centre details', 'error');
+    } finally {
+      setSavingEdit(false);
+    }
+  };
+
   const tabs = [
     { id: 'basic', label: '1. Basic Information', icon: Building2 },
     { id: 'personnel', label: '2. Personnel', icon: UserCheck },
@@ -252,6 +289,20 @@ export default function CentreProfileModal({
 
           <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
             {/* Quick Admin Actions */}
+            {(currentUserRole === 'ADMIN' || currentUserRole === 'OPERATIONS') && (
+              <button
+                className="btn btn-sm btn-secondary"
+                onClick={() => {
+                  if (!isEditing) setActiveTab('basic');
+                  setIsEditing(!isEditing);
+                }}
+                style={{ display: 'flex', alignItems: 'center', gap: 6, color: isEditing ? '#dc2626' : '#2563eb' }}
+                title="Edit Centre Details"
+              >
+                {isEditing ? <X size={14} /> : <Edit size={14} />} {isEditing ? 'Cancel Edit' : 'Edit Details'}
+              </button>
+            )}
+
             {centre.centreStatus !== 'Ready to Book' && centre.centreStatus !== 'Approved' && (
               <button
                 className="btn btn-sm btn-primary"
@@ -352,8 +403,115 @@ export default function CentreProfileModal({
 
         {/* Tab Contents */}
         <div style={{ flex: 1, overflowY: 'auto', padding: '24px' }}>
-          {/* 1. Basic Information Tab */}
-          {activeTab === 'basic' && (
+          {/* 1. Basic Information Tab - Edit Mode */}
+          {activeTab === 'basic' && isEditing && (
+            <div className="card" style={{ padding: 20 }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 }}>
+                <h4 style={{ margin: 0, fontSize: '1rem', fontWeight: 600, color: '#1e40af' }}>
+                  Edit Centre Information (Authorized Admin / Operations)
+                </h4>
+                <div style={{ display: 'flex', gap: 8 }}>
+                  <button
+                    className="btn btn-sm btn-secondary"
+                    onClick={() => setIsEditing(false)}
+                    disabled={savingEdit}
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    className="btn btn-sm btn-primary"
+                    onClick={handleSaveEdit}
+                    disabled={savingEdit}
+                    style={{ display: 'flex', alignItems: 'center', gap: 6 }}
+                  >
+                    <Save size={14} /> {savingEdit ? 'Saving...' : 'Save Changes'}
+                  </button>
+                </div>
+              </div>
+
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(260px, 1fr))', gap: 16 }}>
+                <div>
+                  <label className="form-label" style={{ fontWeight: 600, fontSize: '0.8125rem' }}>Centre Name (As per Document)</label>
+                  <input
+                    type="text"
+                    className="form-control"
+                    value={editForm.centreName}
+                    onChange={(e) => setEditForm({ ...editForm, centreName: e.target.value })}
+                  />
+                </div>
+
+                <div>
+                  <label className="form-label" style={{ fontWeight: 600, fontSize: '0.8125rem' }}>Centre Category</label>
+                  <select
+                    className="form-control"
+                    value={editForm.centreCategory}
+                    onChange={(e) => setEditForm({ ...editForm, centreCategory: e.target.value })}
+                  >
+                    {['College', 'School', 'University', 'Government Institution', 'Private Educational Institution', 'Dedicated Examination Centre', 'Other'].map((cat) => (
+                      <option key={cat} value={cat}>{cat}</option>
+                    ))}
+                  </select>
+                </div>
+
+                <div>
+                  <label className="form-label" style={{ fontWeight: 600, fontSize: '0.8125rem' }}>Organization Type</label>
+                  <select
+                    className="form-control"
+                    value={editForm.organizationType}
+                    onChange={(e) => setEditForm({ ...editForm, organizationType: e.target.value })}
+                  >
+                    {['Trust', 'Society', 'Partnership', 'Company', 'Individual', 'Other'].map((org) => (
+                      <option key={org} value={org}>{org}</option>
+                    ))}
+                  </select>
+                </div>
+
+                <div>
+                  <label className="form-label" style={{ fontWeight: 600, fontSize: '0.8125rem' }}>State</label>
+                  <input
+                    type="text"
+                    className="form-control"
+                    value={editForm.stateName}
+                    onChange={(e) => setEditForm({ ...editForm, stateName: e.target.value })}
+                  />
+                </div>
+
+                <div>
+                  <label className="form-label" style={{ fontWeight: 600, fontSize: '0.8125rem' }}>City</label>
+                  <input
+                    type="text"
+                    className="form-control"
+                    value={editForm.cityName}
+                    onChange={(e) => setEditForm({ ...editForm, cityName: e.target.value })}
+                  />
+                </div>
+
+                <div>
+                  <label className="form-label" style={{ fontWeight: 600, fontSize: '0.8125rem' }}>PIN Code</label>
+                  <input
+                    type="text"
+                    className="form-control"
+                    value={editForm.pincode}
+                    maxLength={6}
+                    onChange={(e) => setEditForm({ ...editForm, pincode: e.target.value })}
+                  />
+                </div>
+
+                <div style={{ gridColumn: '1 / -1' }}>
+                  <label className="form-label" style={{ fontWeight: 600, fontSize: '0.8125rem' }}>Full Centre Address</label>
+                  <textarea
+                    className="form-control"
+                    rows={2}
+                    value={editForm.centreAddress}
+                    onChange={(e) => setEditForm({ ...editForm, centreAddress: e.target.value })}
+                  />
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* 1. Basic Information Tab - View Mode */}
+          {activeTab === 'basic' && !isEditing && (
             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: 20 }}>
               <div className="card" style={{ padding: 16 }}>
                 <h4 style={{ margin: '0 0 14px', fontSize: '0.9375rem', fontWeight: 600, color: '#1e40af' }}>

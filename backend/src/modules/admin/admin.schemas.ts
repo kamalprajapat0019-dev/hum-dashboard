@@ -228,13 +228,41 @@ export const createCentreSchema = z.object({
   googleMapLink: z.string().url().optional().or(z.literal('')),
   remarks: z.string().optional(),
   organizationType: z.enum(['Individual', 'Trust', 'Society', 'Partnership', 'Company', 'Other']).default('Trust'),
-  centreStatus: z.enum(['Draft', 'Active', 'Approved', 'Rejected', 'Inactive']).default('Draft'),
+  centreStatus: z.enum([
+    'Draft',
+    'Registered',
+    'Ready to Book',
+    'Invited',
+    'Booked',
+    'Auditor Assigned',
+    'Audited',
+    'Allocated',
+    'Rejected',
+    'Blacklisted',
+    'Active',
+    'Approved',
+    'Inactive',
+  ]).default('Draft'),
 });
 
 export const updateCentreSchema = createCentreSchema.partial();
 
 export const updateCentreStatusSchema = z.object({
-  status: z.enum(['Draft', 'Active', 'Approved', 'Rejected', 'Inactive']),
+  status: z.enum([
+    'Draft',
+    'Registered',
+    'Ready to Book',
+    'Invited',
+    'Booked',
+    'Auditor Assigned',
+    'Audited',
+    'Allocated',
+    'Rejected',
+    'Blacklisted',
+    'Active',
+    'Approved',
+    'Inactive',
+  ]),
   reason: z.string().optional(),
 });
 

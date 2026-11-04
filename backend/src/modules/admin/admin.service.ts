@@ -1108,16 +1108,21 @@ export class AdminService {
     }
 
     return prisma.$transaction(async (tx: any) => {
+      const updateData: any = { centreStatus: status };
+      if (status === 'Rejected' && reason) {
+        updateData.rejectionReason = reason;
+      }
+
       const updated = await tx.centre.update({
         where: { id },
-        data: { centreStatus: status },
+        data: updateData,
       });
 
       await tx.auditLog.create({
         data: {
           userId: adminUserId,
           userEmail: adminEmail,
-          action: `CENTRE_STATUS_${status.toUpperCase()}`,
+          action: `CENTRE_STATUS_${status.toUpperCase().replace(/\s+/g, '_')}`,
           entity: 'Centre',
           entityId: id,
           details: { priorStatus: existing.centreStatus, newStatus: status, reason },
