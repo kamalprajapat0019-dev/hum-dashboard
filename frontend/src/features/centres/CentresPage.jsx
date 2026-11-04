@@ -509,7 +509,7 @@ export default function CentresPage() {
       {/* Drawer */}
       {activeCentreDrawer && (
         <div className="modal-backdrop" onClick={() => setActiveCentreDrawer(null)}>
-          <div className="drawer" onClick={e => e.stopPropagation()} style={{ width: 'min(100vw, 560px)', background: '#fff', height: '100vh', position: 'fixed', right: 0, top: 0, overflowY: 'auto', boxShadow: 'var(--shadow-2xl, 0 25px 50px -12px rgba(0, 0, 0, 0.25))', zIndex: 9999, display: 'flex', flexDirection: 'column' }}>
+          <div className="drawer" onClick={e => e.stopPropagation()} style={{ width: 'min(100vw, 560px)', maxWidth: '100vw', background: '#fff', height: '100vh', maxHeight: '100dvh', position: 'fixed', right: 0, top: 0, overflowY: 'auto', boxShadow: 'var(--shadow-2xl, 0 25px 50px -12px rgba(0, 0, 0, 0.25))', zIndex: 9999, display: 'flex', flexDirection: 'column' }}>
             <div style={{ padding: '20px 24px', borderBottom: '1px solid var(--border-default, #e2e8f0)', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
               <div>
                 <span className="badge badge-primary">{activeCentreDrawer.centreCode || activeCentreDrawer.centre_id}</span>
@@ -584,7 +584,7 @@ export default function CentresPage() {
                 <X size={18} />
               </button>
             </div>
-            <form onSubmit={handleSaveCentre}>
+            <form onSubmit={handleSaveCentre} className="modal-form" style={{ display: 'flex', flexDirection: 'column', flex: 1, minHeight: 0, overflow: 'hidden' }}>
               <div className="modal-body" style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
                 <div className="grid-3">
                   <div className="form-group">

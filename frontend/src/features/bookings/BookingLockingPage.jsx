@@ -478,7 +478,7 @@ export default function BookingLockingPage() {
                 <X size={18} />
               </button>
             </div>
-            <form onSubmit={handleCreateInvite}>
+            <form onSubmit={handleCreateInvite} className="modal-form" style={{ display: 'flex', flexDirection: 'column', flex: 1, minHeight: 0, overflow: 'hidden' }}>
               <div className="modal-body" style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
                 <div style={{ background: 'var(--bg-subtle)', padding: 12, borderRadius: 'var(--radius-md)' }}>
                   <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>Target Project:</div>
@@ -579,7 +579,7 @@ export default function BookingLockingPage() {
                 <X size={18} />
               </button>
             </div>
-            <form onSubmit={handleReplaceCentre}>
+            <form onSubmit={handleReplaceCentre} className="modal-form" style={{ display: 'flex', flexDirection: 'column', flex: 1, minHeight: 0, overflow: 'hidden' }}>
               <div className="modal-body" style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
                 <div style={{ background: '#fffbeb', border: '1px solid #fde68a', borderRadius: 'var(--radius-md)', padding: '10px 14px', fontSize: '0.8125rem', color: '#92400e' }}>
                   Replacing <strong>{selectedBookingForAction.centre_name}</strong> for {selectedBookingForAction.requested_nodes} target nodes on {selectedBookingForAction.exam_date}.

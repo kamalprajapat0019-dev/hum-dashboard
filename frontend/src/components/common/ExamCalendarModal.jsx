@@ -527,13 +527,7 @@ export default function ExamCalendarModal({ onClose }) {
                 <span style={{ fontSize: '0.875rem' }}>Synchronizing examination dates with database...</span>
               </div>
             ) : viewMode === 'year' ? (
-              <div
-                style={{
-                  display: 'grid',
-                  gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))',
-                  gap: 14,
-                }}
-              >
+              <div className="cal-year-grid">
                 {MONTH_NAMES.map((_, idx) => renderMonthGrid(selectedYear, idx))}
               </div>
             ) : (
@@ -955,6 +949,11 @@ export default function ExamCalendarModal({ onClose }) {
         </div>
 
         <style>{`
+          .cal-year-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+            gap: 14px;
+          }
           .calendar-month-cell {
             min-height: 90px;
           }
@@ -962,6 +961,10 @@ export default function ExamCalendarModal({ onClose }) {
             display: none;
           }
           @media (max-width: 640px) {
+            .cal-year-grid {
+              grid-template-columns: 1fr;
+              gap: 10px;
+            }
             .calendar-month-cell {
               min-height: 54px;
               padding: 4px !important;

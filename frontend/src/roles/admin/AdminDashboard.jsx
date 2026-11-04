@@ -362,6 +362,8 @@ export default function AdminDashboard() {
                 outline: 'none',
                 cursor: safeAvailableProjects.length === 0 ? 'not-allowed' : 'pointer',
                 fontWeight: selectedProjectId ? 600 : 400,
+                maxWidth: '100%',
+                minWidth: 0,
               }}
             >
               <option value="">All Projects ({safeAvailableProjects.length})</option>
@@ -392,6 +394,8 @@ export default function AdminDashboard() {
                   outline: 'none',
                   cursor: safeAvailableExamTypes.length === 0 ? 'not-allowed' : 'pointer',
                   fontWeight: selectedExamTypeId ? 600 : 400,
+                  maxWidth: '100%',
+                  minWidth: 0,
                 }}
               >
                 <option value="">All Exam Types ({safeAvailableExamTypes.length})</option>
@@ -423,6 +427,8 @@ export default function AdminDashboard() {
                   outline: 'none',
                   cursor: safeAvailableExams.length === 0 ? 'not-allowed' : 'pointer',
                   fontWeight: selectedExamId ? 600 : 400,
+                  maxWidth: '100%',
+                  minWidth: 0,
                 }}
               >
                 <option value="">All Exams ({safeAvailableExams.length})</option>

@@ -1491,7 +1491,7 @@ export default function ProjectsPage() {
                 <X size={18} />
               </button>
             </div>
-            <form onSubmit={handleSaveProject}>
+            <form onSubmit={handleSaveProject} className="modal-form" style={{ display: 'flex', flexDirection: 'column', flex: 1, minHeight: 0, overflow: 'hidden' }}>
               <div className="modal-body" style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
                 <div className="grid-2">
                   <div className="form-group">
@@ -1597,22 +1597,13 @@ export default function ProjectsPage() {
                       No examination dates scheduled yet. Click <strong>"Add Exam Date"</strong> above to schedule multiple dates and shifts for this project.
                     </div>
                   ) : (
-                    <div style={{ display: 'flex', flexDirection: 'column', gap: 8, maxHeight: 220, overflowY: 'auto' }}>
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: 8, maxHeight: 240, overflowY: 'auto' }}>
                       {projectForm.examDates.map((row, idx) => (
                         <div
                           key={row.id || idx}
-                          style={{
-                            display: 'grid',
-                            gridTemplateColumns: '1.4fr 1.2fr 1fr 1fr auto',
-                            gap: 8,
-                            alignItems: 'center',
-                            background: 'var(--bg-surface, #ffffff)',
-                            padding: '8px 10px',
-                            borderRadius: 'var(--radius-sm)',
-                            border: '1px solid var(--border-subtle)',
-                          }}
+                          className="exam-date-row"
                         >
-                          <div>
+                          <div className="exam-date-col-full">
                             <label style={{ fontSize: '0.6875rem', color: 'var(--text-muted)', display: 'block', marginBottom: 2 }}>
                               Exam Date *
                             </label>
@@ -1620,7 +1611,7 @@ export default function ProjectsPage() {
                               type="date"
                               required
                               className="form-control"
-                              style={{ padding: '4px 8px', fontSize: '0.8125rem' }}
+                              style={{ padding: '6px 8px', fontSize: '0.8125rem' }}
                               value={row.examDate}
                               onChange={e => handleDateRowChange(idx, 'examDate', e.target.value)}
                             />
@@ -1631,7 +1622,7 @@ export default function ProjectsPage() {
                             </label>
                             <select
                               className="form-control"
-                              style={{ padding: '4px 8px', fontSize: '0.8125rem' }}
+                              style={{ padding: '6px 8px', fontSize: '0.8125rem' }}
                               value={row.shift}
                               onChange={e => handleDateRowChange(idx, 'shift', e.target.value)}
                             >
@@ -1650,7 +1641,7 @@ export default function ProjectsPage() {
                               type="text"
                               className="form-control"
                               placeholder="09:00 AM"
-                              style={{ padding: '4px 8px', fontSize: '0.8125rem' }}
+                              style={{ padding: '6px 8px', fontSize: '0.8125rem' }}
                               value={row.startTime || ''}
                               onChange={e => handleDateRowChange(idx, 'startTime', e.target.value)}
                             />
@@ -1663,20 +1654,20 @@ export default function ProjectsPage() {
                               type="text"
                               className="form-control"
                               placeholder="12:00 PM"
-                              style={{ padding: '4px 8px', fontSize: '0.8125rem' }}
+                              style={{ padding: '6px 8px', fontSize: '0.8125rem' }}
                               value={row.endTime || ''}
                               onChange={e => handleDateRowChange(idx, 'endTime', e.target.value)}
                             />
                           </div>
-                          <div style={{ paddingTop: 16 }}>
+                          <div className="exam-date-col-actions" style={{ paddingTop: 16 }}>
                             <button
                               type="button"
                               className="btn btn-ghost"
                               onClick={() => handleRemoveDateRow(idx)}
                               title="Remove exam date"
-                              style={{ padding: '4px', color: 'var(--color-danger, #ef4444)' }}
+                              style={{ padding: '6px', color: 'var(--color-danger, #ef4444)' }}
                             >
-                              <Trash2 size={15} />
+                              <Trash2 size={16} />
                             </button>
                           </div>
                         </div>
@@ -2200,6 +2191,8 @@ export default function ProjectsPage() {
                                     background: '#f8fafc',
                                     borderRadius: '6px',
                                     border: '1px solid #e2e8f0',
+                                    flexWrap: 'wrap',
+                                    gap: 8,
                                   }}
                                 >
                                   <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>

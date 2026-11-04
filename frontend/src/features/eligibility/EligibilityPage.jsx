@@ -391,7 +391,7 @@ export default function EligibilityPage() {
                 <X size={18} />
               </button>
             </div>
-            <form onSubmit={handleBlacklistSubmit}>
+            <form onSubmit={handleBlacklistSubmit} className="modal-form" style={{ display: 'flex', flexDirection: 'column', flex: 1, minHeight: 0, overflow: 'hidden' }}>
               <div className="modal-body" style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
                 <p style={{ fontSize: '0.8125rem', color: 'var(--text-secondary)' }}>
                   You are about to blacklist <strong>{activeCentre.centreName || activeCentre.centre_name}</strong>.
@@ -433,7 +433,7 @@ export default function EligibilityPage() {
                 <X size={18} />
               </button>
             </div>
-            <form onSubmit={handleOverrideSubmit}>
+            <form onSubmit={handleOverrideSubmit} className="modal-form" style={{ display: 'flex', flexDirection: 'column', flex: 1, minHeight: 0, overflow: 'hidden' }}>
               <div className="modal-body" style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
                 <p style={{ fontSize: '0.8125rem', color: 'var(--text-secondary)' }}>
                   Authorizing executive override for <strong>{activeCentre.centreName || activeCentre.centre_name}</strong> restores

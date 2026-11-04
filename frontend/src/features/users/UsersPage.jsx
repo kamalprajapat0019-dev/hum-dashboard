@@ -573,7 +573,7 @@ export default function UsersPage() {
                 <X size={18} />
               </button>
             </div>
-            <form onSubmit={handleSaveUser}>
+            <form onSubmit={handleSaveUser} className="modal-form" style={{ display: 'flex', flexDirection: 'column', flex: 1, minHeight: 0, overflow: 'hidden' }}>
               <div className="modal-body" style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
                 <div className="form-group">
                   <label className="form-label">Full Name *</label>
