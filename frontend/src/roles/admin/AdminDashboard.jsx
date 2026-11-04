@@ -208,11 +208,11 @@ export default function AdminDashboard() {
       if (analyticsRes.status === 'fulfilled' && analyticsRes.value?.success) {
         setLiveData(analyticsRes.value.data);
       } else {
-        const errorMsg =
+        const errorObj =
           analyticsRes.status === 'rejected'
-            ? analyticsRes.reason?.message
-            : analyticsRes.value?.message || 'Failed to fetch executive analytics';
-        throw new Error(errorMsg);
+            ? analyticsRes.reason
+            : new Error(analyticsRes.value?.message || 'Failed to fetch executive analytics');
+        throw errorObj;
       }
 
       if (projectsRes.status === 'fulfilled' && projectsRes.value?.success && Array.isArray(projectsRes.value.data)) {
@@ -225,7 +225,37 @@ export default function AdminDashboard() {
       console.error('Failed to load live dashboard data for client:', err);
       setLiveData(null);
       setProjectsList([]);
-      setError(err.message || 'Unable to connect to backend API server');
+
+      const isRouting = Boolean(err?.isRoutingError || err?.isHtmlResponse);
+      const isAuth = Boolean(err?.status === 401 || err?.isAuthError);
+      const isNetwork = Boolean(err?.isNetworkError);
+      const isNotFound = Boolean(err?.status === 404 || err?.isNotFound);
+
+      let errorTitle = 'Backend API Error:';
+      let errorMsg = err?.message || 'Unable to connect to backend API server';
+
+      if (isRouting) {
+        errorTitle = 'API Configuration / Routing Error:';
+        errorMsg =
+          'Received HTML instead of JSON. The frontend is requesting the static frontend host instead of the backend API. Please configure VITE_API_BASE_URL in your Vercel Project Settings to point to your backend.';
+      } else if (isAuth) {
+        errorTitle = 'Authentication Error:';
+        errorMsg = 'Session expired or invalid credentials. Please log in again.';
+      } else if (isNetwork) {
+        errorTitle = 'Network Connection Error:';
+        errorMsg = 'Unable to reach backend server. Please verify backend status and network connection.';
+      } else if (isNotFound) {
+        errorTitle = 'API Endpoint Not Found (404):';
+      }
+
+      setError({
+        title: errorTitle,
+        message: errorMsg,
+        isRouting,
+        isAuth,
+        isNetwork,
+        status: err?.status,
+      });
     } finally {
       if (requestId === activeRequestRef.current) {
         setLoading(false);
@@ -489,29 +519,44 @@ export default function AdminDashboard() {
       {/* Error Banner with Retry */}
       {error && (
         <div style={{
-          background: '#fee2e2',
-          border: '1px solid #ef4444',
+          background: error?.isRouting ? '#fffbeb' : '#fee2e2',
+          border: `1px solid ${error?.isRouting ? '#f59e0b' : '#ef4444'}`,
           borderRadius: 'var(--radius-md, 8px)',
           padding: '12px 16px',
           marginBottom: 20,
           display: 'flex',
           alignItems: 'center',
           justifyContent: 'space-between',
-          color: '#991b1b',
+          color: error?.isRouting ? '#92400e' : '#991b1b',
         }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-            <AlertCircle size={20} />
+            <AlertCircle size={20} color={error?.isRouting ? '#d97706' : '#dc2626'} />
             <div>
-              <strong>Database Connection Error:</strong> {error}
+              <strong>{error?.title || 'API Error:'}</strong>{' '}
+              {error?.message || (typeof error === 'string' ? error : 'An unexpected error occurred.')}
             </div>
           </div>
-          <button
-            className="btn btn-sm btn-secondary"
-            onClick={fetchDashboardData}
-            style={{ background: '#fff', borderColor: '#f87171', color: '#991b1b' }}
-          >
-            Retry Query
-          </button>
+          <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
+            {error?.isAuth && (
+              <button
+                className="btn btn-sm btn-primary"
+                onClick={() => navigate('/login')}
+              >
+                Log In
+              </button>
+            )}
+            <button
+              className="btn btn-sm btn-secondary"
+              onClick={fetchDashboardData}
+              style={{
+                background: '#fff',
+                borderColor: error?.isRouting ? '#f59e0b' : '#f87171',
+                color: error?.isRouting ? '#92400e' : '#991b1b',
+              }}
+            >
+              Retry Query
+            </button>
+          </div>
         </div>
       )}
 

@@ -97,8 +97,11 @@ export const authService = {
           error: apiErr.data?.error?.message || apiErr.message || 'Invalid email or password',
         };
       }
-      // If backend is unreachable (offline during development or not started), fallback to demo accounts
-      console.warn('Backend unavailable, falling back to local demo accounts:', apiErr.message);
+      if (apiErr.isRoutingError) {
+        console.error('[Auth Error] API routing misconfiguration:', apiErr.message);
+      } else {
+        console.warn('Backend unavailable, falling back to local demo accounts:', apiErr.message);
+      }
     }
 
     // 2. Demo fallback for local development or non-admin roles pending backend integration

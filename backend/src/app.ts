@@ -92,8 +92,21 @@ export function createApp(): Express {
     }
   });
 
-  // Mount API version prefix
+  // Handle accidental double prefix (e.g. /api/v1/api/v1/* -> /api/v1/*)
+  app.use((req: Request, _res: Response, next) => {
+    if (req.url.startsWith('/api/v1/api/v1/')) {
+      req.url = req.url.replace('/api/v1/api/v1/', '/api/v1/');
+    }
+    next();
+  });
+
+  // Mount API version prefix (standard: /api/v1)
   app.use(env.API_PREFIX, routes);
+
+  // Graceful fallback: also handle requests without /api/v1 prefix (e.g. /auth/login, /admin/*)
+  if (env.API_PREFIX !== '/') {
+    app.use(routes);
+  }
 
   // 404 Handler
   app.use((req: Request, res: Response) => {

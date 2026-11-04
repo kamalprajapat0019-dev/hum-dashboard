@@ -6,6 +6,21 @@ import { sendSuccess } from '../utils/response.js';
 
 const router = Router();
 
+// ── Root API v1 Information ───────────────────────────────────────────────
+router.get('/', (_req: Request, res: Response) => {
+  sendSuccess(res, {
+    status: 'online',
+    service: 'oem-portal-backend-api-v1',
+    version: '1.0.0',
+    endpoints: {
+      health: '/health',
+      auth: '/auth',
+      admin: '/admin',
+    },
+    timestamp: new Date().toISOString(),
+  });
+});
+
 // ── Health Check (Sanitized - no credentials exposed) ──────────────────────
 router.get('/health', async (_req: Request, res: Response) => {
   const dbStatus = await verifyDatabaseConnection();
