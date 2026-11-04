@@ -51,6 +51,8 @@ model Client {
   name         String    // e.g. "NTA"
   fullName     String    // "National Testing Agency"
   contactEmail String
+  description  String?   @db.Text
+  isActive     Boolean   @default(true)
   status       String    @default("Active")
   createdAt    DateTime  @default(now())
   updatedAt    DateTime  @updatedAt
@@ -67,8 +69,11 @@ model Project {
   clientId        String
   client          Client            @relation(fields: [clientId], references: [id])
   examType        String            // "NEET UG", "JEE Mains", etc.
+  description     String?           @db.Text
   stage           String            @default("Setup") // Setup, Booking, Document Verification, Audit & Compliance, Allocation, Execution, Closed
   status          String            @default("Active") // Active, OnHold, Completed, Closed
+  startDate       DateTime?
+  endDate         DateTime?
   examDate        DateTime?
   citiesCount     Int               @default(0)
   candidateTarget Int               @default(0)
@@ -81,9 +86,102 @@ model Project {
 
   bookings        Booking[]
   audits          AuditAssignment[]
+  examTypes       ExamType[]
+  examDates       ProjectExamDate[]
 
   @@index([status, stage])
   @@map("oecm_projects")
+}
+
+model ProjectExamDate {
+  id        String   @id @default(cuid())
+  projectId String
+  project   Project  @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  examDate  DateTime
+  shift     String   @default("Shift 1")
+  startTime String?
+  endTime   String?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([projectId, examDate, shift])
+  @@index([projectId, examDate])
+  @@index([examDate])
+  @@map("oecm_project_exam_dates")
+}
+
+model ExamType {
+  id           String    @id @default(cuid())
+  projectId    String
+  project      Project   @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  examCode     String
+  examTypeName String
+  description  String?   @db.Text
+  isActive     Boolean   @default(true)
+  createdAt    DateTime  @default(now())
+  updatedAt    DateTime  @updatedAt
+
+  exams        Exam[]
+
+  @@unique([projectId, examCode])
+  @@index([projectId, isActive])
+  @@map("oecm_exam_types")
+}
+
+model Exam {
+  id          String    @id @default(cuid())
+  examTypeId  String
+  examType    ExamType  @relation(fields: [examTypeId], references: [id], onDelete: Cascade)
+  examCode    String
+  examName    String
+  examYear    Int
+  description String?   @db.Text
+  status      String    @default("Scheduled")
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+
+  dates       ExamDate[]
+  bookings    Booking[]
+  audits      AuditAssignment[]
+
+  @@unique([examTypeId, examCode])
+  @@index([examTypeId, status])
+  @@map("oecm_exams")
+}
+
+model ExamDate {
+  id            String      @id @default(cuid())
+  examId        String
+  exam          Exam        @relation(fields: [examId], references: [id], onDelete: Cascade)
+  examDate      DateTime
+  reportingTime String?
+  status        String      @default("Scheduled")
+  createdAt     DateTime    @default(now())
+  updatedAt     DateTime    @updatedAt
+
+  shifts        ExamShift[]
+
+  @@index([examId, examDate])
+  @@map("oecm_exam_dates")
+}
+
+model ExamShift {
+  id            String    @id @default(cuid())
+  examDateId    String
+  examDate      ExamDate  @relation(fields: [examDateId], references: [id], onDelete: Cascade)
+  shiftName     String
+  shiftNumber   Int
+  startTime     String
+  endTime       String
+  reportingTime String?
+  status        String    @default("Scheduled")
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+
+  bookings      Booking[]
+
+  @@index([examDateId, shiftNumber])
+  @@map("oecm_exam_shifts")
 }
 
 model Centre {
@@ -161,24 +259,29 @@ model CentreCapacity {
 }
 
 model Booking {
-  id            String    @id @default(cuid())
-  bookingCode   String    @unique
+  id            String     @id @default(cuid())
+  bookingCode   String     @unique
   projectId     String
-  project       Project   @relation(fields: [projectId], references: [id])
+  project       Project    @relation(fields: [projectId], references: [id])
   centreId      String
-  centre        Centre    @relation(fields: [centreId], references: [id])
-  dates         Json      // array of dates
-  shiftsCount   Int       @default(1)
-  systemsBooked Int       @default(0)
-  status        String    @default("Draft") // Draft, Requested, Confirmed, Cancelled
-  isLocked      Boolean   @default(false)
+  centre        Centre     @relation(fields: [centreId], references: [id])
+  examId        String?
+  exam          Exam?      @relation(fields: [examId], references: [id])
+  examShiftId   String?
+  examShift     ExamShift? @relation(fields: [examShiftId], references: [id])
+  dates         Json       // array of dates
+  shiftsCount   Int        @default(1)
+  systemsBooked Int        @default(0)
+  status        String     @default("Draft") // Draft, Requested, Confirmed, Cancelled
+  isLocked      Boolean    @default(false)
   lockReason    String?
   lockedBy      String?
   lockedAt      DateTime?
-  createdAt     DateTime  @default(now())
-  updatedAt     DateTime  @updatedAt
+  createdAt     DateTime   @default(now())
+  updatedAt     DateTime   @updatedAt
 
   @@index([projectId, centreId])
+  @@index([examId])
   @@map("oecm_bookings")
 }
 
@@ -189,6 +292,8 @@ model AuditAssignment {
   project          Project   @relation(fields: [projectId], references: [id])
   centreId         String
   centre           Centre    @relation(fields: [centreId], references: [id])
+  examId           String?
+  exam             Exam?     @relation(fields: [examId], references: [id])
   auditorId        String?
   auditor          User?     @relation(fields: [auditorId], references: [id])
   auditDate        DateTime?
@@ -199,6 +304,7 @@ model AuditAssignment {
   updatedAt        DateTime  @updatedAt
 
   @@index([projectId, centreId, auditorId])
+  @@index([examId])
   @@map("oecm_audit_assignments")
 }
 

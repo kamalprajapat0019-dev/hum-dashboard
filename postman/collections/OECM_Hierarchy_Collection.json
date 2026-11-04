@@ -1,0 +1,394 @@
+{
+  "info": {
+    "_postman_id": "c1f7b8e2-9b2a-4a6c-9c12-8e7c1f8e1234",
+    "name": "OECM Portal - Client, Project & Exam Hierarchy API",
+    "description": "Complete Postman collection for the Hum Dashboard 6-tier hierarchy: Client -> Project -> Exam Type -> Exam Instance -> Exam Date -> Exam Shift.",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "auth": {
+    "type": "bearer",
+    "bearer": [
+      {
+        "key": "token",
+        "value": "{{adminToken}}",
+        "type": "string"
+      }
+    ]
+  },
+  "item": [
+    {
+      "name": "1. Authentication",
+      "item": [
+        {
+          "name": "Admin Login",
+          "request": {
+            "auth": { "type": "noauth" },
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"email\": \"admin@oemportal.in\",\n  \"password\": \"Admin@2026\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/auth/login",
+              "host": ["{{baseUrl}}"],
+              "path": ["auth", "login"]
+            }
+          }
+        },
+        {
+          "name": "Get Current User Profile",
+          "request": {
+            "method": "GET",
+            "url": {
+              "raw": "{{baseUrl}}/auth/me",
+              "host": ["{{baseUrl}}"],
+              "path": ["auth", "me"]
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "2. Executive Analytics (Cascading Filters)",
+      "item": [
+        {
+          "name": "Analytics - Full Portfolio",
+          "request": {
+            "method": "GET",
+            "url": {
+              "raw": "{{baseUrl}}/admin/analytics",
+              "host": ["{{baseUrl}}"],
+              "path": ["admin", "analytics"]
+            }
+          }
+        },
+        {
+          "name": "Analytics - Filtered by Client",
+          "request": {
+            "method": "GET",
+            "url": {
+              "raw": "{{baseUrl}}/admin/analytics?clientId={{clientId}}",
+              "host": ["{{baseUrl}}"],
+              "path": ["admin", "analytics"],
+              "query": [{ "key": "clientId", "value": "{{clientId}}" }]
+            }
+          }
+        },
+        {
+          "name": "Analytics - Filtered by Project",
+          "request": {
+            "method": "GET",
+            "url": {
+              "raw": "{{baseUrl}}/admin/analytics?clientId={{clientId}}&projectId={{projectId}}",
+              "host": ["{{baseUrl}}"],
+              "path": ["admin", "analytics"],
+              "query": [
+                { "key": "clientId", "value": "{{clientId}}" },
+                { "key": "projectId", "value": "{{projectId}}" }
+              ]
+            }
+          }
+        },
+        {
+          "name": "Analytics - Filtered by Exam Type",
+          "request": {
+            "method": "GET",
+            "url": {
+              "raw": "{{baseUrl}}/admin/analytics?clientId={{clientId}}&projectId={{projectId}}&examTypeId={{examTypeId}}",
+              "host": ["{{baseUrl}}"],
+              "path": ["admin", "analytics"],
+              "query": [
+                { "key": "clientId", "value": "{{clientId}}" },
+                { "key": "projectId", "value": "{{projectId}}" },
+                { "key": "examTypeId", "value": "{{examTypeId}}" }
+              ]
+            }
+          }
+        },
+        {
+          "name": "Analytics - Filtered by Exam Instance",
+          "request": {
+            "method": "GET",
+            "url": {
+              "raw": "{{baseUrl}}/admin/analytics?clientId={{clientId}}&projectId={{projectId}}&examTypeId={{examTypeId}}&examId={{examId}}",
+              "host": ["{{baseUrl}}"],
+              "path": ["admin", "analytics"],
+              "query": [
+                { "key": "clientId", "value": "{{clientId}}" },
+                { "key": "projectId", "value": "{{projectId}}" },
+                { "key": "examTypeId", "value": "{{examTypeId}}" },
+                { "key": "examId", "value": "{{examId}}" }
+              ]
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "3. Clients (Tier 1)",
+      "item": [
+        {
+          "name": "List All Clients",
+          "request": {
+            "method": "GET",
+            "url": {
+              "raw": "{{baseUrl}}/admin/clients?limit=50",
+              "host": ["{{baseUrl}}"],
+              "path": ["admin", "clients"],
+              "query": [{ "key": "limit", "value": "50" }]
+            }
+          }
+        },
+        {
+          "name": "Get Client by ID",
+          "request": {
+            "method": "GET",
+            "url": {
+              "raw": "{{baseUrl}}/admin/clients/{{clientId}}",
+              "host": ["{{baseUrl}}"],
+              "path": ["admin", "clients", "{{clientId}}"]
+            }
+          }
+        },
+        {
+          "name": "Create Client",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"code\": \"CL-NEW\",\n  \"name\": \"NewClient\",\n  \"fullName\": \"New National Testing Client\",\n  \"contactEmail\": \"contact@newclient.gov.in\",\n  \"description\": \"Tier 1 government client agency\",\n  \"status\": \"Active\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/admin/clients",
+              "host": ["{{baseUrl}}"],
+              "path": ["admin", "clients"]
+            }
+          }
+        },
+        {
+          "name": "Update Client Status",
+          "request": {
+            "method": "PATCH",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"status\": \"Active\",\n  \"isActive\": true\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/admin/clients/{{clientId}}/status",
+              "host": ["{{baseUrl}}"],
+              "path": ["admin", "clients", "{{clientId}}", "status"]
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "4. Projects (Tier 2)",
+      "item": [
+        {
+          "name": "List Projects (Client Filtered)",
+          "request": {
+            "method": "GET",
+            "url": {
+              "raw": "{{baseUrl}}/admin/projects?clientId={{clientId}}&limit=50",
+              "host": ["{{baseUrl}}"],
+              "path": ["admin", "projects"],
+              "query": [
+                { "key": "clientId", "value": "{{clientId}}" },
+                { "key": "limit", "value": "50" }
+              ]
+            }
+          }
+        },
+        {
+          "name": "Create Project under Client",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"projectCode\": \"PRJ-NEW-01\",\n  \"name\": \"State Level Entrance Examination 2027\",\n  \"clientId\": \"{{clientId}}\",\n  \"examType\": \"CBT Entrance Exam\",\n  \"description\": \"Multi-city competitive CBT drive\",\n  \"stage\": \"Setup\",\n  \"status\": \"Active\",\n  \"candidateTarget\": 40000,\n  \"centreTarget\": 25,\n  \"citiesCount\": 12,\n  \"slaHealth\": \"OnTrack\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/admin/projects",
+              "host": ["{{baseUrl}}"],
+              "path": ["admin", "projects"]
+            }
+          }
+        },
+        {
+          "name": "Update Project Status",
+          "request": {
+            "method": "PATCH",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"status\": \"Active\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/admin/projects/{{projectId}}/status",
+              "host": ["{{baseUrl}}"],
+              "path": ["admin", "projects", "{{projectId}}", "status"]
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "5. Exam Types (Tier 3)",
+      "item": [
+        {
+          "name": "List Exam Types by Project",
+          "request": {
+            "method": "GET",
+            "url": {
+              "raw": "{{baseUrl}}/admin/exam-types?projectId={{projectId}}",
+              "host": ["{{baseUrl}}"],
+              "path": ["admin", "exam-types"],
+              "query": [{ "key": "projectId", "value": "{{projectId}}" }]
+            }
+          }
+        },
+        {
+          "name": "Create Exam Type",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"projectId\": \"{{projectId}}\",\n  \"examCode\": \"EX-TYPE-01\",\n  \"examTypeName\": \"Combined Competitive Test\",\n  \"description\": \"Modular test definition\",\n  \"isActive\": true\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/admin/exam-types",
+              "host": ["{{baseUrl}}"],
+              "path": ["admin", "exam-types"]
+            }
+          }
+        },
+        {
+          "name": "Toggle Exam Type Status",
+          "request": {
+            "method": "PATCH",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"isActive\": true\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/admin/exam-types/{{examTypeId}}/status",
+              "host": ["{{baseUrl}}"],
+              "path": ["admin", "exam-types", "{{examTypeId}}", "status"]
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "6. Exam Instances (Tier 4)",
+      "item": [
+        {
+          "name": "List Exams by Exam Type",
+          "request": {
+            "method": "GET",
+            "url": {
+              "raw": "{{baseUrl}}/admin/exams?examTypeId={{examTypeId}}",
+              "host": ["{{baseUrl}}"],
+              "path": ["admin", "exams"],
+              "query": [{ "key": "examTypeId", "value": "{{examTypeId}}" }]
+            }
+          }
+        },
+        {
+          "name": "Get Exam by ID (With Dates & Shifts)",
+          "request": {
+            "method": "GET",
+            "url": {
+              "raw": "{{baseUrl}}/admin/exams/{{examId}}",
+              "host": ["{{baseUrl}}"],
+              "path": ["admin", "exams", "{{examId}}"]
+            }
+          }
+        },
+        {
+          "name": "Create Exam Instance",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"examTypeId\": \"{{examTypeId}}\",\n  \"examCode\": \"EX-2027\",\n  \"examName\": \"Combined Competitive Examination 2027\",\n  \"examYear\": 2027,\n  \"description\": \"Annual national drive\",\n  \"status\": \"Scheduled\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/admin/exams",
+              "host": ["{{baseUrl}}"],
+              "path": ["admin", "exams"]
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "7. Exam Dates & Shifts (Tier 5 & 6)",
+      "item": [
+        {
+          "name": "List Dates for Exam",
+          "request": {
+            "method": "GET",
+            "url": {
+              "raw": "{{baseUrl}}/admin/exams/{{examId}}/dates",
+              "host": ["{{baseUrl}}"],
+              "path": ["admin", "exams", "{{examId}}", "dates"]
+            }
+          }
+        },
+        {
+          "name": "Add Date to Exam",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"examDate\": \"2027-03-15T00:00:00.000Z\",\n  \"reportingTime\": \"08:00 AM\",\n  \"status\": \"Scheduled\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/admin/exams/{{examId}}/dates",
+              "host": ["{{baseUrl}}"],
+              "path": ["admin", "exams", "{{examId}}", "dates"]
+            }
+          }
+        },
+        {
+          "name": "List Shifts for Date",
+          "request": {
+            "method": "GET",
+            "url": {
+              "raw": "{{baseUrl}}/admin/exams/dates/{{dateId}}/shifts",
+              "host": ["{{baseUrl}}"],
+              "path": ["admin", "exams", "dates", "{{dateId}}", "shifts"]
+            }
+          }
+        },
+        {
+          "name": "Add Shift to Date",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"shiftName\": \"Shift 1 – Morning Session\",\n  \"shiftNumber\": 1,\n  \"startTime\": \"09:00 AM\",\n  \"endTime\": \"12:00 PM\",\n  \"reportingTime\": \"08:00 AM\",\n  \"status\": \"Scheduled\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/admin/exams/dates/{{dateId}}/shifts",
+              "host": ["{{baseUrl}}"],
+              "path": ["admin", "exams", "dates", "{{dateId}}", "shifts"]
+            }
+          }
+        }
+      ]
+    }
+  ]
+}
+

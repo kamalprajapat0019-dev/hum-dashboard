@@ -11,7 +11,21 @@ class ApiClient {
   }
 
   async request(endpoint, options = {}) {
-    const url = `${this.baseUrl}${endpoint.startsWith('/') ? endpoint : `/${endpoint}`}`;
+    let url = `${this.baseUrl}${endpoint.startsWith('/') ? endpoint : `/${endpoint}`}`;
+
+    if (options.params && typeof options.params === 'object') {
+      const searchParams = new URLSearchParams();
+      Object.entries(options.params).forEach(([key, val]) => {
+        if (val !== undefined && val !== null && val !== '') {
+          searchParams.append(key, String(val));
+        }
+      });
+      const queryString = searchParams.toString();
+      if (queryString) {
+        url += (url.includes('?') ? '&' : '?') + queryString;
+      }
+    }
+
     const token = storage.get(appConfig.auth.tokenStorageKey, 'session');
 
     const headers = {
@@ -23,6 +37,14 @@ class ApiClient {
 
     const controller = new AbortController();
     const timer = setTimeout(() => controller.abort(), this.timeout);
+
+    if (options.signal) {
+      if (options.signal.aborted) {
+        controller.abort();
+      } else {
+        options.signal.addEventListener('abort', () => controller.abort());
+      }
+    }
 
     try {
       const response = await fetch(url, {
@@ -45,7 +67,7 @@ class ApiClient {
     } catch (err) {
       clearTimeout(timer);
       if (err.name === 'AbortError') {
-        const timeoutErr = new Error(`Request timeout after ${this.timeout}ms`);
+        const timeoutErr = new Error(`Request timeout or aborted after ${this.timeout}ms`);
         timeoutErr.status = 408;
         throw timeoutErr;
       }
@@ -53,8 +75,11 @@ class ApiClient {
     }
   }
 
-  get(endpoint, headers = {}) {
-    return this.request(endpoint, { method: 'GET', headers });
+  get(endpoint, options = {}) {
+    const isOptionsObject = options && (options.headers || options.params || options.signal);
+    const headers = isOptionsObject ? options.headers : options;
+    const reqOptions = isOptionsObject ? { ...options, method: 'GET' } : { method: 'GET', headers };
+    return this.request(endpoint, reqOptions);
   }
 
   post(endpoint, body, headers = {}) {

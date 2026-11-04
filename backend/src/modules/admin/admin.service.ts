@@ -4,13 +4,154 @@ import { Role, UserStatus, Prisma } from '@prisma/client';
 
 export class AdminService {
   // ── 1. Analytics & Executive KPI Aggregation ──────────────────────────────
-  static async getExecutiveAnalytics() {
+  static async getExecutiveAnalytics(filters: {
+    clientId?: string;
+    projectId?: string;
+    examTypeId?: string;
+    examId?: string;
+  } = {}) {
+    const { clientId, projectId, examTypeId, examId } = filters;
+
+    let clientRecord = null;
+    let projectRecord = null;
+    let examTypeRecord = null;
+    let examRecord = null;
+
+    if (clientId) {
+      clientRecord = await prisma.client.findUnique({
+        where: { id: clientId },
+      });
+      if (!clientRecord) {
+        throw new Error('Client not found');
+      }
+    }
+
+    if (projectId) {
+      projectRecord = await prisma.project.findUnique({
+        where: { id: projectId },
+        include: { client: true },
+      });
+      if (!projectRecord) {
+        throw new Error('Project not found');
+      }
+      if (clientId && projectRecord.clientId !== clientId) {
+        throw new Error('Project does not belong to the selected client');
+      }
+      if (!clientRecord) {
+        clientRecord = projectRecord.client;
+      }
+    }
+
+    if (examTypeId) {
+      examTypeRecord = await prisma.examType.findUnique({
+        where: { id: examTypeId },
+        include: { project: { include: { client: true } } },
+      });
+      if (!examTypeRecord) {
+        throw new Error('Exam type not found');
+      }
+      if (projectId && examTypeRecord.projectId !== projectId) {
+        throw new Error('Exam type does not belong to the selected project');
+      }
+      if (clientId && examTypeRecord.project.clientId !== clientId) {
+        throw new Error('Exam type does not belong to the selected client');
+      }
+      if (!projectRecord) {
+        projectRecord = examTypeRecord.project;
+      }
+      if (!clientRecord) {
+        clientRecord = examTypeRecord.project.client;
+      }
+    }
+
+    if (examId) {
+      examRecord = await prisma.exam.findUnique({
+        where: { id: examId },
+        include: { examType: { include: { project: { include: { client: true } } } } },
+      });
+      if (!examRecord) {
+        throw new Error('Exam not found');
+      }
+      if (examTypeId && examRecord.examTypeId !== examTypeId) {
+        throw new Error('Exam does not belong to the selected exam type');
+      }
+      if (projectId && examRecord.examType.projectId !== projectId) {
+        throw new Error('Exam does not belong to the selected project');
+      }
+      if (clientId && examRecord.examType.project.clientId !== clientId) {
+        throw new Error('Exam does not belong to the selected client');
+      }
+      if (!examTypeRecord) {
+        examTypeRecord = examRecord.examType;
+      }
+      if (!projectRecord) {
+        projectRecord = examRecord.examType.project;
+      }
+      if (!clientRecord) {
+        clientRecord = examRecord.examType.project.client;
+      }
+    }
+
+    const projectWhere: Prisma.ProjectWhereInput = {};
+    if (projectId) {
+      projectWhere.id = projectId;
+    } else if (examTypeId) {
+      projectWhere.examTypes = { some: { id: examTypeId } };
+    } else if (examId) {
+      projectWhere.examTypes = { some: { exams: { some: { id: examId } } } };
+    } else if (clientId) {
+      projectWhere.clientId = clientId;
+    }
+
+    // Centres linked to this hierarchy selection (via Bookings or Audits)
+    let centreWhere: Prisma.CentreWhereInput = {};
+    if (examId) {
+      centreWhere = {
+        OR: [
+          { bookings: { some: { examId } } },
+          { bookings: { some: { project: { id: examRecord!.examType.projectId } } } },
+          { audits: { some: { project: { id: examRecord!.examType.projectId } } } },
+        ],
+      };
+    } else if (examTypeId) {
+      centreWhere = {
+        OR: [
+          { bookings: { some: { exam: { examTypeId } } } },
+          { bookings: { some: { project: { id: examTypeRecord!.projectId } } } },
+          { audits: { some: { project: { id: examTypeRecord!.projectId } } } },
+        ],
+      };
+    } else if (projectId) {
+      centreWhere = {
+        OR: [
+          { bookings: { some: { projectId } } },
+          { audits: { some: { projectId } } },
+        ],
+      };
+    } else if (clientId) {
+      centreWhere = {
+        OR: [
+          { bookings: { some: { project: { clientId } } } },
+          { audits: { some: { project: { clientId } } } },
+        ],
+      };
+    }
+
+    const hasFilter = Boolean(clientId || projectId || examTypeId || examId);
+    const blacklistWhere: Prisma.BlacklistRecordWhereInput = {
+      isActive: true,
+      ...(hasFilter ? { centre: centreWhere } : {}),
+    };
+
     const [
       totalCentres,
       activeCentres,
       pendingApprovalCentres,
       totalProjects,
       activeProjects,
+      completedProjects,
+      onHoldProjects,
+      projectAggregate,
       totalUsers,
       activeUsers,
       openBlacklists,
@@ -18,14 +159,23 @@ export class AdminService {
       projectStages,
       centreStatuses,
     ] = await Promise.all([
-      prisma.centre.count(),
-      prisma.centre.count({ where: { centreStatus: { in: ['Approved', 'Active'] } } }),
-      prisma.centre.count({ where: { centreStatus: 'Draft' } }),
-      prisma.project.count(),
-      prisma.project.count({ where: { status: 'Active' } }),
+      prisma.centre.count({ where: centreWhere }),
+      prisma.centre.count({ where: { ...centreWhere, centreStatus: { in: ['Approved', 'Active'] } } }),
+      prisma.centre.count({ where: { ...centreWhere, centreStatus: 'Draft' } }),
+      prisma.project.count({ where: projectWhere }),
+      prisma.project.count({ where: { ...projectWhere, status: 'Active' } }),
+      prisma.project.count({ where: { ...projectWhere, status: 'Completed' } }),
+      prisma.project.count({ where: { ...projectWhere, status: 'OnHold' } }),
+      prisma.project.aggregate({
+        where: projectWhere,
+        _sum: {
+          candidateTarget: true,
+          centreTarget: true,
+        },
+      }),
       prisma.user.count(),
       prisma.user.count({ where: { status: 'Active' } }),
-      prisma.blacklistRecord.count({ where: { isActive: true } }),
+      prisma.blacklistRecord.count({ where: blacklistWhere }),
       prisma.auditLog.findMany({
         take: 10,
         orderBy: { createdAt: 'desc' },
@@ -33,15 +183,17 @@ export class AdminService {
       }),
       prisma.project.groupBy({
         by: ['stage'],
+        where: projectWhere,
         _count: { stage: true },
       }),
       prisma.centre.groupBy({
         by: ['centreStatus'],
+        where: centreWhere,
         _count: { centreStatus: true },
       }),
     ]);
 
-    const projectStatusData = projectStages.map((ps) => ({
+    const projectStatusData = projectStages.map((ps: any) => ({
       name: ps.stage,
       value: ps._count.stage,
       color:
@@ -56,7 +208,7 @@ export class AdminService {
           : '#64748b',
     }));
 
-    const centreStatusData = centreStatuses.map((cs) => ({
+    const centreStatusData = centreStatuses.map((cs: any) => ({
       name: cs.centreStatus,
       value: cs._count.centreStatus,
       color:
@@ -70,9 +222,61 @@ export class AdminService {
     }));
 
     return {
+      client: clientRecord
+        ? {
+            id: clientRecord.id,
+            code: clientRecord.code,
+            name: clientRecord.name,
+            fullName: clientRecord.fullName,
+          }
+        : null,
+      project: projectRecord
+        ? {
+            id: projectRecord.id,
+            projectCode: projectRecord.projectCode,
+            name: projectRecord.name,
+          }
+        : null,
+      examType: examTypeRecord
+        ? {
+            id: examTypeRecord.id,
+            examCode: examTypeRecord.examCode,
+            examTypeName: examTypeRecord.examTypeName,
+          }
+        : null,
+      exam: examRecord
+        ? {
+            id: examRecord.id,
+            examCode: examRecord.examCode,
+            examName: examRecord.examName,
+            examYear: examRecord.examYear,
+          }
+        : null,
+      filters: {
+        clientId: clientRecord?.id || null,
+        projectId: projectRecord?.id || null,
+        examTypeId: examTypeRecord?.id || null,
+        examId: examRecord?.id || null,
+      },
       kpis: {
-        activeProjects: { value: activeProjects, total: totalProjects },
-        totalCentres: { value: totalCentres, active: activeCentres },
+        activeProjects: {
+          value: activeProjects,
+          total: totalProjects,
+          completed: completedProjects,
+          onHold: onHoldProjects,
+        },
+        totalCentres: {
+          value: totalCentres,
+          active: activeCentres,
+          pending: pendingApprovalCentres,
+        },
+        candidates: {
+          total: projectAggregate._sum.candidateTarget || 0,
+          target: projectAggregate._sum.candidateTarget || 0,
+        },
+        centreRequirements: {
+          target: projectAggregate._sum.centreTarget || 0,
+        },
         activeUsers: { value: activeUsers, total: totalUsers },
         openExceptions: { value: openBlacklists, critical: openBlacklists },
         pendingApprovals: { value: pendingApprovalCentres },
@@ -81,7 +285,7 @@ export class AdminService {
         projectStatusData,
         centreStatusData,
       },
-      recentActivity: recentAuditLogs.map((log) => ({
+      recentActivity: recentAuditLogs.map((log: any) => ({
         id: log.id,
         user: log.user?.name || log.userEmail || 'System',
         role: log.user?.role || 'SYSTEM',
@@ -171,7 +375,7 @@ export class AdminService {
 
     const passwordHash = await hashPassword(data.password);
 
-    const newUser = await prisma.$transaction(async (tx) => {
+    const newUser = await prisma.$transaction(async (tx: any) => {
       const created = await tx.user.create({
         data: {
           email: data.email.toLowerCase().trim(),
@@ -258,7 +462,7 @@ export class AdminService {
       updateData.passwordHash = await hashPassword(data.password);
     }
 
-    const updated = await prisma.$transaction(async (tx) => {
+    const updated = await prisma.$transaction(async (tx: any) => {
       const u = await tx.user.update({
         where: { id },
         data: updateData,
@@ -308,7 +512,7 @@ export class AdminService {
       throw new Error('Administrators cannot deactivate their own account');
     }
 
-    await prisma.$transaction(async (tx) => {
+    await prisma.$transaction(async (tx: any) => {
       await tx.user.update({
         where: { id },
         data: { status: 'Inactive' },
@@ -337,14 +541,18 @@ export class AdminService {
     status?: string;
     stage?: string;
     clientId?: string;
+    projectId?: string;
+    examTypeId?: string;
   }) {
-    const { page, limit, search, status, stage, clientId } = params;
+    const { page, limit, search, status, stage, clientId, projectId, examTypeId } = params;
     const skip = (page - 1) * limit;
 
     const where: Prisma.ProjectWhereInput = {
       ...(status ? { status } : {}),
       ...(stage ? { stage } : {}),
       ...(clientId ? { clientId } : {}),
+      ...(projectId ? { id: projectId } : {}),
+      ...(examTypeId ? { examTypes: { some: { id: examTypeId } } } : {}),
       ...(search
         ? {
             OR: [
@@ -365,7 +573,8 @@ export class AdminService {
         include: {
           client: { select: { id: true, name: true, fullName: true } },
           projectManager: { select: { id: true, name: true, email: true } },
-          _count: { select: { bookings: true, audits: true } },
+          examDates: { orderBy: { examDate: 'asc' } },
+          _count: { select: { bookings: true, audits: true, examTypes: true, examDates: true } },
         },
       }),
       prisma.project.count({ where }),
@@ -383,7 +592,9 @@ export class AdminService {
   }
 
   static async createProject(
-    data: Prisma.ProjectUncheckedCreateInput,
+    data: Prisma.ProjectUncheckedCreateInput & {
+      examDates?: Array<{ examDate: string; shift?: string; startTime?: string; endTime?: string }>;
+    },
     adminUserId: string,
     adminEmail: string
   ) {
@@ -394,10 +605,45 @@ export class AdminService {
       throw new Error(`Project code "${data.projectCode}" is already in use`);
     }
 
-    return prisma.$transaction(async (tx) => {
+    const { examDates, ...projectInput } = data;
+
+    let primaryExamDate = projectInput.examDate ? new Date(projectInput.examDate as string) : undefined;
+    if (examDates && examDates.length > 0 && !primaryExamDate) {
+      primaryExamDate = new Date(examDates[0].examDate);
+    }
+
+    let datesToCreate: Array<{ examDate: Date; shift: string; startTime?: string | null; endTime?: string | null }> = [];
+    if (examDates && examDates.length > 0) {
+      datesToCreate = examDates.map((ed) => ({
+        examDate: new Date(ed.examDate),
+        shift: ed.shift || 'Shift 1',
+        startTime: ed.startTime || null,
+        endTime: ed.endTime || null,
+      }));
+    } else if (primaryExamDate) {
+      datesToCreate = [
+        {
+          examDate: primaryExamDate,
+          shift: 'Shift 1',
+          startTime: '09:00 AM',
+          endTime: '12:00 PM',
+        },
+      ];
+    }
+
+    return prisma.$transaction(async (tx: any) => {
       const project = await tx.project.create({
-        data,
-        include: { client: true },
+        data: {
+          ...projectInput,
+          examDate: primaryExamDate,
+          examDates: datesToCreate.length > 0 ? {
+            create: datesToCreate,
+          } : undefined,
+        },
+        include: {
+          client: true,
+          examDates: { orderBy: { examDate: 'asc' } },
+        },
       });
 
       await tx.auditLog.create({
@@ -407,7 +653,7 @@ export class AdminService {
           action: 'PROJECT_CREATED',
           entity: 'Project',
           entityId: project.id,
-          details: { name: project.name, projectCode: project.projectCode },
+          details: { name: project.name, projectCode: project.projectCode, examDatesCount: datesToCreate.length },
         },
       });
 
@@ -421,6 +667,7 @@ export class AdminService {
       include: {
         client: true,
         projectManager: { select: { id: true, name: true, email: true } },
+        examDates: { orderBy: { examDate: 'asc' } },
         bookings: { include: { centre: true } },
         audits: { include: { centre: true, auditor: { select: { name: true } } } },
       },
@@ -433,7 +680,9 @@ export class AdminService {
 
   static async updateProject(
     id: string,
-    data: Prisma.ProjectUpdateInput,
+    data: Prisma.ProjectUpdateInput & {
+      examDates?: Array<{ id?: string; examDate: string; shift?: string; startTime?: string; endTime?: string }>;
+    },
     adminUserId: string,
     adminEmail: string
   ) {
@@ -442,11 +691,37 @@ export class AdminService {
       throw new Error('Project not found');
     }
 
-    return prisma.$transaction(async (tx) => {
+    const { examDates, ...projectData } = data;
+
+    return prisma.$transaction(async (tx: any) => {
+      if (examDates !== undefined) {
+        await tx.projectExamDate.deleteMany({
+          where: { projectId: id },
+        });
+
+        if (examDates.length > 0) {
+          await tx.projectExamDate.createMany({
+            data: examDates.map((ed) => ({
+              projectId: id,
+              examDate: new Date(ed.examDate),
+              shift: ed.shift || 'Shift 1',
+              startTime: ed.startTime || null,
+              endTime: ed.endTime || null,
+            })),
+          });
+          projectData.examDate = new Date(examDates[0].examDate);
+        } else {
+          projectData.examDate = null;
+        }
+      }
+
       const updated = await tx.project.update({
         where: { id },
-        data,
-        include: { client: true },
+        data: projectData as Prisma.ProjectUpdateInput,
+        include: {
+          client: true,
+          examDates: { orderBy: { examDate: 'asc' } },
+        },
       });
 
       await tx.auditLog.create({
@@ -457,6 +732,158 @@ export class AdminService {
           entity: 'Project',
           entityId: id,
           details: JSON.parse(JSON.stringify(data)),
+        },
+      });
+
+      return updated;
+    });
+  }
+
+
+  // ── 3b. Annual Examination Calendar Synchronization ────────────────────────
+  static async getCalendarExams(filters: {
+    year?: number;
+    month?: number;
+    clientId?: string;
+    agency?: string;
+    date?: string;
+  } = {}) {
+    const year = filters.year || new Date().getFullYear();
+    const { month, clientId, agency, date } = filters;
+
+    let startDate: Date;
+    let endDate: Date;
+
+    if (date) {
+      startDate = new Date(`${date}T00:00:00.000Z`);
+      endDate = new Date(`${date}T23:59:59.999Z`);
+    } else if (month !== undefined && month >= 1 && month <= 12) {
+      startDate = new Date(Date.UTC(year, month - 1, 1, 0, 0, 0, 0));
+      endDate = new Date(Date.UTC(year, month, 0, 23, 59, 59, 999));
+    } else {
+      startDate = new Date(Date.UTC(year, 0, 1, 0, 0, 0, 0));
+      endDate = new Date(Date.UTC(year, 11, 31, 23, 59, 59, 999));
+    }
+
+    const where: Prisma.ProjectExamDateWhereInput = {
+      examDate: {
+        gte: startDate,
+        lte: endDate,
+      },
+      project: {
+        ...(clientId ? { clientId } : {}),
+        ...(agency && agency !== 'All'
+          ? {
+              client: {
+                OR: [
+                  { name: { contains: agency } },
+                  { fullName: { contains: agency } },
+                ],
+              },
+            }
+          : {}),
+      },
+    };
+
+    const examDates = await prisma.projectExamDate.findMany({
+      where,
+      orderBy: [{ examDate: 'asc' }, { shift: 'asc' }],
+      include: {
+        project: {
+          include: {
+            client: { select: { id: true, name: true, fullName: true } },
+          },
+        },
+      },
+    });
+
+    const CLIENT_COLORS: Record<string, string> = {
+      Eduquity: '#1e40af',
+      'Edu-Spark': '#d97706',
+      NTA: '#2563eb',
+      UGC: '#7c3aed',
+      AICTE: '#0ea5e9',
+      CSIR: '#16a34a',
+    };
+
+    const exams = examDates.map((item: any) => {
+      const clientName = item.project.client?.name || 'Eduquity';
+      const color =
+        CLIENT_COLORS[clientName] ||
+        (clientName.toLowerCase().includes('spark') ? '#d97706' : '#1e40af');
+      const isoDate = item.examDate.toISOString().split('T')[0];
+
+      return {
+        id: item.id,
+        projectId: item.projectId,
+        projectCode: item.project.projectCode,
+        name: item.project.name,
+        projectName: item.project.name,
+        client: clientName,
+        clientId: item.project.clientId,
+        clientFullName: item.project.client?.fullName || clientName,
+        examType: item.project.examType || 'CBT Exam',
+        type: item.project.examType || 'CBT Exam',
+        date: isoDate,
+        rawDate: item.examDate.toISOString(),
+        shift: item.shift || 'Shift 1',
+        startTime: item.startTime || '09:00 AM',
+        endTime: item.endTime || '12:00 PM',
+        candidateTarget: item.project.candidateTarget || 0,
+        candidates: Number(item.project.candidateTarget || 0).toLocaleString(),
+        centreTarget: item.project.centreTarget || 0,
+        centres: item.project.centreTarget || 0,
+        citiesCount: item.project.citiesCount || 1,
+        cities: item.project.citiesCount || 1,
+        stage: item.project.stage || 'Setup',
+        status: item.project.status || 'Active',
+        slaHealth: item.project.slaHealth || 'OnTrack',
+        color,
+      };
+    });
+
+    const activeProjectIds = new Set(exams.map((e: any) => e.projectId));
+
+    return {
+      exams,
+      summary: {
+        year,
+        totalExams: exams.length,
+        activeProjects: activeProjectIds.size,
+        totalCandidateTarget: exams.reduce((acc: number, e: any) => acc + (e.candidateTarget || 0), 0),
+        totalCentreTarget: exams.reduce((acc: number, e: any) => acc + (e.centreTarget || 0), 0),
+        clientId: clientId || null,
+        agency: agency || null,
+      },
+    };
+  }
+
+  static async updateProjectStatus(
+    id: string,
+    status: 'Active' | 'OnHold' | 'Completed' | 'Closed',
+    adminUserId: string,
+    adminEmail: string
+  ) {
+    const existing = await prisma.project.findUnique({ where: { id } });
+    if (!existing) {
+      throw new Error('Project not found');
+    }
+
+    return prisma.$transaction(async (tx: any) => {
+      const updated = await tx.project.update({
+        where: { id },
+        data: { status },
+        include: { client: true },
+      });
+
+      await tx.auditLog.create({
+        data: {
+          userId: adminUserId,
+          userEmail: adminEmail,
+          action: 'PROJECT_STATUS_UPDATED',
+          entity: 'Project',
+          entityId: id,
+          details: { status },
         },
       });
 
@@ -535,7 +962,7 @@ export class AdminService {
       throw new Error(`Centre code "${data.centreCode}" already exists`);
     }
 
-    return prisma.$transaction(async (tx) => {
+    return prisma.$transaction(async (tx: any) => {
       const centre = await tx.centre.create({
         data,
       });
@@ -584,7 +1011,7 @@ export class AdminService {
       throw new Error('Centre not found');
     }
 
-    return prisma.$transaction(async (tx) => {
+    return prisma.$transaction(async (tx: any) => {
       const updated = await tx.centre.update({
         where: { id },
         data,
@@ -617,7 +1044,7 @@ export class AdminService {
       throw new Error('Centre not found');
     }
 
-    return prisma.$transaction(async (tx) => {
+    return prisma.$transaction(async (tx: any) => {
       const updated = await tx.centre.update({
         where: { id },
         data: { centreStatus: status },
@@ -650,7 +1077,7 @@ export class AdminService {
       throw new Error('Centre not found');
     }
 
-    return prisma.$transaction(async (tx) => {
+    return prisma.$transaction(async (tx: any) => {
       // Mark active blacklist record
       const record = await tx.blacklistRecord.create({
         data: {
@@ -694,7 +1121,7 @@ export class AdminService {
       throw new Error('Centre not found');
     }
 
-    return prisma.$transaction(async (tx) => {
+    return prisma.$transaction(async (tx: any) => {
       // If was blacklisted, deactivate existing blacklist records
       if (centre.eligibilityStatus === 'Blacklisted' && eligibilityStatus !== 'Blacklisted') {
         await tx.blacklistRecord.updateMany({
@@ -782,7 +1209,7 @@ export class AdminService {
     adminUserId: string,
     adminEmail: string
   ) {
-    return prisma.$transaction(async (tx) => {
+    return prisma.$transaction(async (tx: any) => {
       const config = await tx.systemConfig.upsert({
         where: { key },
         update: {
@@ -884,17 +1311,27 @@ export class AdminService {
   }
 
   static async createClient(
-    data: { code?: string; name: string; fullName: string; contactEmail: string; status?: string },
+    data: {
+      code?: string;
+      name: string;
+      fullName: string;
+      contactEmail: string;
+      description?: string;
+      isActive?: boolean;
+      status?: string;
+    },
     adminUserId: string,
     adminEmail: string
   ) {
-    return prisma.$transaction(async (tx) => {
+    return prisma.$transaction(async (tx: any) => {
       const client = await tx.client.create({
         data: {
           code: data.code,
           name: data.name,
           fullName: data.fullName,
           contactEmail: data.contactEmail,
+          description: data.description,
+          isActive: data.isActive ?? true,
           status: data.status || 'Active',
         },
       });
@@ -916,11 +1353,19 @@ export class AdminService {
 
   static async updateClient(
     id: string,
-    data: { code?: string; name?: string; fullName?: string; contactEmail?: string; status?: string },
+    data: {
+      code?: string;
+      name?: string;
+      fullName?: string;
+      contactEmail?: string;
+      description?: string;
+      isActive?: boolean;
+      status?: string;
+    },
     adminUserId: string,
     adminEmail: string
   ) {
-    return prisma.$transaction(async (tx) => {
+    return prisma.$transaction(async (tx: any) => {
       const existing = await tx.client.findUnique({ where: { id } });
       if (!existing) {
         throw new Error('Client not found');
@@ -943,6 +1388,702 @@ export class AdminService {
       });
 
       return updated;
+    });
+  }
+
+  static async updateClientStatus(
+    id: string,
+    data: { status?: 'Active' | 'Inactive'; isActive?: boolean },
+    adminUserId: string,
+    adminEmail: string
+  ) {
+    return prisma.$transaction(async (tx: any) => {
+      const existing = await tx.client.findUnique({ where: { id } });
+      if (!existing) {
+        throw new Error('Client not found');
+      }
+
+      const updateData: Prisma.ClientUpdateInput = {};
+      if (data.status) {
+        updateData.status = data.status;
+        updateData.isActive = data.status === 'Active';
+      }
+      if (data.isActive !== undefined) {
+        updateData.isActive = data.isActive;
+        if (!data.status) {
+          updateData.status = data.isActive ? 'Active' : 'Inactive';
+        }
+      }
+
+      const updated = await tx.client.update({
+        where: { id },
+        data: updateData,
+      });
+
+      await tx.auditLog.create({
+        data: {
+          userId: adminUserId,
+          userEmail: adminEmail,
+          action: 'CLIENT_STATUS_UPDATED',
+          entity: 'Client',
+          entityId: id,
+          details: JSON.parse(JSON.stringify(updateData)),
+        },
+      });
+
+      return updated;
+    });
+  }
+
+  // ── 8. Exam Types Management ─────────────────────────────────────────────
+  static async listExamTypes(params: {
+    page: number;
+    limit: number;
+    search?: string;
+    projectId?: string;
+    clientId?: string;
+    isActive?: boolean;
+  }) {
+    const { page, limit, search, projectId, clientId, isActive } = params;
+    const skip = (page - 1) * limit;
+
+    const where: Prisma.ExamTypeWhereInput = {
+      ...(projectId ? { projectId } : {}),
+      ...(clientId ? { project: { clientId } } : {}),
+      ...(isActive !== undefined ? { isActive } : {}),
+      ...(search
+        ? {
+            OR: [
+              { examCode: { contains: search } },
+              { examTypeName: { contains: search } },
+            ],
+          }
+        : {}),
+    };
+
+    const [examTypes, total] = await Promise.all([
+      prisma.examType.findMany({
+        where,
+        skip,
+        take: limit,
+        orderBy: { createdAt: 'desc' },
+        include: {
+          project: {
+            select: {
+              id: true,
+              projectCode: true,
+              name: true,
+              clientId: true,
+              client: { select: { id: true, name: true, fullName: true } },
+            },
+          },
+          _count: { select: { exams: true } },
+        },
+      }),
+      prisma.examType.count({ where }),
+    ]);
+
+    return {
+      data: examTypes,
+      pagination: {
+        total,
+        page,
+        limit,
+        totalPages: Math.ceil(total / limit),
+      },
+    };
+  }
+
+  static async getExamTypeById(id: string) {
+    const examType = await prisma.examType.findUnique({
+      where: { id },
+      include: {
+        project: {
+          include: { client: true },
+        },
+        exams: {
+          orderBy: { createdAt: 'desc' },
+          include: {
+            dates: {
+              orderBy: { examDate: 'asc' },
+              include: { shifts: { orderBy: { shiftNumber: 'asc' } } },
+            },
+            _count: { select: { bookings: true } },
+          },
+        },
+      },
+    });
+
+    if (!examType) {
+      throw new Error('Exam type not found');
+    }
+
+    return examType;
+  }
+
+  static async createExamType(
+    data: {
+      projectId: string;
+      examCode: string;
+      examTypeName: string;
+      description?: string;
+      isActive?: boolean;
+    },
+    adminUserId: string,
+    adminEmail: string
+  ) {
+    const project = await prisma.project.findUnique({
+      where: { id: data.projectId },
+    });
+    if (!project) {
+      throw new Error('Project not found');
+    }
+
+    const existing = await prisma.examType.findUnique({
+      where: {
+        projectId_examCode: {
+          projectId: data.projectId,
+          examCode: data.examCode,
+        },
+      },
+    });
+    if (existing) {
+      throw new Error(`Exam code "${data.examCode}" already exists for this project`);
+    }
+
+    return prisma.$transaction(async (tx: any) => {
+      const examType = await tx.examType.create({
+        data: {
+          projectId: data.projectId,
+          examCode: data.examCode.trim(),
+          examTypeName: data.examTypeName.trim(),
+          description: data.description,
+          isActive: data.isActive ?? true,
+        },
+        include: {
+          project: { include: { client: true } },
+        },
+      });
+
+      await tx.auditLog.create({
+        data: {
+          userId: adminUserId,
+          userEmail: adminEmail,
+          action: 'EXAM_TYPE_CREATED',
+          entity: 'ExamType',
+          entityId: examType.id,
+          details: { examCode: examType.examCode, examTypeName: examType.examTypeName },
+        },
+      });
+
+      return examType;
+    });
+  }
+
+  static async updateExamType(
+    id: string,
+    data: {
+      projectId?: string;
+      examCode?: string;
+      examTypeName?: string;
+      description?: string;
+      isActive?: boolean;
+    },
+    adminUserId: string,
+    adminEmail: string
+  ) {
+    const existing = await prisma.examType.findUnique({ where: { id } });
+    if (!existing) {
+      throw new Error('Exam type not found');
+    }
+
+    if (data.projectId && data.projectId !== existing.projectId) {
+      const targetProject = await prisma.project.findUnique({ where: { id: data.projectId } });
+      if (!targetProject) {
+        throw new Error('Target project not found');
+      }
+    }
+
+    return prisma.$transaction(async (tx: any) => {
+      const updated = await tx.examType.update({
+        where: { id },
+        data: {
+          ...(data.projectId ? { projectId: data.projectId } : {}),
+          ...(data.examCode ? { examCode: data.examCode.trim() } : {}),
+          ...(data.examTypeName ? { examTypeName: data.examTypeName.trim() } : {}),
+          ...(data.description !== undefined ? { description: data.description } : {}),
+          ...(data.isActive !== undefined ? { isActive: data.isActive } : {}),
+        },
+        include: { project: { include: { client: true } } },
+      });
+
+      await tx.auditLog.create({
+        data: {
+          userId: adminUserId,
+          userEmail: adminEmail,
+          action: 'EXAM_TYPE_UPDATED',
+          entity: 'ExamType',
+          entityId: id,
+          details: { changes: data },
+        },
+      });
+
+      return updated;
+    });
+  }
+
+  static async updateExamTypeStatus(
+    id: string,
+    isActive: boolean,
+    adminUserId: string,
+    adminEmail: string
+  ) {
+    const existing = await prisma.examType.findUnique({ where: { id } });
+    if (!existing) {
+      throw new Error('Exam type not found');
+    }
+
+    return prisma.$transaction(async (tx: any) => {
+      const updated = await tx.examType.update({
+        where: { id },
+        data: { isActive },
+      });
+
+      await tx.auditLog.create({
+        data: {
+          userId: adminUserId,
+          userEmail: adminEmail,
+          action: 'EXAM_TYPE_STATUS_UPDATED',
+          entity: 'ExamType',
+          entityId: id,
+          details: { isActive },
+        },
+      });
+
+      return updated;
+    });
+  }
+
+  static async deleteExamType(id: string, adminUserId: string, adminEmail: string) {
+    const existing = await prisma.examType.findUnique({ where: { id } });
+    if (!existing) {
+      throw new Error('Exam type not found');
+    }
+
+    return prisma.$transaction(async (tx: any) => {
+      await tx.examType.delete({ where: { id } });
+
+      await tx.auditLog.create({
+        data: {
+          userId: adminUserId,
+          userEmail: adminEmail,
+          action: 'EXAM_TYPE_DELETED',
+          entity: 'ExamType',
+          entityId: id,
+          details: { examCode: existing.examCode, examTypeName: existing.examTypeName },
+        },
+      });
+
+      return { success: true };
+    });
+  }
+
+  // ── 9. Exam Instances Management ─────────────────────────────────────────
+  static async listExams(params: {
+    page: number;
+    limit: number;
+    search?: string;
+    examTypeId?: string;
+    projectId?: string;
+    clientId?: string;
+    status?: string;
+  }) {
+    const { page, limit, search, examTypeId, projectId, clientId, status } = params;
+    const skip = (page - 1) * limit;
+
+    const where: Prisma.ExamWhereInput = {
+      ...(examTypeId ? { examTypeId } : {}),
+      ...(projectId ? { examType: { projectId } } : {}),
+      ...(clientId ? { examType: { project: { clientId } } } : {}),
+      ...(status ? { status } : {}),
+      ...(search
+        ? {
+            OR: [
+              { examCode: { contains: search } },
+              { examName: { contains: search } },
+            ],
+          }
+        : {}),
+    };
+
+    const [exams, total] = await Promise.all([
+      prisma.exam.findMany({
+        where,
+        skip,
+        take: limit,
+        orderBy: { createdAt: 'desc' },
+        include: {
+          examType: {
+            include: {
+              project: {
+                select: {
+                  id: true,
+                  projectCode: true,
+                  name: true,
+                  client: { select: { id: true, name: true, fullName: true } },
+                },
+              },
+            },
+          },
+          dates: {
+            orderBy: { examDate: 'asc' },
+            include: { shifts: { orderBy: { shiftNumber: 'asc' } } },
+          },
+          _count: { select: { bookings: true } },
+        },
+      }),
+      prisma.exam.count({ where }),
+    ]);
+
+    return {
+      data: exams,
+      pagination: {
+        total,
+        page,
+        limit,
+        totalPages: Math.ceil(total / limit),
+      },
+    };
+  }
+
+  static async getExamById(id: string) {
+    const exam = await prisma.exam.findUnique({
+      where: { id },
+      include: {
+        examType: {
+          include: {
+            project: {
+              include: { client: true },
+            },
+          },
+        },
+        dates: {
+          orderBy: { examDate: 'asc' },
+          include: { shifts: { orderBy: { shiftNumber: 'asc' } } },
+        },
+        bookings: {
+          include: { centre: true },
+        },
+      },
+    });
+
+    if (!exam) {
+      throw new Error('Exam not found');
+    }
+
+    return exam;
+  }
+
+  static async createExam(
+    data: {
+      examTypeId: string;
+      examCode: string;
+      examName: string;
+      examYear?: number;
+      description?: string;
+      status?: string;
+    },
+    adminUserId: string,
+    adminEmail: string
+  ) {
+    const examType = await prisma.examType.findUnique({ where: { id: data.examTypeId } });
+    if (!examType) {
+      throw new Error('Exam type not found');
+    }
+
+    const existing = await prisma.exam.findUnique({
+      where: {
+        examTypeId_examCode: {
+          examTypeId: data.examTypeId,
+          examCode: data.examCode,
+        },
+      },
+    });
+    if (existing) {
+      throw new Error(`Exam code "${data.examCode}" already exists for this exam type`);
+    }
+
+    return prisma.$transaction(async (tx: any) => {
+      const exam = await tx.exam.create({
+        data: {
+          examTypeId: data.examTypeId,
+          examCode: data.examCode.trim(),
+          examName: data.examName.trim(),
+          examYear: data.examYear || new Date().getFullYear(),
+          description: data.description,
+          status: data.status || 'Scheduled',
+        },
+        include: {
+          examType: { include: { project: { include: { client: true } } } },
+        },
+      });
+
+      await tx.auditLog.create({
+        data: {
+          userId: adminUserId,
+          userEmail: adminEmail,
+          action: 'EXAM_CREATED',
+          entity: 'Exam',
+          entityId: exam.id,
+          details: { examCode: exam.examCode, examName: exam.examName },
+        },
+      });
+
+      return exam;
+    });
+  }
+
+  static async updateExam(
+    id: string,
+    data: {
+      examTypeId?: string;
+      examCode?: string;
+      examName?: string;
+      examYear?: number;
+      description?: string;
+      status?: string;
+    },
+    adminUserId: string,
+    adminEmail: string
+  ) {
+    const existing = await prisma.exam.findUnique({ where: { id } });
+    if (!existing) {
+      throw new Error('Exam not found');
+    }
+
+    if (data.examTypeId && data.examTypeId !== existing.examTypeId) {
+      const targetType = await prisma.examType.findUnique({ where: { id: data.examTypeId } });
+      if (!targetType) {
+        throw new Error('Target exam type not found');
+      }
+    }
+
+    return prisma.$transaction(async (tx: any) => {
+      const updated = await tx.exam.update({
+        where: { id },
+        data: {
+          ...(data.examTypeId ? { examTypeId: data.examTypeId } : {}),
+          ...(data.examCode ? { examCode: data.examCode.trim() } : {}),
+          ...(data.examName ? { examName: data.examName.trim() } : {}),
+          ...(data.examYear !== undefined ? { examYear: data.examYear } : {}),
+          ...(data.description !== undefined ? { description: data.description } : {}),
+          ...(data.status ? { status: data.status } : {}),
+        },
+        include: {
+          examType: { include: { project: { include: { client: true } } } },
+        },
+      });
+
+      await tx.auditLog.create({
+        data: {
+          userId: adminUserId,
+          userEmail: adminEmail,
+          action: 'EXAM_UPDATED',
+          entity: 'Exam',
+          entityId: id,
+          details: { changes: data },
+        },
+      });
+
+      return updated;
+    });
+  }
+
+  static async deleteExam(id: string, adminUserId: string, adminEmail: string) {
+    const existing = await prisma.exam.findUnique({ where: { id } });
+    if (!existing) {
+      throw new Error('Exam not found');
+    }
+
+    return prisma.$transaction(async (tx: any) => {
+      await tx.exam.delete({ where: { id } });
+
+      await tx.auditLog.create({
+        data: {
+          userId: adminUserId,
+          userEmail: adminEmail,
+          action: 'EXAM_DELETED',
+          entity: 'Exam',
+          entityId: id,
+          details: { examCode: existing.examCode, examName: existing.examName },
+        },
+      });
+
+      return { success: true };
+    });
+  }
+
+  // ── 10. Exam Dates Management ────────────────────────────────────────────
+  static async listExamDates(examId: string) {
+    const exam = await prisma.exam.findUnique({ where: { id: examId } });
+    if (!exam) {
+      throw new Error('Exam not found');
+    }
+
+    return prisma.examDate.findMany({
+      where: { examId },
+      orderBy: { examDate: 'asc' },
+      include: {
+        shifts: { orderBy: { shiftNumber: 'asc' } },
+      },
+    });
+  }
+
+  static async createExamDate(
+    examId: string,
+    data: {
+      examDate: string | Date;
+      reportingTime?: string;
+      status?: string;
+    },
+    adminUserId: string,
+    adminEmail: string
+  ) {
+    const exam = await prisma.exam.findUnique({ where: { id: examId } });
+    if (!exam) {
+      throw new Error('Exam not found');
+    }
+
+    return prisma.$transaction(async (tx: any) => {
+      const examDate = await tx.examDate.create({
+        data: {
+          examId,
+          examDate: new Date(data.examDate),
+          reportingTime: data.reportingTime,
+          status: data.status || 'Scheduled',
+        },
+        include: { shifts: true },
+      });
+
+      await tx.auditLog.create({
+        data: {
+          userId: adminUserId,
+          userEmail: adminEmail,
+          action: 'EXAM_DATE_CREATED',
+          entity: 'ExamDate',
+          entityId: examDate.id,
+          details: { examId, examDate: data.examDate },
+        },
+      });
+
+      return examDate;
+    });
+  }
+
+  static async deleteExamDate(id: string, adminUserId: string, adminEmail: string) {
+    const existing = await prisma.examDate.findUnique({ where: { id } });
+    if (!existing) {
+      throw new Error('Exam date not found');
+    }
+
+    return prisma.$transaction(async (tx: any) => {
+      await tx.examDate.delete({ where: { id } });
+
+      await tx.auditLog.create({
+        data: {
+          userId: adminUserId,
+          userEmail: adminEmail,
+          action: 'EXAM_DATE_DELETED',
+          entity: 'ExamDate',
+          entityId: id,
+          details: { examId: existing.examId, examDate: existing.examDate },
+        },
+      });
+
+      return { success: true };
+    });
+  }
+
+  // ── 11. Exam Shifts Management ───────────────────────────────────────────
+  static async listExamShifts(examDateId: string) {
+    const examDate = await prisma.examDate.findUnique({ where: { id: examDateId } });
+    if (!examDate) {
+      throw new Error('Exam date not found');
+    }
+
+    return prisma.examShift.findMany({
+      where: { examDateId },
+      orderBy: { shiftNumber: 'asc' },
+    });
+  }
+
+  static async createExamShift(
+    examDateId: string,
+    data: {
+      shiftName: string;
+      shiftNumber?: number;
+      startTime: string;
+      endTime: string;
+      reportingTime?: string;
+      status?: string;
+    },
+    adminUserId: string,
+    adminEmail: string
+  ) {
+    const examDate = await prisma.examDate.findUnique({ where: { id: examDateId } });
+    if (!examDate) {
+      throw new Error('Exam date not found');
+    }
+
+    return prisma.$transaction(async (tx: any) => {
+      const shift = await tx.examShift.create({
+        data: {
+          examDateId,
+          shiftName: data.shiftName.trim(),
+          shiftNumber: data.shiftNumber || 1,
+          startTime: data.startTime.trim(),
+          endTime: data.endTime.trim(),
+          reportingTime: data.reportingTime?.trim(),
+          status: data.status || 'Scheduled',
+        },
+      });
+
+      await tx.auditLog.create({
+        data: {
+          userId: adminUserId,
+          userEmail: adminEmail,
+          action: 'EXAM_SHIFT_CREATED',
+          entity: 'ExamShift',
+          entityId: shift.id,
+          details: { examDateId, shiftName: shift.shiftName, shiftNumber: shift.shiftNumber },
+        },
+      });
+
+      return shift;
+    });
+  }
+
+  static async deleteExamShift(id: string, adminUserId: string, adminEmail: string) {
+    const existing = await prisma.examShift.findUnique({ where: { id } });
+    if (!existing) {
+      throw new Error('Exam shift not found');
+    }
+
+    return prisma.$transaction(async (tx: any) => {
+      await tx.examShift.delete({ where: { id } });
+
+      await tx.auditLog.create({
+        data: {
+          userId: adminUserId,
+          userEmail: adminEmail,
+          action: 'EXAM_SHIFT_DELETED',
+          entity: 'ExamShift',
+          entityId: id,
+          details: { examDateId: existing.examDateId, shiftName: existing.shiftName },
+        },
+      });
+
+      return { success: true };
     });
   }
 }

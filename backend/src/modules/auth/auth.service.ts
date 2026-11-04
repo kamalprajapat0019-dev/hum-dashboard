@@ -57,7 +57,7 @@ export class AuthService {
       email: user.email,
       name: user.name,
       role: user.role,
-      avatar: user.avatar || (user.name ? user.name.split(' ').map((n) => n[0]).join('') : 'U'),
+      avatar: user.avatar || (user.name ? user.name.split(' ').map((n: string) => n[0]).join('') : 'U'),
       status: user.status,
       scope: user.scope || { clients: ['all'], projects: ['all'], centres: ['all'] },
       lastLogin: user.lastLogin,
@@ -88,7 +88,7 @@ export class AuthService {
 
     return {
       ...user,
-      avatar: user.avatar || (user.name ? user.name.split(' ').map((n) => n[0]).join('') : 'U'),
+      avatar: user.avatar || (user.name ? user.name.split(' ').map((n: string) => n[0]).join('') : 'U'),
     };
   }
 }

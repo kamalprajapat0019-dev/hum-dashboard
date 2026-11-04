@@ -10,7 +10,7 @@ export const DEMO_USERS = [
     id: 'u001',
     name: import.meta.env.VITE_ADMIN_NAME || 'Rajesh Kumar',
     email: import.meta.env.VITE_ADMIN_EMAIL || 'admin@oemportal.in',
-    password: import.meta.env.VITE_ADMIN_PASSWORD || 'admin123',
+    password: import.meta.env.VITE_ADMIN_PASSWORD || 'admin_secure_pass_123',
     role: ROLES.ADMIN,
     avatar: 'RK',
     scope: { clients: ['all'], projects: ['all'], centres: ['all'] },

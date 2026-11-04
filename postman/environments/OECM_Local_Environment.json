@@ -1,0 +1,56 @@
+{
+  "id": "e4f8c9b1-2a3b-4c5d-6e7f-8a9b0c1d2e3f",
+  "name": "OECM Portal - Local Environment",
+  "values": [
+    {
+      "key": "baseUrl",
+      "value": "http://localhost:5000/api/v1",
+      "type": "default",
+      "enabled": true
+    },
+    {
+      "key": "adminToken",
+      "value": "",
+      "type": "secret",
+      "enabled": true
+    },
+    {
+      "key": "clientId",
+      "value": "cmvuiz0mv0006ugkkf86q4hpt",
+      "type": "default",
+      "enabled": true
+    },
+    {
+      "key": "projectId",
+      "value": "cmvuiz15y0008ugkkk0132w88",
+      "type": "default",
+      "enabled": true
+    },
+    {
+      "key": "examTypeId",
+      "value": "cmvujx630000213q1oevc2y45",
+      "type": "default",
+      "enabled": true
+    },
+    {
+      "key": "examId",
+      "value": "cmvujx639000613q123b72y46",
+      "type": "default",
+      "enabled": true
+    },
+    {
+      "key": "dateId",
+      "value": "",
+      "type": "default",
+      "enabled": true
+    },
+    {
+      "key": "shiftId",
+      "value": "",
+      "type": "default",
+      "enabled": true
+    }
+  ],
+  "_postman_variable_scope": "environment"
+}
+

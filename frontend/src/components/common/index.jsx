@@ -7,6 +7,7 @@ export { ProgressRing } from '../ui/ProgressRing';
 export { EmptyState } from '../feedback/EmptyState';
 export { SkeletonRows } from '../feedback/SkeletonRows';
 export { ErrorBoundary } from '../feedback/ErrorBoundary';
+export { default as ClientDropdown } from './ClientDropdown';
 
 /**
  * Section Header

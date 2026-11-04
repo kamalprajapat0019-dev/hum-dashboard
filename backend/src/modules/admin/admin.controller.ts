@@ -5,11 +5,36 @@ import { sendSuccess, sendError } from '../../utils/response.js';
 
 export class AdminController {
   // ── Executive Analytics ──────────────────────────────────────────────────
-  static async getAnalytics(_req: AuthenticatedRequest, res: Response): Promise<void> {
+  static async getAnalytics(req: AuthenticatedRequest, res: Response): Promise<void> {
     try {
-      const data = await AdminService.getExecutiveAnalytics();
+      const { clientId, projectId, examTypeId, examId } = req.query as {
+        clientId?: string;
+        projectId?: string;
+        examTypeId?: string;
+        examId?: string;
+      };
+      const data = await AdminService.getExecutiveAnalytics({
+        clientId,
+        projectId,
+        examTypeId,
+        examId,
+      });
       sendSuccess(res, data);
     } catch (err: unknown) {
+      if (err instanceof Error) {
+        if (err.message === 'Client not found') {
+          sendError(res, 404, 'CLIENT_NOT_FOUND', 'Selected client does not exist in the database');
+          return;
+        }
+        if (err.message.includes('not found')) {
+          sendError(res, 404, 'NOT_FOUND', err.message);
+          return;
+        }
+        if (err.message.includes('does not belong to')) {
+          sendError(res, 400, 'INVALID_HIERARCHY', err.message);
+          return;
+        }
+      }
       const msg = err instanceof Error ? err.message : 'Failed to retrieve analytics';
       sendError(res, 500, 'ANALYTICS_ERROR', msg);
     }
@@ -89,14 +114,16 @@ export class AdminController {
   // ── Projects ─────────────────────────────────────────────────────────────
   static async listProjects(req: AuthenticatedRequest, res: Response): Promise<void> {
     try {
-      const { page, limit, search, status, stage, clientId } = req.query as any;
+      const { page, limit, search, status, stage, clientId, projectId, examTypeId } = req.query as any;
       const result = await AdminService.listProjects({
-        page: page || 1,
-        limit: limit || 20,
+        page: page ? parseInt(page, 10) : 1,
+        limit: limit ? parseInt(limit, 10) : 20,
         search,
         status,
         stage,
         clientId,
+        projectId,
+        examTypeId,
       });
       sendSuccess(res, result.projects, 200, result.meta);
     } catch (err: unknown) {
@@ -141,6 +168,39 @@ export class AdminController {
     } catch (err: unknown) {
       const msg = err instanceof Error ? err.message : 'Failed to update project';
       sendError(res, 400, 'PROJECT_UPDATE_FAILED', msg);
+    }
+  }
+
+  static async updateProjectStatus(req: AuthenticatedRequest, res: Response): Promise<void> {
+    try {
+      const updated = await AdminService.updateProjectStatus(
+        req.params.id as string,
+        req.body.status,
+        req.user!.userId,
+        req.user!.email
+      );
+      sendSuccess(res, updated);
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : 'Failed to update project status';
+      sendError(res, 400, 'PROJECT_STATUS_UPDATE_FAILED', msg);
+    }
+  }
+
+  // ── Calendar Synchronization ─────────────────────────────────────────────
+  static async getCalendarExams(req: AuthenticatedRequest, res: Response): Promise<void> {
+    try {
+      const { year, month, clientId, agency, date } = req.query as any;
+      const result = await AdminService.getCalendarExams({
+        year: year ? parseInt(year, 10) : undefined,
+        month: month ? parseInt(month, 10) : undefined,
+        clientId: clientId || undefined,
+        agency: agency || undefined,
+        date: date || undefined,
+      });
+      sendSuccess(res, result);
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : 'Failed to fetch calendar examinations';
+      sendError(res, 400, 'CALENDAR_FETCH_FAILED', msg);
     }
   }
 
@@ -348,6 +408,261 @@ export class AdminController {
     } catch (err: unknown) {
       const msg = err instanceof Error ? err.message : 'Failed to update client';
       sendError(res, 400, 'CLIENT_UPDATE_FAILED', msg);
+    }
+  }
+
+  static async updateClientStatus(req: AuthenticatedRequest, res: Response): Promise<void> {
+    try {
+      const client = await AdminService.updateClientStatus(
+        req.params.id as string,
+        req.body,
+        req.user!.userId,
+        req.user!.email
+      );
+      sendSuccess(res, client);
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : 'Failed to update client status';
+      sendError(res, 400, 'CLIENT_STATUS_UPDATE_FAILED', msg);
+    }
+  }
+
+  // ── Exam Types Management ────────────────────────────────────────────────
+  static async listExamTypes(req: AuthenticatedRequest, res: Response): Promise<void> {
+    try {
+      const { page, limit, search, projectId, clientId, isActive } = req.query as any;
+      const result = await AdminService.listExamTypes({
+        page: page ? parseInt(page, 10) : 1,
+        limit: limit ? parseInt(limit, 10) : 20,
+        search,
+        projectId,
+        clientId,
+        isActive: isActive !== undefined ? isActive === 'true' || isActive === true : undefined,
+      });
+      sendSuccess(res, result.data, 200, result.pagination);
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : 'Failed to list exam types';
+      sendError(res, 500, 'EXAM_TYPES_FETCH_ERROR', msg);
+    }
+  }
+
+  static async getExamTypeById(req: AuthenticatedRequest, res: Response): Promise<void> {
+    try {
+      const examType = await AdminService.getExamTypeById(req.params.id as string);
+      sendSuccess(res, examType);
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : 'Exam type not found';
+      sendError(res, 404, 'EXAM_TYPE_NOT_FOUND', msg);
+    }
+  }
+
+  static async createExamType(req: AuthenticatedRequest, res: Response): Promise<void> {
+    try {
+      const examType = await AdminService.createExamType(
+        req.body,
+        req.user!.userId,
+        req.user!.email
+      );
+      sendSuccess(res, examType, 201);
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : 'Failed to create exam type';
+      sendError(res, 400, 'EXAM_TYPE_CREATION_FAILED', msg);
+    }
+  }
+
+  static async updateExamType(req: AuthenticatedRequest, res: Response): Promise<void> {
+    try {
+      const examType = await AdminService.updateExamType(
+        req.params.id as string,
+        req.body,
+        req.user!.userId,
+        req.user!.email
+      );
+      sendSuccess(res, examType);
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : 'Failed to update exam type';
+      sendError(res, 400, 'EXAM_TYPE_UPDATE_FAILED', msg);
+    }
+  }
+
+  static async updateExamTypeStatus(req: AuthenticatedRequest, res: Response): Promise<void> {
+    try {
+      const examType = await AdminService.updateExamTypeStatus(
+        req.params.id as string,
+        req.body.isActive,
+        req.user!.userId,
+        req.user!.email
+      );
+      sendSuccess(res, examType);
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : 'Failed to update exam type status';
+      sendError(res, 400, 'EXAM_TYPE_STATUS_UPDATE_FAILED', msg);
+    }
+  }
+
+  static async deleteExamType(req: AuthenticatedRequest, res: Response): Promise<void> {
+    try {
+      await AdminService.deleteExamType(
+        req.params.id as string,
+        req.user!.userId,
+        req.user!.email
+      );
+      sendSuccess(res, { message: 'Exam type deleted successfully' });
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : 'Failed to delete exam type';
+      sendError(res, 400, 'EXAM_TYPE_DELETION_FAILED', msg);
+    }
+  }
+
+  // ── Exam Instances Management ────────────────────────────────────────────
+  static async listExams(req: AuthenticatedRequest, res: Response): Promise<void> {
+    try {
+      const { page, limit, search, examTypeId, projectId, clientId, status } = req.query as any;
+      const result = await AdminService.listExams({
+        page: page ? parseInt(page, 10) : 1,
+        limit: limit ? parseInt(limit, 10) : 20,
+        search,
+        examTypeId,
+        projectId,
+        clientId,
+        status,
+      });
+      sendSuccess(res, result.data, 200, result.pagination);
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : 'Failed to list exams';
+      sendError(res, 500, 'EXAMS_FETCH_ERROR', msg);
+    }
+  }
+
+  static async getExamById(req: AuthenticatedRequest, res: Response): Promise<void> {
+    try {
+      const exam = await AdminService.getExamById(req.params.id as string);
+      sendSuccess(res, exam);
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : 'Exam not found';
+      sendError(res, 404, 'EXAM_NOT_FOUND', msg);
+    }
+  }
+
+  static async createExam(req: AuthenticatedRequest, res: Response): Promise<void> {
+    try {
+      const exam = await AdminService.createExam(
+        req.body,
+        req.user!.userId,
+        req.user!.email
+      );
+      sendSuccess(res, exam, 201);
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : 'Failed to create exam';
+      sendError(res, 400, 'EXAM_CREATION_FAILED', msg);
+    }
+  }
+
+  static async updateExam(req: AuthenticatedRequest, res: Response): Promise<void> {
+    try {
+      const exam = await AdminService.updateExam(
+        req.params.id as string,
+        req.body,
+        req.user!.userId,
+        req.user!.email
+      );
+      sendSuccess(res, exam);
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : 'Failed to update exam';
+      sendError(res, 400, 'EXAM_UPDATE_FAILED', msg);
+    }
+  }
+
+  static async deleteExam(req: AuthenticatedRequest, res: Response): Promise<void> {
+    try {
+      await AdminService.deleteExam(
+        req.params.id as string,
+        req.user!.userId,
+        req.user!.email
+      );
+      sendSuccess(res, { message: 'Exam deleted successfully' });
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : 'Failed to delete exam';
+      sendError(res, 400, 'EXAM_DELETION_FAILED', msg);
+    }
+  }
+
+  // ── Exam Dates Management ────────────────────────────────────────────────
+  static async listExamDates(req: AuthenticatedRequest, res: Response): Promise<void> {
+    try {
+      const dates = await AdminService.listExamDates(req.params.examId as string);
+      sendSuccess(res, dates);
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : 'Failed to list exam dates';
+      sendError(res, 500, 'EXAM_DATES_FETCH_ERROR', msg);
+    }
+  }
+
+  static async createExamDate(req: AuthenticatedRequest, res: Response): Promise<void> {
+    try {
+      const date = await AdminService.createExamDate(
+        req.params.examId as string,
+        req.body,
+        req.user!.userId,
+        req.user!.email
+      );
+      sendSuccess(res, date, 201);
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : 'Failed to create exam date';
+      sendError(res, 400, 'EXAM_DATE_CREATION_FAILED', msg);
+    }
+  }
+
+  static async deleteExamDate(req: AuthenticatedRequest, res: Response): Promise<void> {
+    try {
+      await AdminService.deleteExamDate(
+        req.params.dateId as string,
+        req.user!.userId,
+        req.user!.email
+      );
+      sendSuccess(res, { message: 'Exam date deleted successfully' });
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : 'Failed to delete exam date';
+      sendError(res, 400, 'EXAM_DATE_DELETION_FAILED', msg);
+    }
+  }
+
+  // ── Exam Shifts Management ───────────────────────────────────────────────
+  static async listExamShifts(req: AuthenticatedRequest, res: Response): Promise<void> {
+    try {
+      const shifts = await AdminService.listExamShifts(req.params.dateId as string);
+      sendSuccess(res, shifts);
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : 'Failed to list exam shifts';
+      sendError(res, 500, 'EXAM_SHIFTS_FETCH_ERROR', msg);
+    }
+  }
+
+  static async createExamShift(req: AuthenticatedRequest, res: Response): Promise<void> {
+    try {
+      const shift = await AdminService.createExamShift(
+        req.params.dateId as string,
+        req.body,
+        req.user!.userId,
+        req.user!.email
+      );
+      sendSuccess(res, shift, 201);
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : 'Failed to create exam shift';
+      sendError(res, 400, 'EXAM_SHIFT_CREATION_FAILED', msg);
+    }
+  }
+
+  static async deleteExamShift(req: AuthenticatedRequest, res: Response): Promise<void> {
+    try {
+      await AdminService.deleteExamShift(
+        req.params.shiftId as string,
+        req.user!.userId,
+        req.user!.email
+      );
+      sendSuccess(res, { message: 'Exam shift deleted successfully' });
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : 'Failed to delete exam shift';
+      sendError(res, 400, 'EXAM_SHIFT_DELETION_FAILED', msg);
     }
   }
 }
