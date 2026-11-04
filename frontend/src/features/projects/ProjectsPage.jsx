@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import {
   FolderOpen, Plus, Search, Calendar, Users, Building2, CheckCircle2,
   Clock, Edit, Trash2, X, Check, RefreshCw, Award,
@@ -128,59 +128,81 @@ export default function ProjectsPage() {
     setTimeout(() => setToast(null), 3500);
   };
 
-  // ── Data Fetching ────────────────────────────────────────────────────────
-  const loadData = useCallback(async () => {
-    setLoading(true);
-    setError(null);
+  const [debouncedSearch, setDebouncedSearch] = useState(search);
+  const searchTimerRef = useRef(null);
+
+  useEffect(() => {
+    if (searchTimerRef.current) clearTimeout(searchTimerRef.current);
+    searchTimerRef.current = setTimeout(() => {
+      setDebouncedSearch(search);
+    }, 300);
+    return () => {
+      if (searchTimerRef.current) clearTimeout(searchTimerRef.current);
+    };
+  }, [search]);
+
+  // ── Data Fetching: Isolated Reference Data & Projects Queries ────────────
+  const loadReferenceData = useCallback(async () => {
     try {
-      const [projRes, clientRes, etRes, examsRes] = await Promise.allSettled([
-        apiClient.get(ENDPOINTS.ADMIN.PROJECTS, {
-          params: {
-            search: search || undefined,
-            stage: stageFilter || undefined,
-            clientId: clientFilter || undefined,
-            limit: 100,
-          },
-        }),
+      const [clientRes, etRes, examsRes] = await Promise.allSettled([
         apiClient.get(ENDPOINTS.ADMIN.CLIENTS, { params: { limit: 100 } }),
         apiClient.get(ENDPOINTS.ADMIN.EXAM_TYPES, { params: { limit: 100 } }),
         apiClient.get(ENDPOINTS.ADMIN.EXAMS, { params: { limit: 100 } }),
       ]);
 
-      if (projRes.status === 'fulfilled' && projRes.value?.success && Array.isArray(projRes.value.data)) {
-        setProjects(projRes.value.data);
+      if (clientRes.status === 'fulfilled' && clientRes.value?.success && Array.isArray(clientRes.value.data)) {
+        setClients(clientRes.value.data);
+      }
+      if (etRes.status === 'fulfilled' && etRes.value?.success && Array.isArray(etRes.value.data)) {
+        setExamTypes(etRes.value.data);
+      }
+      if (examsRes.status === 'fulfilled' && examsRes.value?.success && Array.isArray(examsRes.value.data)) {
+        setExams(examsRes.value.data);
+      }
+    } catch (err) {
+      console.warn('Failed to load reference metadata:', err);
+    }
+  }, []);
+
+  const loadProjects = useCallback(async () => {
+    setLoading(true);
+    setError(null);
+    try {
+      const projRes = await apiClient.get(ENDPOINTS.ADMIN.PROJECTS, {
+        params: {
+          search: debouncedSearch || undefined,
+          stage: stageFilter || undefined,
+          clientId: clientFilter || undefined,
+          limit: 100,
+        },
+      });
+
+      if (projRes?.success && Array.isArray(projRes.data)) {
+        setProjects(projRes.data);
       } else {
         setProjects([]);
       }
-
-      if (clientRes.status === 'fulfilled' && clientRes.value?.success && Array.isArray(clientRes.value.data)) {
-        setClients(clientRes.value.data);
-      } else {
-        setClients([]);
-      }
-
-      if (etRes.status === 'fulfilled' && etRes.value?.success && Array.isArray(etRes.value.data)) {
-        setExamTypes(etRes.value.data);
-      } else {
-        setExamTypes([]);
-      }
-
-      if (examsRes.status === 'fulfilled' && examsRes.value?.success && Array.isArray(examsRes.value.data)) {
-        setExams(examsRes.value.data);
-      } else {
-        setExams([]);
-      }
     } catch (err) {
-      console.error('Failed to load project hierarchy records:', err);
-      setError(err.message || 'Unable to retrieve project hierarchy database');
+      console.error('Failed to load project records:', err);
+      setError(err.message || 'Unable to retrieve project database');
     } finally {
       setLoading(false);
     }
-  }, [search, stageFilter, clientFilter]);
+  }, [debouncedSearch, stageFilter, clientFilter]);
 
+  const loadData = useCallback(async () => {
+    await Promise.all([loadProjects(), loadReferenceData()]);
+  }, [loadProjects, loadReferenceData]);
+
+  // Load static reference datasets on mount
   useEffect(() => {
-    loadData();
-  }, [loadData]);
+    loadReferenceData();
+  }, [loadReferenceData]);
+
+  // Trigger search & filtered queries with debouncing
+  useEffect(() => {
+    loadProjects();
+  }, [loadProjects]);
 
   // Load Exam Dates & Shifts for selected exam instance
   const loadExamDatesAndShifts = async (examId) => {

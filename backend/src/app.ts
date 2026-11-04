@@ -43,6 +43,18 @@ export function createApp(): Express {
     app.use(morgan('dev'));
   }
 
+  // Response Time & Performance Instrumentation (Sanitized - no credentials logged)
+  app.use((req: Request, res: Response, next) => {
+    const start = performance.now();
+    res.on('finish', () => {
+      const duration = Math.round(performance.now() - start);
+      if (duration > 800 && env.NODE_ENV !== 'test') {
+        console.warn(`[PERF] Slow request: ${req.method} ${req.originalUrl} (${duration}ms) [${res.statusCode}]`);
+      }
+    });
+    next();
+  });
+
   // Rate Limiting
   app.use(apiRateLimiter);
 

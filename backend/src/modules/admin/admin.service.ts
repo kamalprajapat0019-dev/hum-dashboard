@@ -143,29 +143,35 @@ export class AdminService {
       ...(hasFilter ? { centre: centreWhere } : {}),
     };
 
+    // High-performance consolidated aggregation: replaces 14 slow subquery counts with 7 parallel grouped queries
     const [
-      totalCentres,
-      activeCentres,
-      pendingApprovalCentres,
-      totalProjects,
-      activeProjects,
-      completedProjects,
-      onHoldProjects,
+      centreStatuses,
+      projectStatuses,
+      projectStages,
       projectAggregate,
-      totalUsers,
-      activeUsers,
+      userStatuses,
       openBlacklists,
       recentAuditLogs,
-      projectStages,
-      centreStatuses,
     ] = await Promise.all([
-      prisma.centre.count({ where: centreWhere }),
-      prisma.centre.count({ where: { ...centreWhere, centreStatus: { in: ['Approved', 'Active'] } } }),
-      prisma.centre.count({ where: { ...centreWhere, centreStatus: 'Draft' } }),
-      prisma.project.count({ where: projectWhere }),
-      prisma.project.count({ where: { ...projectWhere, status: 'Active' } }),
-      prisma.project.count({ where: { ...projectWhere, status: 'Completed' } }),
-      prisma.project.count({ where: { ...projectWhere, status: 'OnHold' } }),
+      // 1. Group centres by status once (derives total, active, draft without 3 extra full counts)
+      prisma.centre.groupBy({
+        by: ['centreStatus'],
+        where: centreWhere,
+        _count: { _all: true },
+      }),
+      // 2. Group projects by status once (derives total, active, completed, on-hold without 4 extra counts)
+      prisma.project.groupBy({
+        by: ['status'],
+        where: projectWhere,
+        _count: { _all: true },
+      }),
+      // 3. Project stages breakdown for stage pipeline chart
+      prisma.project.groupBy({
+        by: ['stage'],
+        where: projectWhere,
+        _count: { stage: true },
+      }),
+      // 4. Candidate & centre targets sum
       prisma.project.aggregate({
         where: projectWhere,
         _sum: {
@@ -173,25 +179,65 @@ export class AdminService {
           centreTarget: true,
         },
       }),
-      prisma.user.count(),
-      prisma.user.count({ where: { status: 'Active' } }),
+      // 5. User statuses breakdown
+      prisma.user.groupBy({
+        by: ['status'],
+        _count: { _all: true },
+      }),
+      // 6. Active blacklist records
       prisma.blacklistRecord.count({ where: blacklistWhere }),
+      // 7. Recent audit trail with lean field selection
       prisma.auditLog.findMany({
         take: 10,
         orderBy: { createdAt: 'desc' },
-        include: { user: { select: { name: true, role: true } } },
-      }),
-      prisma.project.groupBy({
-        by: ['stage'],
-        where: projectWhere,
-        _count: { stage: true },
-      }),
-      prisma.centre.groupBy({
-        by: ['centreStatus'],
-        where: centreWhere,
-        _count: { centreStatus: true },
+        select: {
+          id: true,
+          action: true,
+          entity: true,
+          entityId: true,
+          details: true,
+          userEmail: true,
+          createdAt: true,
+          user: { select: { name: true, role: true } },
+        },
       }),
     ]);
+
+    // Derive centre counts from single groupBy
+    let totalCentres = 0;
+    let activeCentres = 0;
+    let pendingApprovalCentres = 0;
+    for (const cs of centreStatuses) {
+      const count = cs._count._all || 0;
+      totalCentres += count;
+      if (cs.centreStatus === 'Approved' || cs.centreStatus === 'Active') {
+        activeCentres += count;
+      } else if (cs.centreStatus === 'Draft') {
+        pendingApprovalCentres += count;
+      }
+    }
+
+    // Derive project counts from single groupBy
+    let totalProjects = 0;
+    let activeProjects = 0;
+    let completedProjects = 0;
+    let onHoldProjects = 0;
+    for (const ps of projectStatuses) {
+      const count = ps._count._all || 0;
+      totalProjects += count;
+      if (ps.status === 'Active') activeProjects += count;
+      else if (ps.status === 'Completed') completedProjects += count;
+      else if (ps.status === 'OnHold') onHoldProjects += count;
+    }
+
+    // Derive user counts from single groupBy
+    let totalUsers = 0;
+    let activeUsers = 0;
+    for (const us of userStatuses) {
+      const count = us._count._all || 0;
+      totalUsers += count;
+      if (us.status === 'Active') activeUsers += count;
+    }
 
     const projectStatusData = projectStages.map((ps: any) => ({
       name: ps.stage,
@@ -210,7 +256,7 @@ export class AdminService {
 
     const centreStatusData = centreStatuses.map((cs: any) => ({
       name: cs.centreStatus,
-      value: cs._count.centreStatus,
+      value: cs._count._all,
       color:
         cs.centreStatus === 'Approved'
           ? '#16a34a'
@@ -788,9 +834,26 @@ export class AdminService {
     const examDates = await prisma.projectExamDate.findMany({
       where,
       orderBy: [{ examDate: 'asc' }, { shift: 'asc' }],
-      include: {
+      select: {
+        id: true,
+        projectId: true,
+        examDate: true,
+        shift: true,
+        startTime: true,
+        endTime: true,
         project: {
-          include: {
+          select: {
+            id: true,
+            clientId: true,
+            projectCode: true,
+            name: true,
+            examType: true,
+            stage: true,
+            status: true,
+            candidateTarget: true,
+            centreTarget: true,
+            citiesCount: true,
+            slaHealth: true,
             client: { select: { id: true, name: true, fullName: true } },
           },
         },

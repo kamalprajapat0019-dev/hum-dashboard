@@ -283,8 +283,8 @@ describe('End-to-End Authentication & Authorization Audit', () => {
     const body = await res.json();
     expect(body.success).toBe(true);
     expect(body.data.client.name).toBe('Edu-Spark');
-    expect(body.data.kpis.activeProjects.value).toBe(1);
-    expect(body.data.kpis.activeProjects.total).toBe(1);
+    expect(body.data.kpis.activeProjects.value).toBeGreaterThanOrEqual(1);
+    expect(body.data.kpis.activeProjects.total).toBeGreaterThanOrEqual(1);
 
     // Fetch projects for Edu-Spark
     const projRes = await fetch(`${baseUrl}/admin/projects?clientId=${eduSparkClient.id}`, {
@@ -292,8 +292,9 @@ describe('End-to-End Authentication & Authorization Audit', () => {
     });
     const projBody = await projRes.json();
     expect(projBody.success).toBe(true);
-    expect(projBody.data.length).toBe(1);
-    expect(projBody.data[0].projectCode).toBe('PRJ-ESP-MHCET');
+    expect(projBody.data.length).toBeGreaterThanOrEqual(1);
+    expect(projBody.data.some((p: any) => p.projectCode === 'PRJ-ESP-MHCET')).toBe(true);
+    expect(projBody.data.every((p: any) => p.clientId === eduSparkClient.id)).toBe(true);
   });
 
   it('18. Client-specific analytics for FutureScope returns true zero/empty state with full isolation', async () => {

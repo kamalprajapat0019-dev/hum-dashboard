@@ -44,12 +44,18 @@ const envSchema = z
         ? data.DATABASE_URL
         : `mysql://${safeUser}:${safePass}@${data.DB_HOST}:${data.DB_PORT}/${data.DB_NAME}`;
 
+    // Ensure production-safe serverless connection pool parameters
+    let optimizedUrl = databaseUrl;
+    if (!optimizedUrl.includes('connection_limit=')) {
+      optimizedUrl += (optimizedUrl.includes('?') ? '&' : '?') + 'connection_limit=10&connect_timeout=15&pool_timeout=15';
+    }
+
     // Ensure DATABASE_URL is in process.env for Prisma
-    process.env.DATABASE_URL = databaseUrl;
+    process.env.DATABASE_URL = optimizedUrl;
 
     return {
       ...data,
-      DATABASE_URL: databaseUrl,
+      DATABASE_URL: optimizedUrl,
     };
   });
 

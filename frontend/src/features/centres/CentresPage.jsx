@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import {
   Building2, Plus, Search, Filter, Edit, Trash2, Eye, MapPin,
   Mail, Phone, ShieldCheck, UserCheck, CheckCircle2, AlertTriangle,
@@ -72,6 +72,19 @@ export default function CentresPage() {
   };
   const [contactForm, setContactForm] = useState(initialContact);
 
+  const [debouncedSearch, setDebouncedSearch] = useState(search);
+  const searchTimerRef = useRef(null);
+
+  useEffect(() => {
+    if (searchTimerRef.current) clearTimeout(searchTimerRef.current);
+    searchTimerRef.current = setTimeout(() => {
+      setDebouncedSearch(search);
+    }, 300);
+    return () => {
+      if (searchTimerRef.current) clearTimeout(searchTimerRef.current);
+    };
+  }, [search]);
+
   const showToast = (message, type = 'success') => {
     setToast({ message, type });
     setTimeout(() => setToast(null), 3500);
@@ -83,7 +96,7 @@ export default function CentresPage() {
     try {
       const res = await apiClient.get(ENDPOINTS.ADMIN.CENTRES, {
         params: {
-          search: search || undefined,
+          search: debouncedSearch || undefined,
           status: statusFilter || undefined,
           regionId: regionFilter || undefined,
           limit: 100,
@@ -100,7 +113,7 @@ export default function CentresPage() {
     } finally {
       setLoading(false);
     }
-  }, [search, statusFilter, regionFilter]);
+  }, [debouncedSearch, statusFilter, regionFilter]);
 
   useEffect(() => {
     loadCentres();

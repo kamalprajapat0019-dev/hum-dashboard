@@ -163,7 +163,6 @@ export default function LoginPage() {
     if (!email.trim()) { setError('Please enter your username or email.'); return; }
     if (!password)     { setError('Please enter your password.'); return; }
     setLoading(true);
-    await new Promise(r => setTimeout(r, 400));
     const result = await login(email.trim(), password);
     setLoading(false);
     if (!result.success) {

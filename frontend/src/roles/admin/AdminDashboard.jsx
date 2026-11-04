@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback, useRef } from 'react';
+import { useState, useEffect, useCallback, useRef, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
 import {
   PieChart, Pie, Cell, Tooltip,
@@ -175,17 +175,37 @@ export default function AdminDashboard() {
   const [liveData, setLiveData] = useState(null);
   const [projectsList, setProjectsList] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [isRefreshing, setIsRefreshing] = useState(false);
   const [error, setError] = useState(null);
   const activeRequestRef = useRef(0);
+  const abortControllerRef = useRef(null);
 
-  const fetchDashboardData = useCallback(async () => {
+  // Cleanup pending network requests on unmount
+  useEffect(() => {
+    return () => {
+      if (abortControllerRef.current) {
+        abortControllerRef.current.abort();
+      }
+    };
+  }, []);
+
+  const fetchDashboardData = useCallback(async (bypassCache = false) => {
     if (!selectedClientId) return;
 
+    // Abort previous in-flight requests when switching clients or filters
+    if (abortControllerRef.current) {
+      abortControllerRef.current.abort();
+    }
+    const controller = new AbortController();
+    abortControllerRef.current = controller;
+
     const requestId = ++activeRequestRef.current;
-    setLoading(true);
+    if (!liveData) {
+      setLoading(true);
+    } else {
+      setIsRefreshing(true);
+    }
     setError(null);
-    setLiveData(null); // Prevent stale client data from lingering during fetch
-    setProjectsList([]);
 
     const analyticsParams = { clientId: selectedClientId };
     if (selectedProjectId) analyticsParams.projectId = selectedProjectId;
@@ -198,21 +218,28 @@ export default function AdminDashboard() {
 
     try {
       const [analyticsRes, projectsRes] = await Promise.allSettled([
-        apiClient.get(ENDPOINTS.ADMIN.ANALYTICS, { params: analyticsParams }),
-        apiClient.get(ENDPOINTS.ADMIN.PROJECTS, { params: projectsParams }),
+        apiClient.get(ENDPOINTS.ADMIN.ANALYTICS, {
+          params: analyticsParams,
+          signal: controller.signal,
+          bypassCache,
+        }),
+        apiClient.get(ENDPOINTS.ADMIN.PROJECTS, {
+          params: projectsParams,
+          signal: controller.signal,
+          bypassCache,
+        }),
       ]);
 
-      // If another request was dispatched in the meantime, discard stale responses
-      if (requestId !== activeRequestRef.current) return;
+      // If another request was dispatched in the meantime or aborted, discard stale responses
+      if (requestId !== activeRequestRef.current || controller.signal.aborted) return;
 
       if (analyticsRes.status === 'fulfilled' && analyticsRes.value?.success) {
         setLiveData(analyticsRes.value.data);
+      } else if (analyticsRes.status === 'rejected') {
+        if (analyticsRes.reason?.name === 'AbortError' || controller.signal.aborted) return;
+        throw analyticsRes.reason;
       } else {
-        const errorObj =
-          analyticsRes.status === 'rejected'
-            ? analyticsRes.reason
-            : new Error(analyticsRes.value?.message || 'Failed to fetch executive analytics');
-        throw errorObj;
+        throw new Error(analyticsRes.value?.message || 'Failed to fetch executive analytics');
       }
 
       if (projectsRes.status === 'fulfilled' && projectsRes.value?.success && Array.isArray(projectsRes.value.data)) {
@@ -221,53 +248,31 @@ export default function AdminDashboard() {
         setProjectsList([]);
       }
     } catch (err) {
-      if (requestId !== activeRequestRef.current) return;
-      console.error('Failed to load live dashboard data for client:', err);
-      setLiveData(null);
-      setProjectsList([]);
-
-      const isRouting = Boolean(err?.isRoutingError || err?.isHtmlResponse);
-      const isAuth = Boolean(err?.status === 401 || err?.isAuthError);
-      const isNetwork = Boolean(err?.isNetworkError);
-      const isNotFound = Boolean(err?.status === 404 || err?.isNotFound);
-
-      let errorTitle = 'Backend API Error:';
-      let errorMsg = err?.message || 'Unable to connect to backend API server';
-
-      if (isRouting) {
-        errorTitle = 'API Configuration / Routing Error:';
-        errorMsg =
-          'Received HTML instead of JSON. The frontend is requesting the static frontend host instead of the backend API. Please configure VITE_API_BASE_URL in your Vercel Project Settings to point to your backend.';
-      } else if (isAuth) {
-        errorTitle = 'Authentication Error:';
-        errorMsg = 'Session expired or invalid credentials. Please log in again.';
-      } else if (isNetwork) {
-        errorTitle = 'Network Connection Error:';
-        errorMsg = 'Unable to reach backend server. Please verify backend status and network connection.';
-      } else if (isNotFound) {
-        errorTitle = 'API Endpoint Not Found (404):';
+      if (requestId !== activeRequestRef.current || controller.signal.aborted || err?.name === 'AbortError') {
+        return;
       }
-
+      console.error('Failed to load live dashboard data for client:', err);
       setError({
-        title: errorTitle,
-        message: errorMsg,
-        isRouting,
-        isAuth,
-        isNetwork,
+        title: err?.isRoutingError ? 'API Configuration Error:' : 'Backend API Error:',
+        message: err?.message || 'Unable to connect to backend API server',
+        isRouting: Boolean(err?.isRoutingError || err?.isHtmlResponse),
+        isAuth: Boolean(err?.status === 401 || err?.isAuthError),
+        isNetwork: Boolean(err?.isNetworkError),
         status: err?.status,
       });
     } finally {
       if (requestId === activeRequestRef.current) {
         setLoading(false);
+        setIsRefreshing(false);
       }
     }
-  }, [selectedClientId, selectedProjectId, selectedExamTypeId, selectedExamId]);
+  }, [selectedClientId, selectedProjectId, selectedExamTypeId, selectedExamId, liveData]);
 
   useEffect(() => {
     if (selectedClientId) {
-      fetchDashboardData();
+      fetchDashboardData(false);
     }
-  }, [selectedClientId, selectedProjectId, selectedExamTypeId, selectedExamId, fetchDashboardData]);
+  }, [selectedClientId, selectedProjectId, selectedExamTypeId, selectedExamId]);
 
   // Aggregate values directly from MySQL response - ZERO fake fallbacks
   const totalCentresCount = liveData?.kpis?.totalCentres?.value ?? 0;
@@ -280,10 +285,21 @@ export default function AdminDashboard() {
   const openExceptionsCount = liveData?.kpis?.openExceptions?.value ?? 0;
   const pendingApprovalsCount = liveData?.kpis?.pendingApprovals?.value ?? 0;
 
-  const projectChartData = Array.isArray(liveData?.charts?.projectStatusData) ? liveData.charts.projectStatusData : [];
-  const centreChartData = Array.isArray(liveData?.charts?.centreStatusData) ? liveData.charts.centreStatusData : [];
-  const recentActivityData = Array.isArray(liveData?.recentActivity) ? liveData.recentActivity : [];
-  const safeProjectsList = Array.isArray(projectsList) ? projectsList : [];
+  const projectChartData = useMemo(() => {
+    return Array.isArray(liveData?.charts?.projectStatusData) ? liveData.charts.projectStatusData : [];
+  }, [liveData?.charts?.projectStatusData]);
+
+  const centreChartData = useMemo(() => {
+    return Array.isArray(liveData?.charts?.centreStatusData) ? liveData.charts.centreStatusData : [];
+  }, [liveData?.charts?.centreStatusData]);
+
+  const recentActivityData = useMemo(() => {
+    return Array.isArray(liveData?.recentActivity) ? liveData.recentActivity : [];
+  }, [liveData?.recentActivity]);
+
+  const safeProjectsList = useMemo(() => {
+    return Array.isArray(projectsList) ? projectsList : [];
+  }, [projectsList]);
 
   const slaColors = {
     OnTrack: 'var(--color-success, #16a34a)',
@@ -330,11 +346,11 @@ export default function AdminDashboard() {
             {/* 2. Refresh Button */}
             <button
               className="btn btn-secondary btn-sm"
-              onClick={fetchDashboardData}
-              disabled={loading}
+              onClick={() => fetchDashboardData(true)}
+              disabled={loading || isRefreshing}
               title={`Refresh Data for ${selectedClient?.name || 'Selected Client'}`}
             >
-              <RefreshCw size={13} className={loading ? 'animate-spin' : ''} />
+              <RefreshCw size={13} className={loading || isRefreshing ? 'animate-spin' : ''} />
             </button>
 
             {/* 3. Last Updated Timestamp */}

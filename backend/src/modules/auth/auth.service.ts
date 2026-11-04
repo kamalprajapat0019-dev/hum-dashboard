@@ -7,6 +7,17 @@ export class AuthService {
   static async login(input: LoginInput, ipAddress?: string) {
     const user = await prisma.user.findUnique({
       where: { email: input.email.toLowerCase().trim() },
+      select: {
+        id: true,
+        email: true,
+        passwordHash: true,
+        name: true,
+        role: true,
+        avatar: true,
+        status: true,
+        scope: true,
+        lastLogin: true,
+      },
     });
 
     if (!user) {
@@ -26,24 +37,25 @@ export class AuthService {
       return { success: false, code: 'INVALID_CREDENTIALS', message: 'Invalid email or password' };
     }
 
-    // Update lastLogin timestamp
-    await prisma.user.update({
-      where: { id: user.id },
-      data: { lastLogin: new Date() },
-    });
-
-    // Record login in audit log
-    await prisma.auditLog.create({
-      data: {
-        userId: user.id,
-        userEmail: user.email,
-        action: 'USER_LOGIN',
-        entity: 'User',
-        entityId: user.id,
-        details: { role: user.role, userAgent: 'Browser' },
-        ipAddress,
-      },
-    });
+    // Execute lastLogin timestamp update and audit log recording in parallel
+    const now = new Date();
+    await Promise.all([
+      prisma.user.update({
+        where: { id: user.id },
+        data: { lastLogin: now },
+      }),
+      prisma.auditLog.create({
+        data: {
+          userId: user.id,
+          userEmail: user.email,
+          action: 'USER_LOGIN',
+          entity: 'User',
+          entityId: user.id,
+          details: { role: user.role, userAgent: 'Browser' },
+          ipAddress,
+        },
+      }),
+    ]);
 
     const token = generateToken({
       userId: user.id,
