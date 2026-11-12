@@ -422,6 +422,9 @@ export class CentreService {
       });
 
       return savedCentre;
+    }, {
+      timeout: 25000,
+      maxWait: 10000,
     });
   }
 
@@ -513,6 +516,9 @@ export class CentreService {
       });
 
       return savedDoc;
+    }, {
+      timeout: 25000,
+      maxWait: 10000,
     });
 
     return doc;
@@ -732,6 +738,9 @@ export class CentreService {
         message: 'Your Centre Registration application has been submitted successfully for verification.',
         centre: updatedCentre,
       };
+    }, {
+      timeout: 25000,
+      maxWait: 10000,
     });
   }
 

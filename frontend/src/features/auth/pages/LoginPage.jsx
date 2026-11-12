@@ -11,15 +11,30 @@ import {
   ChartNoAxesColumnIncreasing, Crown, BriefcaseBusiness, Settings2,
 } from 'lucide-react';
 import { useAuth, DEMO_USERS } from '@/context/AuthContext';
+import { normalizeRole, DEFAULT_ROLE_ROUTES } from '@/constants/roles';
 
 /* ── Role root map ────────────────────────────────────────────────── */
 const ROLE_ROOTS = {
   admin:                '/admin',
+  ADMIN:                '/admin',
   project_manager:      '/pm',
+  pm:                   '/pm',
+  PM:                   '/pm',
   auditor_it:           '/auditor',
+  auditor:              '/auditor',
+  AUDITOR:              '/auditor',
   operations_executive: '/ops',
+  operations:           '/ops',
+  ops:                  '/ops',
+  OPERATIONS:           '/ops',
   accounts_finance:     '/finance',
+  finance:              '/finance',
+  FINANCE:              '/finance',
   centre_user:          '/centre',
+  centre:               '/centre',
+  CENTRE:               '/centre',
+  center:               '/centre',
+  CENTER:               '/centre',
 };
 
 /* ── Static data ──────────────────────────────────────────────────── */
@@ -169,8 +184,9 @@ export default function LoginPage() {
       setError(result.error || 'Invalid credentials');
       return;
     }
-    const roleKey = result.user?.role || 'admin';
-    navigate(ROLE_ROOTS[roleKey] || '/admin', { replace: true });
+    const roleKey = normalizeRole(result.user?.role);
+    const destination = DEFAULT_ROLE_ROUTES[roleKey] || ROLE_ROOTS[roleKey] || ROLE_ROOTS[result.user?.role] || '/admin';
+    navigate(destination, { replace: true });
   }
 
   return (

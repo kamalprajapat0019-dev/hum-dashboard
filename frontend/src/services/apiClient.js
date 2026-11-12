@@ -211,7 +211,19 @@ class ApiClient {
         clearTimeout(timer);
 
         if (err.name === 'AbortError') {
-          const timeoutErr = new Error(`Request timeout or aborted after ${this.timeout}ms for endpoint: ${endpoint}`);
+          // If the caller explicitly aborted via options.signal, preserve AbortError so caller can silently ignore it
+          if (options.signal?.aborted) {
+            const abortErr = new Error('Request was aborted by caller');
+            abortErr.name = 'AbortError';
+            abortErr.status = 0;
+            abortErr.isAborted = true;
+            abortErr.endpoint = endpoint;
+            abortErr.url = url;
+            throw abortErr;
+          }
+
+          const timeoutErr = new Error(`Request timeout after ${this.timeout}ms for endpoint: ${endpoint}`);
+          timeoutErr.name = 'TimeoutError';
           timeoutErr.status = 408;
           timeoutErr.isTimeout = true;
           timeoutErr.endpoint = endpoint;

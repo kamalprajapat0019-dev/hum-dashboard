@@ -26,26 +26,15 @@ export default function CentreDashboard() {
       if (res && res.success && res.data) {
         setCentreProfile(res.data);
       } else {
-        // Fallback: check /centres
-        const fallback = await apiClient.get(ENDPOINTS.ADMIN.CENTRES, { params: { limit: 1 } });
-        if (fallback && fallback.success && Array.isArray(fallback.data) && fallback.data.length > 0) {
-          setCentreProfile(fallback.data[0]);
-        } else {
-          setCentreProfile(null);
-        }
+        setCentreProfile(null);
       }
     } catch (err) {
-      console.warn('Failed to query centre profile:', err);
-      // Fallback
-      try {
-        const fallback = await apiClient.get(ENDPOINTS.ADMIN.CENTRES, { params: { limit: 1 } });
-        if (fallback && fallback.success && Array.isArray(fallback.data) && fallback.data.length > 0) {
-          setCentreProfile(fallback.data[0]);
-        } else {
-          setCentreProfile(null);
-        }
-      } catch (e) {
-        setError(err.message || 'Unable to retrieve centre record');
+      if (err?.status === 404) {
+        setCentreProfile(null);
+      } else {
+        console.warn('Centre profile fetch notice:', err?.message || err);
+        setCentreProfile(null);
+        setError(err?.message || 'Unable to retrieve centre record');
       }
     } finally {
       setLoading(false);

@@ -325,10 +325,17 @@ describe('End-to-End Authentication & Authorization Audit', () => {
     const body = await res.json();
     expect(body.success).toBe(true);
     expect(body.data.client.name).toBe('FutureScope');
-    expect(body.data.kpis.activeProjects.value).toBe(0);
-    expect(body.data.kpis.activeProjects.total).toBe(0);
+    const futureScopeActiveCount = await prisma.project.count({
+      where: { clientId: futureScopeClient.id, status: 'Active' },
+    });
+    expect(body.data.kpis.activeProjects.value).toBe(futureScopeActiveCount);
+    expect(body.data.kpis.activeProjects.total).toBe(futureScopeActiveCount);
     expect(body.data.kpis.totalCentres.value).toBe(0);
-    expect(body.data.kpis.candidates.total).toBe(0);
+    const candidateSum = await prisma.project.aggregate({
+      where: { clientId: futureScopeClient.id },
+      _sum: { candidateTarget: true },
+    });
+    expect(body.data.kpis.candidates.total).toBe(candidateSum._sum.candidateTarget || 0);
   });
 
   it('19. GET /admin/analytics with invalid/non-existent clientId returns 404 CLIENT_NOT_FOUND', async () => {

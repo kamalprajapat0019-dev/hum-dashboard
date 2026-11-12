@@ -2,6 +2,8 @@ import { createContext, useContext, useState, useEffect, useCallback, useMemo } 
 import { apiClient } from '../services/apiClient';
 import { ENDPOINTS } from '../services/endpoints';
 import { storage } from '../utils/storage';
+import { useAuth } from './AuthContext';
+import { ROLES, normalizeRole } from '../constants/roles';
 
 const ClientContext = createContext(null);
 
@@ -34,6 +36,13 @@ export const VERIFIED_ENTERPRISE_CLIENTS = [
 export const ALLOWED_CLIENT_NAMES = ['Eduquity', 'Edu-Spark'];
 
 export function ClientProvider({ children }) {
+  const auth = useAuth();
+  const user = auth?.user;
+  const userRole = user?.role ? normalizeRole(user.role) : null;
+  const isAuthorizedToFetchClients = Boolean(
+    user && (userRole === ROLES.ADMIN || userRole === ROLES.OPERATIONS)
+  );
+
   // Pre-seed with verified MySQL enterprise client records so dropdown is never blank
   const [clients, setClients] = useState(VERIFIED_ENTERPRISE_CLIENTS);
   const [selectedClientId, setSelectedClientIdState] = useState(() => {
@@ -47,6 +56,11 @@ export function ClientProvider({ children }) {
   const [clientError, setClientError] = useState(null);
 
   const fetchClients = useCallback(async () => {
+    if (!isAuthorizedToFetchClients) {
+      setLoadingClients(false);
+      setClientError(null);
+      return;
+    }
     setLoadingClients(true);
     setClientError(null);
     try {
@@ -96,11 +110,16 @@ export function ClientProvider({ children }) {
     } finally {
       setLoadingClients(false);
     }
-  }, []);
+  }, [isAuthorizedToFetchClients]);
 
   useEffect(() => {
-    fetchClients();
-  }, [fetchClients]);
+    if (isAuthorizedToFetchClients) {
+      fetchClients();
+    } else {
+      setLoadingClients(false);
+      setClientError(null);
+    }
+  }, [isAuthorizedToFetchClients, fetchClients]);
 
   const setSelectedClientId = useCallback((clientId) => {
     setSelectedClientIdState(clientId);

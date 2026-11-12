@@ -248,7 +248,7 @@ export default function AdminDashboard() {
         setProjectsList([]);
       }
     } catch (err) {
-      if (requestId !== activeRequestRef.current || controller.signal.aborted || err?.name === 'AbortError') {
+      if (requestId !== activeRequestRef.current || controller.signal.aborted || err?.name === 'AbortError' || err?.isAborted) {
         return;
       }
       console.error('Failed to load live dashboard data for client:', err);

@@ -11,7 +11,7 @@ import {
 import { useAuth, ROLES, ROLE_LABELS, ROLE_COLORS } from '../../context/AuthContext';
 
 import { ROLE_NAVIGATION as MENUS } from '../../roles/navigation';
-import { DEFAULT_ROLE_ROUTES as DASHBOARD_ROOTS } from '../../constants/roles';
+import { DEFAULT_ROLE_ROUTES as DASHBOARD_ROOTS, normalizeRole } from '../../constants/roles';
 
 export default function Sidebar({ mobileOpen, onMobileClose }) {
   const [collapsed, setCollapsed] = useState(false);
@@ -43,8 +43,11 @@ export default function Sidebar({ mobileOpen, onMobileClose }) {
 
   if (!user) return null;
 
-  const menuItems = MENUS[user.role] || [];
-  const roleColor = ROLE_COLORS[user.role] || '#1e40af';
+  const normalizedRole = normalizeRole(user.role);
+  const menuItems = MENUS[normalizedRole] || MENUS[user.role] || [];
+  const roleColor = ROLE_COLORS[normalizedRole] || ROLE_COLORS[user.role] || '#1e40af';
+  const roleLabel = RL[normalizedRole] || RL[user.role] || 'User';
+  const dashboardRoot = DASHBOARD_ROOTS[normalizedRole] || DASHBOARD_ROOTS[user.role] || '/';
 
   return (
     <>
@@ -98,7 +101,7 @@ export default function Sidebar({ mobileOpen, onMobileClose }) {
         {!collapsed && (
           <div className="sidebar__role-badge">
             <span className="sidebar__role-dot" style={{ background: roleColor }} />
-            <span className="sidebar__role-label">{RL[user.role]}</span>
+            <span className="sidebar__role-label">{roleLabel}</span>
           </div>
         )}
 
@@ -108,7 +111,7 @@ export default function Sidebar({ mobileOpen, onMobileClose }) {
             {menuItems.map((item) => {
               const Icon = item.icon;
               const isActive = location.pathname === item.path ||
-                (item.path !== DASHBOARD_ROOTS[user.role] && location.pathname.startsWith(item.path));
+                (item.path !== dashboardRoot && location.pathname.startsWith(item.path));
               return (
                 <li key={item.path}>
                   <NavLink

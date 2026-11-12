@@ -1,6 +1,6 @@
 import { Routes, Route, Navigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
-import { ROLES, DEFAULT_ROLE_ROUTES } from '../constants/roles';
+import { ROLES, DEFAULT_ROLE_ROUTES, normalizeRole } from '../constants/roles';
 import { ROUTES } from '../constants/routes';
 import { DashboardLayout } from '../layouts/DashboardLayout';
 import { AuthLayout } from '../layouts/AuthLayout';
@@ -48,7 +48,9 @@ import NotificationCenterPage from '../features/notifications/NotificationCenter
 export function ProtectedRoute({ children, allowedRoles }) {
   const { user } = useAuth();
   if (!user) return <Navigate to={ROUTES.LOGIN} replace />;
-  if (allowedRoles && !allowedRoles.includes(user.role)) {
+  const userRole = normalizeRole(user.role);
+  const normalizedAllowed = (allowedRoles || []).map(normalizeRole);
+  if (allowedRoles && !normalizedAllowed.includes(userRole) && !allowedRoles.includes(user.role)) {
     return <Navigate to={ROUTES.UNAUTHORIZED} replace />;
   }
   return children;
@@ -60,7 +62,8 @@ export function ProtectedRoute({ children, allowedRoles }) {
 export function RoleRedirect() {
   const { user } = useAuth();
   if (!user) return <Navigate to={ROUTES.LOGIN} replace />;
-  return <Navigate to={DEFAULT_ROLE_ROUTES[user.role] || ROUTES.LOGIN} replace />;
+  const userRole = normalizeRole(user.role);
+  return <Navigate to={DEFAULT_ROLE_ROUTES[userRole] || DEFAULT_ROLE_ROUTES[user.role] || ROUTES.LOGIN} replace />;
 }
 
 /**

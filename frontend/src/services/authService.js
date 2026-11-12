@@ -1,4 +1,4 @@
-import { ROLES } from '../constants/roles';
+import { ROLES, normalizeRole } from '../constants/roles';
 import { storage } from '../utils/storage';
 import { appConfig } from '../config/appConfig';
 import { apiClient } from './apiClient';
@@ -81,9 +81,9 @@ export const authService = {
 
       if (response && response.success && response.data) {
         const { token, user } = response.data;
-        // Normalize role to lowercase matching frontend ROLES enum
-        const normalizedRole = (user.role || '').toLowerCase();
-        const clientUser = { ...user, role: normalizedRole };
+        // Normalize role to canonical frontend ROLES enum
+        const canonicalRole = normalizeRole(user.role);
+        const clientUser = { ...user, role: canonicalRole };
 
         storage.set(appConfig.auth.userStorageKey, clientUser, 'session');
         storage.set(appConfig.auth.tokenStorageKey, token, 'session');
@@ -128,7 +128,11 @@ export const authService = {
   },
 
   getCurrentUser() {
-    return storage.get(appConfig.auth.userStorageKey, 'session');
+    const u = storage.get(appConfig.auth.userStorageKey, 'session');
+    if (u && u.role) {
+      return { ...u, role: normalizeRole(u.role) };
+    }
+    return u;
   },
 };
 

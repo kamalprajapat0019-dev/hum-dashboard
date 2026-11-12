@@ -185,6 +185,15 @@ describe('OEMP Centre Master & Centre Registration Workflow Audit', () => {
     expect(body.data.id).toBe(testCentreId);
     expect(body.data.centreName).toBe('Apex Institute of Computer Technology');
     expect(body.data.bankAccount.accountNumber).toBe('XXXX XXXX 7665');
+
+    // Also verify /centre/me alias endpoint
+    const resMe = await fetch(`${baseUrl}/centre/me`, {
+      headers: { Authorization: `Bearer ${centreToken}` },
+    });
+    expect(resMe.status).toBe(200);
+    const bodyMe = await resMe.json();
+    expect(bodyMe.success).toBe(true);
+    expect(bodyMe.data.id).toBe(testCentreId);
   });
 
   it('3. Centre User: Can upload required documents with validation', async () => {

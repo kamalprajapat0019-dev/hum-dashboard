@@ -11,6 +11,7 @@ router.use(authMiddleware);
 router.use(requireRole(Role.CENTRE, Role.ADMIN, Role.OPERATIONS));
 
 router.get('/my-centre', CentreController.getMyCentre);
+router.get('/me', CentreController.getMyCentre);
 router.post('/draft', CentreController.saveDraft);
 router.post('/documents/upload', CentreController.uploadDocument);
 router.post('/submit', CentreController.submitRegistration);

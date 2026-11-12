@@ -132,7 +132,7 @@ export const API_CONFIG = {
   },
   productionBackend: PRODUCTION_BACKEND_URL,
   apiPrefix: API_PREFIX,
-  timeout: Number(import.meta.env.VITE_API_TIMEOUT) || 15000,
+  timeout: Number(import.meta.env.VITE_API_TIMEOUT) || 30000,
 };
 
 export default API_CONFIG;

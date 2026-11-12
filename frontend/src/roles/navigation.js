@@ -13,6 +13,23 @@ export const ROLE_NAVIGATION = {
   [ROLES.OPERATIONS]: opsNav,
   [ROLES.FINANCE]: financeNav,
   [ROLES.CENTRE]: centreNav,
+
+  // Aliases
+  admin: adminNav,
+  ADMIN: adminNav,
+  pm: pmNav,
+  PM: pmNav,
+  auditor: auditorNav,
+  AUDITOR: auditorNav,
+  ops: opsNav,
+  operations: opsNav,
+  OPERATIONS: opsNav,
+  finance: financeNav,
+  FINANCE: financeNav,
+  centre: centreNav,
+  CENTRE: centreNav,
+  center: centreNav,
+  CENTER: centreNav,
 };
 
 export default ROLE_NAVIGATION;
