@@ -375,6 +375,35 @@ export default function UsersPage() {
     showToast('Link copied to clipboard.', 'success');
   };
 
+  // Double-click copy for complete User ID
+  const handleCopyUserId = async (e, fullUserId) => {
+    e.preventDefault();
+    e.stopPropagation();
+    if (!fullUserId) return;
+
+    try {
+      if (navigator.clipboard && window.isSecureContext) {
+        await navigator.clipboard.writeText(fullUserId);
+      } else {
+        const textArea = document.createElement('textarea');
+        textArea.value = fullUserId;
+        textArea.style.position = 'fixed';
+        textArea.style.left = '-999999px';
+        textArea.style.top = '-999999px';
+        document.body.appendChild(textArea);
+        textArea.focus();
+        textArea.select();
+        const successful = document.execCommand('copy');
+        document.body.removeChild(textArea);
+        if (!successful) throw new Error('execCommand failed');
+      }
+      showToast('User ID copied successfully!', 'success');
+    } catch (err) {
+      console.warn('Clipboard copy error:', err);
+      showToast('Unable to copy User ID. Please try again.', 'error');
+    }
+  };
+
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 24 }}>
       {/* ── Toast Alert ── */}
@@ -631,7 +660,7 @@ export default function UsersPage() {
           <table style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'left' }}>
             <thead>
               <tr style={{ background: '#f8fafc', borderBottom: '1px solid #e2e8f0' }}>
-                <th style={{ padding: '12px 16px', fontSize: '0.75rem', fontWeight: 700, color: '#475569', width: 60 }}>
+                <th style={{ padding: '12px 16px', fontSize: '0.75rem', fontWeight: 700, color: '#475569', width: 70, textAlign: 'center' }}>
                   S. No.
                 </th>
                 <th style={{ padding: '12px 16px', fontSize: '0.75rem', fontWeight: 700, color: '#475569', width: 120 }}>
@@ -703,22 +732,30 @@ export default function UsersPage() {
                   </td>
                 </tr>
               ) : (
-                users.map((u) => {
+                users.map((u, idx) => {
                   const roleColor = ROLE_COLORS[u.role] || '#64748b';
                   const roleLabel = ROLE_LABELS[u.role] || u.role;
                   const isActive = u.status === 'Active';
                   const isSelf = currentUser?.id === u.id;
+                  const serialNumber = (page - 1) * limit + idx + 1;
 
                   return (
                     <tr key={u.id} style={{ borderBottom: '1px solid #f1f5f9' }}>
                       {/* S. No. (Continuous) */}
-                      <td style={{ padding: '14px 16px', fontSize: '0.8125rem', fontWeight: 600, color: '#64748b' }}>
-                        {u.serialNumber}
+                      <td style={{ padding: '14px 16px', fontSize: '0.8125rem', fontWeight: 600, color: '#64748b', textAlign: 'center' }}>
+                        {serialNumber}
                       </td>
 
                       {/* User ID */}
                       <td style={{ padding: '14px 16px', fontSize: '0.75rem', fontFamily: 'monospace', color: '#475569' }}>
-                        <span title={u.id}>
+                        <span
+                          title="Double-click to copy"
+                          onDoubleClick={(e) => handleCopyUserId(e, u.id)}
+                          style={{
+                            cursor: 'copy',
+                            userSelect: 'none',
+                          }}
+                        >
                           {u.id.length > 10 ? `${u.id.slice(0, 8)}…` : u.id}
                         </span>
                       </td>
