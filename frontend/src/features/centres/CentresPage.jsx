@@ -250,7 +250,7 @@ export default function CentresPage() {
           }}
         >
           <div style={{ fontSize: '0.8125rem', fontWeight: 600, color: 'var(--text-muted, #64748b)', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
-            Card 1 • Onboarding & Booking
+            ONBOARDING & BOOKING
           </div>
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-end', marginTop: 12 }}>
             <div>
@@ -280,7 +280,7 @@ export default function CentresPage() {
           }}
         >
           <div style={{ fontSize: '0.8125rem', fontWeight: 600, color: 'var(--text-muted, #64748b)', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
-            Card 2 • Demand Pipeline
+            DEMAND PIPELINE
           </div>
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-end', marginTop: 12 }}>
             <div>
@@ -310,7 +310,7 @@ export default function CentresPage() {
           }}
         >
           <div style={{ fontSize: '0.8125rem', fontWeight: 600, color: 'var(--text-muted, #64748b)', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
-            Card 3 • Verification & Audit
+            VERIFICATION & AUDIT
           </div>
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-end', marginTop: 12 }}>
             <div>
@@ -340,7 +340,7 @@ export default function CentresPage() {
           }}
         >
           <div style={{ fontSize: '0.8125rem', fontWeight: 600, color: 'var(--text-muted, #64748b)', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
-            Card 4 • Exceptions & Risk
+            EXCEPTIONS & RISK
           </div>
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-end', marginTop: 12 }}>
             <div>
