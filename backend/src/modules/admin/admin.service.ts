@@ -570,8 +570,7 @@ export class AdminService {
       data.role === Role.PM ||
       data.role === Role.OPERATIONS ||
       data.role === Role.AUDITOR ||
-      data.role === Role.FINANCE ||
-      data.role === Role.ADMIN;
+      data.role === Role.FINANCE;
     if (isInternalRole) {
       const allowed = await this.isDomainAllowed(cleanEmail);
       if (!allowed) {

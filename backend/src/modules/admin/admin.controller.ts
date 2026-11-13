@@ -95,6 +95,9 @@ export class AdminController {
 
   static async getUserById(req: AuthenticatedRequest, res: Response): Promise<void> {
     try {
+      if (req.params.id === 'summary') {
+        return AdminController.getUserSummary(req, res);
+      }
       const user = await AdminService.getUserById(req.params.id as string);
       sendSuccess(res, user);
     } catch (err: unknown) {

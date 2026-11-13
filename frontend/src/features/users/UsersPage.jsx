@@ -35,6 +35,7 @@ export default function UsersPage() {
   });
   const [loading, setLoading] = useState(false);
   const [summaryLoading, setSummaryLoading] = useState(false);
+  const [summaryError, setSummaryError] = useState(null);
 
   // State: Pagination & Sorting
   const [page, setPage] = useState(1);
@@ -106,13 +107,26 @@ export default function UsersPage() {
   // Load KPI Summary Cards
   const loadSummary = useCallback(async () => {
     setSummaryLoading(true);
+    setSummaryError(null);
     try {
-      const res = await apiClient.get(ENDPOINTS.ADMIN.USERS_SUMMARY);
+      const res = await apiClient.get(ENDPOINTS.ADMIN.USERS_SUMMARY, { bypassCache: true });
       if (res && res.success && res.data) {
-        setSummary(res.data);
+        setSummary({
+          totalUsers: Number(res.data.totalUsers ?? 0),
+          internalUsers: Number(res.data.internalUsers ?? 0),
+          centreUsers: Number(res.data.centreUsers ?? 0),
+          adminUsers: Number(res.data.adminUsers ?? 0),
+          activeUsers: Number(res.data.activeUsers ?? 0),
+          inactiveUsers: Number(res.data.inactiveUsers ?? 0),
+        });
+        setSummaryError(null);
+      } else {
+        throw new Error(res?.error?.message || 'Invalid summary response format');
       }
     } catch (err) {
       console.warn('Failed to load user summary counts:', err);
+      const msg = err.data?.error?.message || err.message || 'Unable to retrieve user summary counts';
+      setSummaryError(msg);
     } finally {
       setSummaryLoading(false);
     }
@@ -186,6 +200,7 @@ export default function UsersPage() {
 
   // Handle Refresh Action
   const handleRefresh = async () => {
+    setSummaryError(null);
     await Promise.all([loadSummary(), loadUsers()]);
     showToast('User counts and listing refreshed.', 'success');
   };
@@ -483,6 +498,34 @@ export default function UsersPage() {
         </div>
       </div>
 
+      {/* ── Summary Cards Error Notice ── */}
+      {summaryError && (
+        <div style={{
+          background: '#fef2f2',
+          border: '1px solid #fecaca',
+          borderRadius: 10,
+          padding: '12px 18px',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'space-between',
+          color: '#991b1b',
+          fontSize: '0.875rem',
+          fontWeight: 600,
+        }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+            <AlertCircle size={18} color="#ef4444" />
+            <span>Summary Cards Error: {summaryError}</span>
+          </div>
+          <button
+            onClick={() => loadSummary()}
+            className="btn btn-secondary"
+            style={{ padding: '4px 12px', fontSize: '0.75rem', height: 'auto', background: '#fee2e2', borderColor: '#fca5a5', color: '#991b1b' }}
+          >
+            Retry Counts
+          </button>
+        </div>
+      )}
+
       {/* ── Three Summary Cards (Phase 1) ── */}
       <div className="kpi-grid" style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(260px, 1fr))', gap: 16 }}>
         {/* Card 1: Total Users */}
@@ -496,7 +539,7 @@ export default function UsersPage() {
             </div>
           </div>
           <div className="kpi-card__value" style={{ fontSize: '1.875rem', fontWeight: 800, color: '#1e293b' }}>
-            {summaryLoading ? '—' : summary.totalUsers}
+            {summaryLoading ? '—' : summaryError ? '—' : summary.totalUsers}
           </div>
           <div className="kpi-card__sub" style={{ fontSize: '0.75rem', color: '#64748b', marginTop: 4 }}>
             All existing OEMP accounts (including Admin accounts)
@@ -514,7 +557,7 @@ export default function UsersPage() {
             </div>
           </div>
           <div className="kpi-card__value" style={{ fontSize: '1.875rem', fontWeight: 800, color: '#7c3aed' }}>
-            {summaryLoading ? '—' : summary.internalUsers}
+            {summaryLoading ? '—' : summaryError ? '—' : summary.internalUsers}
           </div>
           <div className="kpi-card__sub" style={{ fontSize: '0.75rem', color: '#64748b', marginTop: 4 }}>
             Project Manager, Operations, Auditor, and Accounts
@@ -532,7 +575,7 @@ export default function UsersPage() {
             </div>
           </div>
           <div className="kpi-card__value" style={{ fontSize: '1.875rem', fontWeight: 800, color: '#d97706' }}>
-            {summaryLoading ? '—' : summary.centreUsers}
+            {summaryLoading ? '—' : summaryError ? '—' : summary.centreUsers}
           </div>
           <div className="kpi-card__sub" style={{ fontSize: '0.75rem', color: '#64748b', marginTop: 4 }}>
             External venue examination and onboarding accounts
