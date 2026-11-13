@@ -381,10 +381,18 @@ export default function UsersPage() {
     e.stopPropagation();
     if (!fullUserId) return;
 
-    try {
-      if (navigator.clipboard && window.isSecureContext) {
+    let copied = false;
+    if (navigator.clipboard && window.isSecureContext) {
+      try {
         await navigator.clipboard.writeText(fullUserId);
-      } else {
+        copied = true;
+      } catch (clipErr) {
+        // Fall back to execCommand below
+      }
+    }
+
+    if (!copied) {
+      try {
         const textArea = document.createElement('textarea');
         textArea.value = fullUserId;
         textArea.style.position = 'fixed';
@@ -393,13 +401,16 @@ export default function UsersPage() {
         document.body.appendChild(textArea);
         textArea.focus();
         textArea.select();
-        const successful = document.execCommand('copy');
+        copied = document.execCommand('copy');
         document.body.removeChild(textArea);
-        if (!successful) throw new Error('execCommand failed');
+      } catch (fallbackErr) {
+        copied = false;
       }
+    }
+
+    if (copied) {
       showToast('User ID copied successfully!', 'success');
-    } catch (err) {
-      console.warn('Clipboard copy error:', err);
+    } else {
       showToast('Unable to copy User ID. Please try again.', 'error');
     }
   };
@@ -747,10 +758,13 @@ export default function UsersPage() {
                       </td>
 
                       {/* User ID */}
-                      <td style={{ padding: '14px 16px', fontSize: '0.75rem', fontFamily: 'monospace', color: '#475569' }}>
+                      <td
+                        style={{ padding: '14px 16px', fontSize: '0.75rem', fontFamily: 'monospace', color: '#475569', cursor: 'copy', userSelect: 'none' }}
+                        title="Double-click to copy"
+                        onDoubleClick={(e) => handleCopyUserId(e, u.id)}
+                      >
                         <span
                           title="Double-click to copy"
-                          onDoubleClick={(e) => handleCopyUserId(e, u.id)}
                           style={{
                             cursor: 'copy',
                             userSelect: 'none',
