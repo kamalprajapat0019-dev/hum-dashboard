@@ -566,7 +566,12 @@ export class AdminService {
     }
 
     // 2. Email Domain Validation for Internal Users
-    const isInternalRole = [Role.PM, Role.OPERATIONS, Role.AUDITOR, Role.FINANCE].includes(data.role);
+    const isInternalRole =
+      data.role === Role.PM ||
+      data.role === Role.OPERATIONS ||
+      data.role === Role.AUDITOR ||
+      data.role === Role.FINANCE ||
+      data.role === Role.ADMIN;
     if (isInternalRole) {
       const allowed = await this.isDomainAllowed(cleanEmail);
       if (!allowed) {
