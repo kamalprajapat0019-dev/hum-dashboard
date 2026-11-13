@@ -41,15 +41,32 @@ export class AdminController {
   }
 
   // ── Users ────────────────────────────────────────────────────────────────
+  static async getUserSummary(req: AuthenticatedRequest, res: Response): Promise<void> {
+    try {
+      const summary = await AdminService.getUserSummary(
+        req.user?.role as any,
+        req.user?.userId
+      );
+      sendSuccess(res, summary);
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : 'Failed to retrieve user summary';
+      sendError(res, 500, 'USER_SUMMARY_ERROR', msg);
+    }
+  }
+
   static async listUsers(req: AuthenticatedRequest, res: Response): Promise<void> {
     try {
-      const { page, limit, search, role, status } = req.query as any;
+      const { page, limit, search, role, status, sortBy, sortOrder } = req.query as any;
       const result = await AdminService.listUsers({
         page: page || 1,
-        limit: limit || 20,
+        limit: limit || 10,
         search,
         role,
         status,
+        sortBy,
+        sortOrder,
+        callerRole: req.user?.role as any,
+        callerUserId: req.user?.userId,
       });
       sendSuccess(res, result.users, 200, result.meta);
     } catch (err: unknown) {
@@ -63,12 +80,16 @@ export class AdminController {
       const user = await AdminService.createUser(
         req.body,
         req.user!.userId,
-        req.user!.email
+        req.user!.email,
+        req.user?.role as any
       );
       sendSuccess(res, user, 201);
     } catch (err: unknown) {
       const msg = err instanceof Error ? err.message : 'Failed to create user';
-      sendError(res, 400, 'USER_CREATION_FAILED', msg);
+      const code = (msg.toLowerCase().includes('domain') || msg.toLowerCase().includes('approved organisation'))
+        ? 'DOMAIN_NOT_ALLOWED'
+        : 'USER_CREATION_FAILED';
+      sendError(res, 400, code, msg);
     }
   }
 
@@ -88,7 +109,8 @@ export class AdminController {
         req.params.id as string,
         req.body,
         req.user!.userId,
-        req.user!.email
+        req.user!.email,
+        req.user?.role as any
       );
       sendSuccess(res, updated);
     } catch (err: unknown) {
@@ -97,17 +119,102 @@ export class AdminController {
     }
   }
 
+  static async activateUser(req: AuthenticatedRequest, res: Response): Promise<void> {
+    try {
+      const result = await AdminService.activateUser(
+        req.params.id as string,
+        req.user!.userId,
+        req.user!.email,
+        req.user?.role as any
+      );
+      sendSuccess(res, result, 200, { message: 'User activated successfully' });
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : 'Failed to activate user';
+      sendError(res, 400, 'USER_ACTIVATION_FAILED', msg);
+    }
+  }
+
+  static async deactivateUser(req: AuthenticatedRequest, res: Response): Promise<void> {
+    try {
+      const result = await AdminService.deactivateUser(
+        req.params.id as string,
+        req.user!.userId,
+        req.user!.email,
+        req.user?.role as any
+      );
+      sendSuccess(res, result, 200, { message: 'User deactivated successfully' });
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : 'Failed to deactivate user';
+      sendError(res, 400, 'USER_DEACTIVATION_FAILED', msg);
+    }
+  }
+
   static async deleteUser(req: AuthenticatedRequest, res: Response): Promise<void> {
     try {
       await AdminService.deleteUser(
         req.params.id as string,
         req.user!.userId,
-        req.user!.email
+        req.user!.email,
+        req.user?.role as any
       );
       sendSuccess(res, { message: 'User deactivated successfully' });
     } catch (err: unknown) {
       const msg = err instanceof Error ? err.message : 'Failed to deactivate user';
       sendError(res, 400, 'USER_DELETION_FAILED', msg);
+    }
+  }
+
+  static async initiatePasswordReset(req: AuthenticatedRequest, res: Response): Promise<void> {
+    try {
+      const result = await AdminService.initiatePasswordReset(
+        req.params.id as string,
+        req.user!.userId,
+        req.user!.email
+      );
+      sendSuccess(res, result);
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : 'Failed to initiate password reset';
+      sendError(res, 400, 'PASSWORD_RESET_FAILED', msg);
+    }
+  }
+
+  static async inviteUser(req: AuthenticatedRequest, res: Response): Promise<void> {
+    try {
+      const result = await AdminService.inviteCentreUser(
+        req.body,
+        req.user!.userId,
+        req.user!.email,
+        req.user?.role as any
+      );
+      sendSuccess(res, result, 201);
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : 'Failed to send invitation';
+      sendError(res, 400, 'INVITATION_FAILED', msg);
+    }
+  }
+
+  static async getAllowedDomains(_req: AuthenticatedRequest, res: Response): Promise<void> {
+    try {
+      const domains = await AdminService.getAllowedDomains();
+      sendSuccess(res, domains);
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : 'Failed to fetch allowed domains';
+      sendError(res, 500, 'DOMAINS_FETCH_ERROR', msg);
+    }
+  }
+
+  static async addAllowedDomain(req: AuthenticatedRequest, res: Response): Promise<void> {
+    try {
+      const { domain } = req.body;
+      if (!domain || typeof domain !== 'string') {
+        sendError(res, 400, 'INVALID_DOMAIN', 'Domain is required');
+        return;
+      }
+      const created = await AdminService.addAllowedDomain(domain, req.user!.userId);
+      sendSuccess(res, created, 201);
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : 'Failed to add allowed domain';
+      sendError(res, 400, 'DOMAIN_CREATION_FAILED', msg);
     }
   }
 

@@ -5,6 +5,8 @@ export const ROUTES = {
   HOME: '/',
   LOGIN: '/login',
   UNAUTHORIZED: '/unauthorized',
+  RESET_PASSWORD: '/reset-password',
+  ACTIVATE_ACCOUNT: '/activate-account',
 
   ADMIN: {
     DASHBOARD: '/admin',

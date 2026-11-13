@@ -37,6 +37,8 @@ export const roleSchema = z.preprocess((val) => {
 export const userQuerySchema = paginationSchema.extend({
   role: roleSchema.optional(),
   status: z.nativeEnum(UserStatus).optional(),
+  sortBy: z.enum(['name', 'createdAt', 'updatedAt', 'id', 'email']).optional().default('name'),
+  sortOrder: z.enum(['asc', 'desc']).optional().default('asc'),
 });
 
 export const createUserSchema = z.object({
@@ -44,11 +46,14 @@ export const createUserSchema = z.object({
   password: z
     .string()
     .min(8, 'Password must be at least 8 characters long')
-    .optional()
-    .default('TempPass@2026'),
+    .optional(),
   name: z.string().min(2, 'Name must be at least 2 characters long'),
+  phoneNumber: z.string().optional(),
   role: roleSchema,
   status: z.nativeEnum(UserStatus).default(UserStatus.Active),
+  managerId: z.string().optional(),
+  centreId: z.string().optional(),
+  clientId: z.string().optional(),
   scope: z
     .object({
       clients: z.array(z.string()).default(['all']),
@@ -60,9 +65,13 @@ export const createUserSchema = z.object({
 
 export const updateUserSchema = z.object({
   name: z.string().min(2).optional(),
+  phoneNumber: z.string().optional(),
   role: roleSchema.optional(),
   status: z.nativeEnum(UserStatus).optional(),
   password: z.string().min(8).optional(),
+  managerId: z.string().nullable().optional(),
+  centreId: z.string().nullable().optional(),
+  clientId: z.string().nullable().optional(),
   scope: z
     .object({
       clients: z.array(z.string()).optional(),
@@ -70,6 +79,28 @@ export const updateUserSchema = z.object({
       centres: z.array(z.string()).optional(),
     })
     .optional(),
+});
+
+export const inviteUserSchema = z.object({
+  email: z.string().email(),
+  name: z.string().min(2),
+  phoneNumber: z.string().optional(),
+  role: roleSchema.default(Role.CENTRE),
+  centreId: z.string().optional(),
+  clientId: z.string().optional(),
+  scope: z.record(z.unknown()).optional(),
+});
+
+export const activateAccountSchema = z.object({
+  token: z.string().min(1, 'Activation token is required'),
+  password: z.string().min(8, 'Password must be at least 8 characters long'),
+  confirmPassword: z.string().min(8).optional(),
+});
+
+export const resetPasswordSchema = z.object({
+  token: z.string().min(1, 'Reset token is required'),
+  password: z.string().min(8, 'Password must be at least 8 characters long'),
+  confirmPassword: z.string().min(8).optional(),
 });
 
 export const analyticsQuerySchema = z.object({

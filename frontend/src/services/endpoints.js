@@ -7,6 +7,10 @@ export const ENDPOINTS = {
     LOGOUT: '/auth/logout',
     ME: '/auth/me',
     REFRESH: '/auth/refresh',
+    RESET_PASSWORD: '/auth/reset-password',
+    VERIFY_RESET_TOKEN: (token) => `/auth/verify-reset-token/${token}`,
+    ACTIVATE_ACCOUNT: '/auth/activate-account',
+    VERIFY_INVITATION: (token) => `/auth/verify-invitation/${token}`,
   },
   USERS: {
     LIST: '/users',
@@ -54,7 +58,13 @@ export const ENDPOINTS = {
   ADMIN: {
     ANALYTICS: '/admin/analytics',
     USERS: '/admin/users',
+    USERS_SUMMARY: '/admin/users/summary',
     USER_DETAIL: (id) => `/admin/users/${id}`,
+    USER_ACTIVATE: (id) => `/admin/users/${id}/activate`,
+    USER_DEACTIVATE: (id) => `/admin/users/${id}/deactivate`,
+    USER_RESET_PASSWORD: (id) => `/admin/users/${id}/reset-password`,
+    USER_INVITE: '/admin/users/invite',
+    ALLOWED_DOMAINS: '/admin/allowed-domains',
     PROJECTS: '/admin/projects',
     PROJECT_DETAIL: (id) => `/admin/projects/${id}`,
     CENTRES: '/admin/centres',
@@ -94,6 +104,7 @@ export const ENDPOINTS = {
     SUBMIT: '/centre/submit',
     UPLOAD_DOC: '/centre/documents/upload',
     STATUS: '/centre/status',
+    INVITE_USER: '/centre/invite-user',
   },
 };
 

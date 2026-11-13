@@ -26,23 +26,32 @@ enum UserStatus {
 }
 
 model User {
-  id               String            @id @default(cuid())
-  email            String            @unique
-  passwordHash     String
-  name             String
-  role             Role              @default(ADMIN)
-  avatar           String?           @db.Text
-  status           UserStatus        @default(Active)
-  scope            Json?             // { clients: string[], projects: string[], centres: string[] }
-  lastLogin        DateTime?
-  createdAt        DateTime          @default(now())
-  updatedAt        DateTime          @updatedAt
+  id                  String               @id @default(cuid())
+  email               String               @unique
+  passwordHash        String
+  name                String
+  phoneNumber         String?
+  role                Role                 @default(ADMIN)
+  avatar              String?              @db.Text
+  status              UserStatus           @default(Active)
+  scope               Json?                // { clients: string[], projects: string[], centres: string[] }
+  managerId           String?
+  manager             User?                @relation("UserManager", fields: [managerId], references: [id], onDelete: SetNull)
+  managedUsers        User[]               @relation("UserManager")
+  centreId            String?
+  clientId            String?
+  lastLogin           DateTime?
+  createdAt           DateTime             @default(now())
+  updatedAt           DateTime             @updatedAt
 
-  projectsManaged  Project[]
-  auditAssignments AuditAssignment[]
-  auditLogs        AuditLog[]
+  projectsManaged     Project[]
+  auditAssignments    AuditAssignment[]
+  auditLogs           AuditLog[]
+  invitationsSent     UserInvitation[]     @relation("Inviter")
+  passwordResetTokens PasswordResetToken[]
 
   @@index([role, status])
+  @@index([managerId])
   @@map("oecm_users")
 }
 
@@ -501,4 +510,53 @@ model SystemConfig {
   updatedAt DateTime @updatedAt
 
   @@map("oecm_system_configs")
+}
+
+model UserInvitation {
+  id         String    @id @default(cuid())
+  email      String
+  name       String
+  role       Role
+  phone      String?
+  clientId   String?
+  centreId   String?
+  scope      Json?
+  token      String    @unique
+  expiresAt  DateTime
+  status     String    @default("Pending") // Pending, Accepted, Expired, Revoked
+  inviterId  String
+  inviter    User      @relation("Inviter", fields: [inviterId], references: [id], onDelete: Cascade)
+  acceptedAt DateTime?
+  createdAt  DateTime  @default(now())
+  updatedAt  DateTime  @updatedAt
+
+  @@index([email])
+  @@index([token])
+  @@index([inviterId])
+  @@map("oecm_user_invitations")
+}
+
+model PasswordResetToken {
+  id        String    @id @default(cuid())
+  userId    String
+  user      User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  token     String    @unique
+  expiresAt DateTime
+  usedAt    DateTime?
+  createdAt DateTime  @default(now())
+
+  @@index([userId])
+  @@index([token])
+  @@map("oecm_password_reset_tokens")
+}
+
+model AllowedEmailDomain {
+  id        String   @id @default(cuid())
+  domain    String   @unique // e.g. "oemportal.in", "assessinfra.com"
+  isActive  Boolean  @default(true)
+  createdBy String?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@map("oecm_allowed_email_domains")
 }

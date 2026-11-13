@@ -1,6 +1,7 @@
 import { Response } from 'express';
 import { AuthenticatedRequest } from '../../middleware/auth.middleware.js';
 import { CentreService } from './centre.service.js';
+import { AdminService } from '../admin/admin.service.js';
 import { sendSuccess, sendError } from '../../utils/response.js';
 
 export class CentreController {
@@ -62,6 +63,21 @@ export class CentreController {
     } catch (err: unknown) {
       const msg = err instanceof Error ? err.message : 'Failed to retrieve application status';
       sendError(res, 500, 'STATUS_RETRIEVAL_ERROR', msg);
+    }
+  }
+
+  static async inviteCentreUser(req: AuthenticatedRequest, res: Response): Promise<void> {
+    try {
+      const result = await AdminService.inviteCentreUser(
+        req.body,
+        req.user!.userId,
+        req.user!.email,
+        req.user?.role as any
+      );
+      sendSuccess(res, result, 201);
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : 'Failed to send centre user invitation';
+      sendError(res, 400, 'INVITATION_FAILED', msg);
     }
   }
 }

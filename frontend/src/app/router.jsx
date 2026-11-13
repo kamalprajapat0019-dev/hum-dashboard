@@ -7,6 +7,7 @@ import { AuthLayout } from '../layouts/AuthLayout';
 
 // Auth
 import LoginPage from '../features/auth/pages/LoginPage';
+import SetNewPasswordPage from '../features/auth/pages/SetNewPasswordPage';
 
 // Role Dashboards
 import AdminDashboard from '../roles/admin/AdminDashboard';
@@ -93,6 +94,14 @@ export function AppRouter() {
       <Route
         path={ROUTES.LOGIN}
         element={user ? <RoleRedirect /> : <AuthLayout><LoginPage /></AuthLayout>}
+      />
+      <Route
+        path={ROUTES.RESET_PASSWORD}
+        element={<SetNewPasswordPage />}
+      />
+      <Route
+        path={ROUTES.ACTIVATE_ACCOUNT}
+        element={<SetNewPasswordPage />}
       />
       <Route path={ROUTES.UNAUTHORIZED} element={<Unauthorized />} />
       <Route path={ROUTES.HOME} element={<RoleRedirect />} />

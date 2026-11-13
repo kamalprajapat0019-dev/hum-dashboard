@@ -3,7 +3,7 @@ import {
   X, CheckCircle, AlertTriangle, ShieldCheck, FileText, Building2,
   Zap, Lock, CreditCard, History, UserCheck, Eye, EyeOff, Check,
   Clock, Download, RefreshCw, AlertCircle, Ban, Send, Calendar,
-  MapPin, Phone, Mail, Award, CheckCircle2, Edit, Save
+  MapPin, Phone, Mail, Award, CheckCircle2, Edit, Save, Copy
 } from 'lucide-react';
 import { StatusBadge } from '@/components/common';
 import { apiClient } from '@/services/apiClient';
@@ -54,11 +54,64 @@ export default function CentreProfileModal({
   const [bankRemarks, setBankRemarks] = useState('');
   const [bankRejectionReason, setBankRejectionReason] = useState('');
 
+  // Centre User Invitation Modal
+  const [showInviteModal, setShowInviteModal] = useState(false);
+  const [inviteForm, setInviteForm] = useState({
+    name: '',
+    email: '',
+    phone: '',
+    notes: '',
+  });
+  const [inviteResult, setInviteResult] = useState(null);
+  const [inviting, setInviting] = useState(false);
+  const [copiedInviteUrl, setCopiedInviteUrl] = useState(false);
+
   const [previewDocUrl, setPreviewDocUrl] = useState(null);
 
   const showNotification = (message, type = 'success') => {
     setToast({ message, type });
     setTimeout(() => setToast(null), 3500);
+  };
+
+  const handleOpenInvite = (contact) => {
+    setInviteForm({
+      name: contact?.fullName || '',
+      email: contact?.email || '',
+      phone: contact?.contactNumber || '',
+      notes: '',
+    });
+    setInviteResult(null);
+    setCopiedInviteUrl(false);
+    setShowInviteModal(true);
+  };
+
+  const handleSendInvite = async (e) => {
+    e.preventDefault();
+    if (!inviteForm.name.trim() || !inviteForm.email.trim()) {
+      showNotification('Contact Name and Email are required.', 'error');
+      return;
+    }
+    setInviting(true);
+    try {
+      const endpoint = currentUserRole === 'ADMIN' ? ENDPOINTS.ADMIN.USER_INVITE : ENDPOINTS.CENTRE_PORTAL.INVITE_USER;
+      const res = await apiClient.post(endpoint, {
+        name: inviteForm.name.trim(),
+        email: inviteForm.email.trim().toLowerCase(),
+        phone: inviteForm.phone.trim() || undefined,
+        centreId: centre.id,
+        clientId: centre.clientId,
+        role: 'CENTRE',
+        scope: { centres: [centre.id], projects: [], clients: [centre.clientId].filter(Boolean) },
+      });
+      if (res && res.success && res.data) {
+        setInviteResult(res.data);
+        showNotification(`Invitation generated successfully for ${inviteForm.email}!`);
+      }
+    } catch (err) {
+      showNotification(err.message || 'Failed to send invitation', 'error');
+    } finally {
+      setInviting(false);
+    }
   };
 
   if (!centre) return null;
@@ -322,6 +375,15 @@ export default function CentreProfileModal({
                 <AlertTriangle size={14} /> Reject
               </button>
             )}
+
+            <button
+              className="btn btn-sm btn-secondary"
+              onClick={() => handleOpenInvite(cs?.fullName ? cs : owner)}
+              style={{ display: 'flex', alignItems: 'center', gap: 6 }}
+              title="Invite Centre Superintendent / Representative to Centre Portal"
+            >
+              <Send size={14} /> Invite User
+            </button>
 
             <button
               className="btn btn-sm btn-secondary"
@@ -595,6 +657,14 @@ export default function CentreProfileModal({
                       )}
                       {p.data.fatherName && <div><span style={{ color: '#64748b' }}>Father's Name:</span> {p.data.fatherName}</div>}
                       {p.data.permanentAddress && <div><span style={{ color: '#64748b' }}>Address:</span> {p.data.permanentAddress}</div>}
+                      <button
+                        type="button"
+                        className="btn btn-sm btn-outline-primary"
+                        onClick={() => handleOpenInvite(p.data)}
+                        style={{ marginTop: 8, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6, width: '100%' }}
+                      >
+                        <Send size={13} /> Invite as Centre Portal User
+                      </button>
                     </div>
                   ) : (
                     <div style={{ fontSize: '0.8125rem', color: '#94a3b8', padding: '12px 0' }}>
@@ -1259,6 +1329,127 @@ export default function CentreProfileModal({
                 {loadingAction ? 'Saving...' : showBankActionModal === 'verify' ? 'Approve Bank' : 'Reject Bank'}
               </button>
             </div>
+          </div>
+        </div>
+      )}
+
+      {/* Centre User Invitation Modal */}
+      {showInviteModal && (
+        <div className="modal-backdrop" style={{ zIndex: 1250 }} onClick={() => setShowInviteModal(false)}>
+          <div className="modal" style={{ maxWidth: 520 }} onClick={(e) => e.stopPropagation()}>
+            <div className="modal-header">
+              <h3 className="modal-title" style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                <Send size={18} style={{ color: '#2563eb' }} /> Invite Centre User
+              </h3>
+              <button className="btn-ghost" onClick={() => setShowInviteModal(false)}><X size={16} /></button>
+            </div>
+            {inviteResult ? (
+              <div className="modal-body" style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
+                <div style={{ background: '#f0fdf4', border: '1px solid #bbf7d0', padding: 16, borderRadius: 8 }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 8, color: '#166534', fontWeight: 600, marginBottom: 6 }}>
+                    <CheckCircle2 size={18} /> Invitation Generated Successfully!
+                  </div>
+                  <p style={{ margin: 0, fontSize: '0.875rem', color: '#15803d' }}>
+                    An onboarding activation link has been created for <strong>{inviteResult.invitation?.email}</strong>.
+                    This link is valid for <strong>7 days</strong>.
+                  </p>
+                </div>
+
+                <div>
+                  <label className="form-label" style={{ fontWeight: 600, fontSize: '0.8125rem' }}>Activation URL</label>
+                  <div style={{ display: 'flex', gap: 8 }}>
+                    <input
+                      type="text"
+                      className="form-control"
+                      readOnly
+                      value={`${window.location.origin}/activate-account?token=${inviteResult.invitation?.token}`}
+                      style={{ fontSize: '0.8125rem', fontFamily: 'monospace', background: '#f8fafc' }}
+                    />
+                    <button
+                      className="btn btn-secondary"
+                      type="button"
+                      onClick={() => {
+                        navigator.clipboard.writeText(`${window.location.origin}/activate-account?token=${inviteResult.invitation?.token}`);
+                        setCopiedInviteUrl(true);
+                        setTimeout(() => setCopiedInviteUrl(false), 2000);
+                      }}
+                    >
+                      {copiedInviteUrl ? <Check size={14} style={{ color: '#16a34a' }} /> : <Copy size={14} />}
+                    </button>
+                  </div>
+                </div>
+
+                <div className="modal-footer" style={{ padding: '12px 0 0', margin: 0 }}>
+                  <button className="btn btn-primary" onClick={() => setShowInviteModal(false)} style={{ width: '100%' }}>
+                    Done
+                  </button>
+                </div>
+              </div>
+            ) : (
+              <form onSubmit={handleSendInvite}>
+                <div className="modal-body" style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
+                  <div style={{ background: '#f8fafc', padding: '10px 14px', borderRadius: 6, fontSize: '0.8125rem', border: '1px solid #e2e8f0' }}>
+                    <div style={{ color: '#64748b' }}>Assigned Venue:</div>
+                    <strong style={{ color: '#0f172a' }}>{centre.centreName} ({centre.centreCode || centre.id})</strong>
+                  </div>
+
+                  <div className="form-group">
+                    <label className="form-label" style={{ fontWeight: 600 }}>Contact Person Name *</label>
+                    <input
+                      type="text"
+                      className="form-control"
+                      value={inviteForm.name}
+                      onChange={(e) => setInviteForm({ ...inviteForm, name: e.target.value })}
+                      placeholder="e.g. Dr. Ramesh Kumar"
+                      required
+                    />
+                  </div>
+
+                  <div className="form-group">
+                    <label className="form-label" style={{ fontWeight: 600 }}>Email Address *</label>
+                    <input
+                      type="email"
+                      className="form-control"
+                      value={inviteForm.email}
+                      onChange={(e) => setInviteForm({ ...inviteForm, email: e.target.value })}
+                      placeholder="e.g. superintendent@centre.edu.in"
+                      required
+                    />
+                  </div>
+
+                  <div className="form-group">
+                    <label className="form-label">Mobile Number (Optional)</label>
+                    <input
+                      type="tel"
+                      className="form-control"
+                      value={inviteForm.phone}
+                      onChange={(e) => setInviteForm({ ...inviteForm, phone: e.target.value })}
+                      placeholder="e.g. +91 9876543210"
+                    />
+                  </div>
+
+                  <div className="form-group">
+                    <label className="form-label">Operational Notes / Scope Instructions (Optional)</label>
+                    <textarea
+                      className="form-control"
+                      rows={2}
+                      value={inviteForm.notes}
+                      onChange={(e) => setInviteForm({ ...inviteForm, notes: e.target.value })}
+                      placeholder="e.g. Authorized to submit seating dossiers and lab infrastructure."
+                    />
+                  </div>
+                </div>
+
+                <div className="modal-footer">
+                  <button type="button" className="btn btn-secondary" onClick={() => setShowInviteModal(false)} disabled={inviting}>
+                    Cancel
+                  </button>
+                  <button type="submit" className="btn btn-primary" disabled={inviting} style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                    <Send size={14} /> {inviting ? 'Generating Invitation...' : 'Send Invitation'}
+                  </button>
+                </div>
+              </form>
+            )}
           </div>
         </div>
       )}

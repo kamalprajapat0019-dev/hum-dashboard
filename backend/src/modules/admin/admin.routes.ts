@@ -9,6 +9,7 @@ import {
   userQuerySchema,
   createUserSchema,
   updateUserSchema,
+  inviteUserSchema,
   clientQuerySchema,
   createClientSchema,
   updateClientSchema,
@@ -53,11 +54,19 @@ router.put('/clients/:id', validateRequest({ body: updateClientSchema }), AdminC
 router.patch('/clients/:id/status', validateRequest({ body: updateClientStatusSchema }), AdminController.updateClientStatus);
 
 // User Management
+router.get('/users/summary', AdminController.getUserSummary);
 router.get('/users', validateRequest({ query: userQuerySchema }), AdminController.listUsers);
 router.post('/users', validateRequest({ body: createUserSchema }), AdminController.createUser);
 router.get('/users/:id', AdminController.getUserById);
 router.put('/users/:id', validateRequest({ body: updateUserSchema }), AdminController.updateUser);
+router.patch('/users/:id', validateRequest({ body: updateUserSchema }), AdminController.updateUser);
 router.delete('/users/:id', AdminController.deleteUser);
+router.post('/users/:id/activate', AdminController.activateUser);
+router.post('/users/:id/deactivate', AdminController.deactivateUser);
+router.post('/users/:id/reset-password', AdminController.initiatePasswordReset);
+router.post('/users/invite', validateRequest({ body: inviteUserSchema }), AdminController.inviteUser);
+router.get('/allowed-domains', AdminController.getAllowedDomains);
+router.post('/allowed-domains', AdminController.addAllowedDomain);
 
 // Project Management
 router.get('/projects', validateRequest({ query: projectQuerySchema }), AdminController.listProjects);
