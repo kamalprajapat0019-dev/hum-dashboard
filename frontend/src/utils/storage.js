@@ -7,7 +7,13 @@ export const storage = {
     try {
       const store = storageType === 'local' ? window.localStorage : window.sessionStorage;
       const item = store.getItem(key);
-      return item ? JSON.parse(item) : null;
+      if (!item) return null;
+      try {
+        return JSON.parse(item);
+      } catch {
+        // Safe fallback for legacy or plain string entries stored without JSON.stringify
+        return item;
+      }
     } catch (e) {
       console.warn(`[storage] Error reading key "${key}":`, e);
       return null;

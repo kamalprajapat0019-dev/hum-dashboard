@@ -13,7 +13,8 @@ import ExamCalendarModal from '../common/ExamCalendarModal';
 const ROUTE_LABELS = {
   '/admin':              ['Executive Overview'],
   '/admin/users':        ['User & Role Management'],
-  '/admin/projects':     ['Client & Project Management'],
+  '/admin/clients':      ['Client Management'],
+  '/admin/projects':     ['Project Management'],
   '/admin/centres':      ['Centre Master'],
   '/admin/audit':        ['Audit & Compliance'],
   '/admin/notifications':['Notifications & Alert Center'],

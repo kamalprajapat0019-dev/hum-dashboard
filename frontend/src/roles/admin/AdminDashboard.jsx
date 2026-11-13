@@ -179,6 +179,18 @@ export default function AdminDashboard() {
   const [error, setError] = useState(null);
   const activeRequestRef = useRef(0);
   const abortControllerRef = useRef(null);
+  const prevClientIdRef = useRef(selectedClientId);
+
+  // When client changes, clear stale data immediately so previous client data is never shown
+  useEffect(() => {
+    if (prevClientIdRef.current !== selectedClientId) {
+      prevClientIdRef.current = selectedClientId;
+      setLiveData(null);
+      setProjectsList([]);
+      setError(null);
+      setLoading(true);
+    }
+  }, [selectedClientId]);
 
   // Cleanup pending network requests on unmount
   useEffect(() => {
@@ -190,7 +202,9 @@ export default function AdminDashboard() {
   }, []);
 
   const fetchDashboardData = useCallback(async (bypassCache = false) => {
-    if (!selectedClientId) return;
+    if (!selectedClientId) {
+      return;
+    }
 
     // Abort previous in-flight requests when switching clients or filters
     if (abortControllerRef.current) {
@@ -200,11 +214,6 @@ export default function AdminDashboard() {
     abortControllerRef.current = controller;
 
     const requestId = ++activeRequestRef.current;
-    if (!liveData) {
-      setLoading(true);
-    } else {
-      setIsRefreshing(true);
-    }
     setError(null);
 
     const analyticsParams = { clientId: selectedClientId };
@@ -231,12 +240,17 @@ export default function AdminDashboard() {
       ]);
 
       // If another request was dispatched in the meantime or aborted, discard stale responses
-      if (requestId !== activeRequestRef.current || controller.signal.aborted) return;
+      if (requestId !== activeRequestRef.current || controller.signal.aborted) {
+        return;
+      }
 
       if (analyticsRes.status === 'fulfilled' && analyticsRes.value?.success) {
         setLiveData(analyticsRes.value.data);
+        setError(null);
       } else if (analyticsRes.status === 'rejected') {
-        if (analyticsRes.reason?.name === 'AbortError' || controller.signal.aborted) return;
+        if (analyticsRes.reason?.name === 'AbortError' || controller.signal.aborted) {
+          return;
+        }
         throw analyticsRes.reason;
       } else {
         throw new Error(analyticsRes.value?.message || 'Failed to fetch executive analytics');
@@ -261,20 +275,21 @@ export default function AdminDashboard() {
         status: err?.status,
       });
     } finally {
-      if (requestId === activeRequestRef.current) {
+      if (requestId === activeRequestRef.current && !controller.signal.aborted) {
         setLoading(false);
         setIsRefreshing(false);
       }
     }
-  }, [selectedClientId, selectedProjectId, selectedExamTypeId, selectedExamId, liveData]);
+  }, [selectedClientId, selectedProjectId, selectedExamTypeId, selectedExamId]);
 
   useEffect(() => {
     if (selectedClientId) {
       fetchDashboardData(false);
     }
-  }, [selectedClientId, selectedProjectId, selectedExamTypeId, selectedExamId]);
+  }, [selectedClientId, selectedProjectId, selectedExamTypeId, selectedExamId, fetchDashboardData]);
 
   // Aggregate values directly from MySQL response - ZERO fake fallbacks
+  const isDataLoading = loading || (!liveData && !error);
   const totalCentresCount = liveData?.kpis?.totalCentres?.value ?? 0;
   const activeCentresCount = liveData?.kpis?.totalCentres?.active ?? 0;
   const activeProjectsCount = liveData?.kpis?.activeProjects?.value ?? 0;
@@ -563,7 +578,7 @@ export default function AdminDashboard() {
             )}
             <button
               className="btn btn-sm btn-secondary"
-              onClick={fetchDashboardData}
+              onClick={() => fetchDashboardData(true)}
               style={{
                 background: '#fff',
                 borderColor: error?.isRouting ? '#f59e0b' : '#f87171',
@@ -580,8 +595,8 @@ export default function AdminDashboard() {
       <div className="kpi-grid" style={{ marginBottom: 24 }}>
         <KpiCard
           label="Active Projects"
-          value={loading ? '...' : activeProjectsCount}
-          sub={`${totalProjectsCount} total · ${totalCandidatesCount > 0 ? `${Number(totalCandidatesCount).toLocaleString('en-IN')} candidates` : '0 candidates'}`}
+          value={isDataLoading ? '...' : activeProjectsCount}
+          sub={isDataLoading ? 'Loading metrics...' : `${totalProjectsCount} total · ${totalCandidatesCount > 0 ? `${Number(totalCandidatesCount).toLocaleString('en-IN')} candidates` : '0 candidates'}`}
           icon="Briefcase"
           variant="blue"
           iconBg="rgba(37, 99, 235, 0.12)"
@@ -590,8 +605,8 @@ export default function AdminDashboard() {
         />
         <KpiCard
           label="Total Centres"
-          value={loading ? '...' : totalCentresCount}
-          sub={`${activeCentresCount} active / verified`}
+          value={isDataLoading ? '...' : totalCentresCount}
+          sub={isDataLoading ? 'Loading metrics...' : `${activeCentresCount} active / verified`}
           icon="Building2"
           variant="teal"
           iconBg="rgba(13, 148, 136, 0.12)"
@@ -600,8 +615,8 @@ export default function AdminDashboard() {
         />
         <KpiCard
           label="Active Users"
-          value={loading ? '...' : activeUsersCount}
-          sub={`${totalUsersCount} accounts in DB`}
+          value={isDataLoading ? '...' : activeUsersCount}
+          sub={isDataLoading ? 'Loading metrics...' : `${totalUsersCount} accounts in DB`}
           icon="Users"
           variant="purple"
           iconBg="rgba(124, 58, 237, 0.10)"
@@ -610,8 +625,8 @@ export default function AdminDashboard() {
         />
         <KpiCard
           label="Open Exceptions"
-          value={loading ? '...' : openExceptionsCount}
-          sub={`${openExceptionsCount} active blacklists`}
+          value={isDataLoading ? '...' : openExceptionsCount}
+          sub={isDataLoading ? 'Loading metrics...' : `${openExceptionsCount} active blacklists`}
           icon="AlertTriangle"
           variant="red"
           iconBg="rgba(220, 38, 38, 0.10)"
@@ -620,8 +635,8 @@ export default function AdminDashboard() {
         />
         <KpiCard
           label="Pending Approvals"
-          value={loading ? '...' : pendingApprovalsCount}
-          sub="Centres awaiting review"
+          value={isDataLoading ? '...' : pendingApprovalsCount}
+          sub={isDataLoading ? 'Loading metrics...' : 'Centres awaiting review'}
           icon="CheckCircle"
           variant="orange"
           iconBg="rgba(217, 119, 6, 0.10)"
@@ -652,7 +667,12 @@ export default function AdminDashboard() {
             </span>
           </div>
           <div style={{ flex: 1, minHeight: 220, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-            {projectChartData.length > 0 ? (
+            {isDataLoading ? (
+              <EmptyChartPlaceholder
+                title="Loading Project Stages..."
+                message={`Retrieving project lifecycle distribution for ${selectedClient?.name || 'Eduquity'}...`}
+              />
+            ) : projectChartData.length > 0 ? (
               <ResponsiveContainer width="100%" height={220}>
                 <PieChart>
                   <Pie
@@ -694,7 +714,12 @@ export default function AdminDashboard() {
             <span style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>Infrastructure Verification</span>
           </div>
           <div style={{ flex: 1, minHeight: 220, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-            {centreChartData.length > 0 ? (
+            {isDataLoading ? (
+              <EmptyChartPlaceholder
+                title="Loading Centre Readiness..."
+                message={`Aggregating live verification metrics for ${selectedClient?.name || 'Eduquity'}...`}
+              />
+            ) : centreChartData.length > 0 ? (
               <ResponsiveContainer width="100%" height={220}>
                 <PieChart>
                   <Pie
@@ -740,7 +765,11 @@ export default function AdminDashboard() {
             </button>
           </div>
           <div style={{ padding: '4px 0', flex: 1 }}>
-            {recentActivityData.length > 0 ? (
+            {isDataLoading ? (
+              <div style={{ padding: '24px 20px', textAlign: 'center', color: 'var(--text-muted)' }}>
+                Loading recent activity logs...
+              </div>
+            ) : recentActivityData.length > 0 ? (
               recentActivityData.map((a, idx) => {
                 if (!a) return null;
                 const timeStr = a.time && !isNaN(new Date(a.time).getTime())
@@ -808,7 +837,13 @@ export default function AdminDashboard() {
               </tr>
             </thead>
             <tbody>
-              {safeProjectsList.length > 0 ? (
+              {isDataLoading ? (
+                <tr>
+                  <td colSpan={7} style={{ textAlign: 'center', padding: '24px', color: 'var(--text-muted)' }}>
+                    Loading projects...
+                  </td>
+                </tr>
+              ) : safeProjectsList.length > 0 ? (
                 safeProjectsList.map((p, idx) => {
                   if (!p) return null;
                   const dateStr = p.examDate && !isNaN(new Date(p.examDate).getTime())

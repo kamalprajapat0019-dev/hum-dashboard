@@ -1,7 +1,7 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
 import {
   FolderOpen, Plus, Search, Calendar, Users, Building2, CheckCircle2,
-  Clock, Edit, Trash2, X, Check, RefreshCw, Award,
+  Clock, Edit, Eye, Trash2, X, Check, RefreshCw, Award,
   AlertCircle, Loader2, Layers, BookOpen, ToggleLeft, ToggleRight,
   CalendarDays
 } from 'lucide-react';
@@ -22,7 +22,7 @@ const STAGES = [
 ];
 
 export default function ProjectsPage() {
-  const [activeTab, setActiveTab] = useState('projects'); // 'projects' | 'clients' | 'exam-types' | 'exams'
+  const [activeTab, setActiveTab] = useState('projects'); // 'projects' | 'exam-types' | 'exams'
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [toast, setToast] = useState(null);
@@ -34,10 +34,13 @@ export default function ProjectsPage() {
   const [examTypes, setExamTypes] = useState([]);
   const [exams, setExams] = useState([]);
 
-  // ── Filters ───────────────────────────────────────────────────────────────
+  // ── Filters & Pagination ──────────────────────────────────────────────────
   const [search, setSearch] = useState('');
   const [stageFilter, setStageFilter] = useState('');
+  const [statusFilter, setStatusFilter] = useState('');
   const [clientFilter, setClientFilter] = useState('');
+  const [projectPage, setProjectPage] = useState(1);
+  const [projectLimit, setProjectLimit] = useState(10);
 
   // Exam Types tab filters
   const [etClientFilter, setEtClientFilter] = useState('');
@@ -51,9 +54,8 @@ export default function ProjectsPage() {
   // ── Modals & Drawers ─────────────────────────────────────────────────────
   const [showProjectModal, setShowProjectModal] = useState(false);
   const [editingProject, setEditingProject] = useState(null);
-
-  const [showClientModal, setShowClientModal] = useState(false);
-  const [editingClient, setEditingClient] = useState(null);
+  const [showViewProjectModal, setShowViewProjectModal] = useState(false);
+  const [viewingProject, setViewingProject] = useState(null);
 
   const [showExamTypeModal, setShowExamTypeModal] = useState(false);
   const [editingExamType, setEditingExamType] = useState(null);
@@ -83,16 +85,6 @@ export default function ProjectsPage() {
     slaHealth: 'OnTrack',
   };
   const [projectForm, setProjectForm] = useState(initialProjectForm);
-
-  const initialClientForm = {
-    code: '',
-    name: '',
-    fullName: '',
-    contactEmail: '',
-    description: '',
-    status: 'Active',
-  };
-  const [clientForm, setClientForm] = useState(initialClientForm);
 
   const initialExamTypeForm = {
     projectId: '',
@@ -150,8 +142,13 @@ export default function ProjectsPage() {
         apiClient.get(ENDPOINTS.ADMIN.EXAMS, { params: { limit: 100 } }),
       ]);
 
-      if (clientRes.status === 'fulfilled' && clientRes.value?.success && Array.isArray(clientRes.value.data)) {
-        setClients(clientRes.value.data);
+      if (clientRes.status === 'fulfilled' && clientRes.value?.success) {
+        const clientList = Array.isArray(clientRes.value.data)
+          ? clientRes.value.data
+          : Array.isArray(clientRes.value.data?.data)
+          ? clientRes.value.data.data
+          : [];
+        setClients(clientList);
       }
       if (etRes.status === 'fulfilled' && etRes.value?.success && Array.isArray(etRes.value.data)) {
         setExamTypes(etRes.value.data);
@@ -172,6 +169,7 @@ export default function ProjectsPage() {
         params: {
           search: debouncedSearch || undefined,
           stage: stageFilter || undefined,
+          status: statusFilter || undefined,
           clientId: clientFilter || undefined,
           limit: 100,
         },
@@ -188,7 +186,7 @@ export default function ProjectsPage() {
     } finally {
       setLoading(false);
     }
-  }, [debouncedSearch, stageFilter, clientFilter]);
+  }, [debouncedSearch, stageFilter, statusFilter, clientFilter]);
 
   const loadData = useCallback(async () => {
     await Promise.all([loadProjects(), loadReferenceData()]);
@@ -409,81 +407,9 @@ export default function ProjectsPage() {
     }
   };
 
-  // ── Client Handlers ──────────────────────────────────────────────────────
-  const handleOpenAddClient = () => {
-    setEditingClient(null);
-    setClientForm(initialClientForm);
-    setShowClientModal(true);
-  };
-
-  const handleOpenEditClient = (c) => {
-    setEditingClient(c);
-    setClientForm({
-      code: c.code || '',
-      name: c.name || '',
-      fullName: c.fullName || '',
-      contactEmail: c.contactEmail || '',
-      description: c.description || '',
-      status: c.status || 'Active',
-    });
-    setShowClientModal(true);
-  };
-
-  const handleSaveClient = async (e) => {
-    e.preventDefault();
-    if (!clientForm.name?.trim() || !clientForm.fullName?.trim() || !clientForm.contactEmail?.trim()) {
-      showToast('Please provide Short Name, Full Name, and Contact Email', 'error');
-      return;
-    }
-
-    setSubmitting(true);
-    try {
-      const payload = {
-        code: clientForm.code?.trim() || `CL-${clientForm.name.trim().toUpperCase()}`,
-        name: clientForm.name.trim(),
-        fullName: clientForm.fullName.trim(),
-        contactEmail: clientForm.contactEmail.trim().toLowerCase(),
-        description: clientForm.description?.trim() || undefined,
-        status: clientForm.status || 'Active',
-      };
-
-      if (editingClient) {
-        const res = await apiClient.put(ENDPOINTS.ADMIN.CLIENT_DETAIL(editingClient.id), payload);
-        if (res?.success) {
-          showToast(`Client "${clientForm.name}" updated successfully!`, 'success');
-          setShowClientModal(false);
-          await loadData();
-        }
-      } else {
-        const res = await apiClient.post(ENDPOINTS.ADMIN.CLIENTS, payload);
-        if (res?.success) {
-          showToast(`Client "${clientForm.name}" registered successfully!`, 'success');
-          setShowClientModal(false);
-          await loadData();
-        }
-      }
-    } catch (err) {
-      const msg = err.data?.error?.message || err.message || 'Failed to save client';
-      showToast(msg, 'error');
-    } finally {
-      setSubmitting(false);
-    }
-  };
-
-  const handleToggleClientStatus = async (c) => {
-    const nextStatus = c.status === 'Active' ? 'Inactive' : 'Active';
-    try {
-      const res = await apiClient.patch(ENDPOINTS.ADMIN.CLIENT_STATUS(c.id), {
-        status: nextStatus,
-        isActive: nextStatus === 'Active',
-      });
-      if (res?.success) {
-        showToast(`Client status updated to ${nextStatus}`, 'success');
-        await loadData();
-      }
-    } catch (err) {
-      showToast(err.message || 'Failed to toggle client status', 'error');
-    }
+  const handleOpenViewProject = (p) => {
+    setViewingProject(p);
+    setShowViewProjectModal(true);
   };
 
   // ── Exam Type Handlers ───────────────────────────────────────────────────
@@ -734,8 +660,13 @@ export default function ProjectsPage() {
   // ── Filtered Collections ─────────────────────────────────────────────────
   const filteredProjects = projects.filter(p => {
     if (clientFilter && p.clientId !== clientFilter) return false;
+    if (stageFilter && p.stage !== stageFilter) return false;
+    if (statusFilter && p.status !== statusFilter) return false;
     return true;
   });
+
+  const totalProjectPages = Math.ceil(filteredProjects.length / projectLimit) || 1;
+  const paginatedProjects = filteredProjects.slice((projectPage - 1) * projectLimit, projectPage * projectLimit);
 
   const filteredExamTypes = examTypes.filter(et => {
     if (etClientFilter && et.project?.clientId !== etClientFilter) return false;
@@ -785,13 +716,13 @@ export default function ProjectsPage() {
             <div className="breadcrumb">
               <span>Admin</span>
               <span className="breadcrumb-sep">/</span>
-              <span className="breadcrumb-current">Enterprise Hierarchy &amp; Projects</span>
+              <span className="breadcrumb-current">Project Management</span>
             </div>
             <h1 className="page-header__title" style={{ marginTop: 6 }}>
-              Client → Project → Exam Hierarchy
+              Project Management
             </h1>
             <p className="page-header__subtitle">
-              Scalable multi-tier governance: Clients, Projects, Examination Types, Instances &amp; Shifts
+              Manage examination projects, target candidates, venue capacity, exam types and examination shifts
             </p>
           </div>
           <div className="page-header__actions">
@@ -803,11 +734,6 @@ export default function ProjectsPage() {
             >
               <RefreshCw size={14} className={loading ? 'animate-spin' : ''} /> Refresh
             </button>
-            {activeTab === 'clients' && (
-              <button className="btn btn-primary" onClick={handleOpenAddClient}>
-                <Plus size={14} /> Register Client
-              </button>
-            )}
             {activeTab === 'projects' && (
               <>
                 <button
@@ -866,134 +792,32 @@ export default function ProjectsPage() {
         </div>
       )}
 
-      {/* 4-Tier Hierarchy Tabs */}
+      {/* 3-Tier Project Governance Tabs */}
       <div className="tabs" style={{ marginBottom: 20 }}>
-        <button
-          className={`tab-btn ${activeTab === 'clients' ? 'active' : ''}`}
-          onClick={() => setActiveTab('clients')}
-        >
-          <Building2 size={15} style={{ marginRight: 6, display: 'inline-block', verticalAlign: '-2px' }} />
-          1. Clients ({clients.length})
-        </button>
         <button
           className={`tab-btn ${activeTab === 'projects' ? 'active' : ''}`}
           onClick={() => setActiveTab('projects')}
         >
           <FolderOpen size={15} style={{ marginRight: 6, display: 'inline-block', verticalAlign: '-2px' }} />
-          2. Projects ({projects.length})
+          1. Projects ({projects.length})
         </button>
         <button
           className={`tab-btn ${activeTab === 'exam-types' ? 'active' : ''}`}
           onClick={() => setActiveTab('exam-types')}
         >
           <Layers size={15} style={{ marginRight: 6, display: 'inline-block', verticalAlign: '-2px' }} />
-          3. Exam Types ({examTypes.length})
+          2. Exam Types ({examTypes.length})
         </button>
         <button
           className={`tab-btn ${activeTab === 'exams' ? 'active' : ''}`}
           onClick={() => setActiveTab('exams')}
         >
           <BookOpen size={15} style={{ marginRight: 6, display: 'inline-block', verticalAlign: '-2px' }} />
-          4. Examinations &amp; Shifts ({exams.length})
+          3. Examinations &amp; Shifts ({exams.length})
         </button>
       </div>
 
-      {/* ── TAB 1: CLIENTS ─────────────────────────────────────────────────── */}
-      {activeTab === 'clients' && (
-        <div className="card">
-          <div className="card-header" style={{ flexWrap: 'wrap', gap: 12 }}>
-            <div>
-              <h3 className="card-title">Registered Testing Agency Clients</h3>
-              <p style={{ fontSize: '0.75rem', color: 'var(--text-muted)', marginTop: 2 }}>
-                Tier 1 Root: Organizations assigning national and state-level examination drives
-              </p>
-            </div>
-            <button className="btn btn-primary btn-sm" onClick={handleOpenAddClient}>
-              <Plus size={13} /> Add Client
-            </button>
-          </div>
-
-          <div className="table-wrapper">
-            <table>
-              <thead>
-                <tr>
-                  <th>Client Code</th>
-                  <th>Short Code</th>
-                  <th>Full Institutional Name</th>
-                  <th>Official Contact</th>
-                  <th>Projects Count</th>
-                  <th>Status</th>
-                  <th style={{ textAlign: 'right' }}>Actions</th>
-                </tr>
-              </thead>
-              <tbody>
-                {loading ? (
-                  <tr>
-                    <td colSpan={7} style={{ textAlign: 'center', padding: '36px', color: 'var(--text-muted)' }}>
-                      Loading clients from database...
-                    </td>
-                  </tr>
-                ) : clients.length === 0 ? (
-                  <tr>
-                    <td colSpan={7} style={{ textAlign: 'center', padding: '36px', color: 'var(--text-muted)' }}>
-                      No clients found in database. Click &quot;Add Client&quot; to register one.
-                    </td>
-                  </tr>
-                ) : (
-                  clients.map(c => (
-                    <tr key={c.id}>
-                      <td>
-                        <span style={{ fontFamily: 'monospace', fontWeight: 600 }}>{c.code || c.id}</span>
-                      </td>
-                      <td>
-                        <span style={{ fontWeight: 700, color: 'var(--color-primary)', fontSize: '0.9375rem' }}>{c.name}</span>
-                      </td>
-                      <td>
-                        <div style={{ fontWeight: 500 }}>{c.fullName}</div>
-                        {c.description && (
-                          <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)', marginTop: 2 }}>{c.description}</div>
-                        )}
-                      </td>
-                      <td>
-                        <span style={{ fontFamily: 'monospace', fontSize: '0.8125rem' }}>{c.contactEmail}</span>
-                      </td>
-                      <td>
-                        <span className="badge badge-blue" style={{ fontSize: '0.75rem' }}>
-                          {c._count?.projects ?? projects.filter(p => p.clientId === c.id).length} Projects
-                        </span>
-                      </td>
-                      <td>
-                        <StatusBadge status={c.status} />
-                      </td>
-                      <td style={{ textAlign: 'right' }}>
-                        <div style={{ display: 'inline-flex', gap: 6 }}>
-                          <button
-                            className="btn btn-secondary btn-sm"
-                            onClick={() => handleToggleClientStatus(c)}
-                            title={c.status === 'Active' ? 'Deactivate Client' : 'Activate Client'}
-                          >
-                            {c.status === 'Active' ? <ToggleRight size={14} color="#16a34a" /> : <ToggleLeft size={14} color="#dc2626" />}
-                            <span>{c.status === 'Active' ? 'Active' : 'Inactive'}</span>
-                          </button>
-                          <button
-                            className="btn btn-secondary btn-sm"
-                            onClick={() => handleOpenEditClient(c)}
-                            title="Edit Client"
-                          >
-                            <Edit size={13} />
-                          </button>
-                        </div>
-                      </td>
-                    </tr>
-                  ))
-                )}
-              </tbody>
-            </table>
-          </div>
-        </div>
-      )}
-
-      {/* ── TAB 2: PROJECTS ────────────────────────────────────────────────── */}
+      {/* ── TAB 1: PROJECTS ────────────────────────────────────────────────── */}
       {activeTab === 'projects' && (
         <>
           {/* KPI Cards */}
@@ -1052,14 +876,17 @@ export default function ProjectsPage() {
           {/* Table Card */}
           <div className="card">
             <div className="card-header" style={{ flexWrap: 'wrap', gap: 12 }}>
-              <div style={{ position: 'relative', width: 'min(100%, 260px)' }}>
+              <div style={{ position: 'relative', width: 'min(100%, 240px)' }}>
                 <Search size={14} style={{ position: 'absolute', left: 10, top: 10, color: 'var(--text-muted)' }} />
                 <input
                   type="text"
                   className="form-control"
                   placeholder="Search project name, code..."
                   value={search}
-                  onChange={e => setSearch(e.target.value)}
+                  onChange={e => {
+                    setSearch(e.target.value);
+                    setProjectPage(1);
+                  }}
                   style={{ paddingLeft: 30, fontSize: '0.8125rem' }}
                 />
               </div>
@@ -1068,8 +895,11 @@ export default function ProjectsPage() {
               <select
                 className="form-control"
                 value={clientFilter}
-                onChange={e => setClientFilter(e.target.value)}
-                style={{ width: 180, fontSize: '0.75rem' }}
+                onChange={e => {
+                  setClientFilter(e.target.value);
+                  setProjectPage(1);
+                }}
+                style={{ width: 170, fontSize: '0.75rem' }}
               >
                 <option value="">All Clients</option>
                 {clients.map(c => (
@@ -1081,115 +911,281 @@ export default function ProjectsPage() {
               <select
                 className="form-control"
                 value={stageFilter}
-                onChange={e => setStageFilter(e.target.value)}
-                style={{ width: 160, fontSize: '0.75rem' }}
+                onChange={e => {
+                  setStageFilter(e.target.value);
+                  setProjectPage(1);
+                }}
+                style={{ width: 150, fontSize: '0.75rem' }}
               >
                 <option value="">All Stages</option>
                 {STAGES.map(s => <option key={s} value={s}>{s}</option>)}
               </select>
+
+              {/* Status Filter */}
+              <select
+                className="form-control"
+                value={statusFilter}
+                onChange={e => {
+                  setStatusFilter(e.target.value);
+                  setProjectPage(1);
+                }}
+                style={{ width: 130, fontSize: '0.75rem' }}
+              >
+                <option value="">All Statuses</option>
+                <option value="Active">Active</option>
+                <option value="OnHold">On Hold</option>
+                <option value="Completed">Completed</option>
+                <option value="Closed">Closed</option>
+                <option value="Cancelled">Cancelled</option>
+              </select>
+
+              {(search || clientFilter || stageFilter || statusFilter) && (
+                <button
+                  className="btn btn-ghost btn-sm"
+                  onClick={() => {
+                    setSearch('');
+                    setClientFilter('');
+                    setStageFilter('');
+                    setStatusFilter('');
+                    setProjectPage(1);
+                  }}
+                  style={{ fontSize: '0.75rem' }}
+                >
+                  Reset
+                </button>
+              )}
+
+              <div style={{ marginLeft: 'auto', fontSize: '0.8125rem', color: 'var(--text-muted)' }}>
+                Showing <strong>{paginatedProjects.length}</strong> of <strong>{filteredProjects.length}</strong> projects
+              </div>
             </div>
 
             <div className="table-wrapper">
               <table>
                 <thead>
                   <tr>
-                    <th>Project Code</th>
-                    <th>Project Name &amp; Client</th>
-                    <th>Exam Types</th>
-                    <th>Exam Date</th>
-                    <th>Coverage</th>
-                    <th>Candidates</th>
-                    <th>Lifecycle Stage</th>
-                    <th>Status</th>
-                    <th style={{ textAlign: 'right' }}>Actions</th>
+                    <th style={{ width: 60, textAlign: 'center' }}>S. NO.</th>
+                    <th style={{ width: 130 }}>PROJECT CODE</th>
+                    <th style={{ minWidth: 170 }}>PROJECT NAME</th>
+                    <th style={{ minWidth: 140 }}>ASSOCIATED CLIENT</th>
+                    <th style={{ width: 110, textAlign: 'center' }}>EXAM TYPES</th>
+                    <th style={{ width: 140 }}>CANDIDATE TARGETS</th>
+                    <th style={{ minWidth: 150 }}>EXAMINATION DATES</th>
+                    <th style={{ minWidth: 140 }}>COVERAGE</th>
+                    <th style={{ width: 130 }}>LIFECYCLE STAGE</th>
+                    <th style={{ width: 110 }}>STATUS</th>
+                    <th style={{ width: 120, textAlign: 'right' }}>ACTIONS</th>
                   </tr>
                 </thead>
                 <tbody>
                   {loading ? (
                     <tr>
-                      <td colSpan={9} style={{ textAlign: 'center', padding: '36px', color: 'var(--text-muted)' }}>
+                      <td colSpan={11} style={{ textAlign: 'center', padding: '36px', color: 'var(--text-muted)' }}>
                         <Loader2 className="animate-spin" size={24} style={{ margin: '0 auto 8px', display: 'block' }} />
                         Querying projects from MySQL database...
                       </td>
                     </tr>
-                  ) : filteredProjects.length === 0 ? (
+                  ) : paginatedProjects.length === 0 ? (
                     <tr>
-                      <td colSpan={9} style={{ textAlign: 'center', padding: '36px', color: 'var(--text-muted)' }}>
-                        No examination projects found. Click &quot;Setup New Project&quot; to initialize one.
+                      <td colSpan={11} style={{ textAlign: 'center', padding: '36px', color: 'var(--text-muted)' }}>
+                        No examination projects found matching current filters. Click &quot;Setup New Project&quot; to initialize one.
                       </td>
                     </tr>
                   ) : (
-                    filteredProjects.map(p => (
-                      <tr key={p.id}>
-                        <td>
-                          <span style={{ fontFamily: 'monospace', fontWeight: 700, color: 'var(--color-primary)' }}>
-                            {p.projectCode}
-                          </span>
-                        </td>
-                        <td>
-                          <div style={{ fontWeight: 600, color: 'var(--text-primary)' }}>{p.name}</div>
-                          <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)', display: 'flex', alignItems: 'center', gap: 4, marginTop: 2 }}>
-                            <span className="badge badge-purple" style={{ fontSize: '0.625rem' }}>
+                    paginatedProjects.map((p, idx) => {
+                      const serialNumber = (projectPage - 1) * projectLimit + idx + 1;
+                      return (
+                        <tr key={p.id}>
+                          {/* 1. S. No. */}
+                          <td style={{ textAlign: 'center', fontWeight: 600, color: 'var(--text-muted)' }}>
+                            {serialNumber}
+                          </td>
+
+                          {/* 2. Project Code */}
+                          <td>
+                            <span
+                              style={{
+                                fontFamily: 'monospace',
+                                fontWeight: 700,
+                                color: 'var(--color-primary)',
+                                background: 'rgba(30, 64, 175, 0.08)',
+                                padding: '3px 6px',
+                                borderRadius: 4,
+                                cursor: 'pointer'
+                              }}
+                              title="Double-click to copy Project Code"
+                              onDoubleClick={() => {
+                                navigator.clipboard.writeText(p.projectCode);
+                                showToast('Project Code copied to clipboard', 'success');
+                              }}
+                            >
+                              {p.projectCode}
+                            </span>
+                          </td>
+
+                          {/* 3. Project Name */}
+                          <td>
+                            <div style={{ fontWeight: 600, color: 'var(--text-primary)' }}>{p.name}</div>
+                            {p.description && (
+                              <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)', marginTop: 2, maxWidth: 220, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                                {p.description}
+                              </div>
+                            )}
+                          </td>
+
+                          {/* 4. Associated Client */}
+                          <td>
+                            <span className="badge badge-purple" style={{ fontSize: '0.75rem', fontWeight: 600 }}>
                               {p.client?.name || 'Client'}
                             </span>
-                          </div>
-                        </td>
-                        <td>
-                          <span className="badge badge-info" style={{ fontSize: '0.6875rem' }}>
-                            {p._count?.examTypes ?? examTypes.filter(et => et.projectId === p.id).length} Types
-                          </span>
-                        </td>
-                        <td>
-                          <div style={{ display: 'flex', flexDirection: 'column', gap: 2, fontSize: '0.8125rem' }}>
-                            <div style={{ display: 'flex', alignItems: 'center', gap: 5 }}>
-                              <Calendar size={13} color="var(--text-muted)" />
-                              <span>{p.examDate ? new Date(p.examDate).toLocaleDateString('en-IN') : 'TBD'}</span>
+                          </td>
+
+                          {/* 5. Exam Types */}
+                          <td style={{ textAlign: 'center' }}>
+                            <span className="badge badge-info" style={{ fontSize: '0.6875rem' }}>
+                              {p._count?.examTypes ?? examTypes.filter(et => et.projectId === p.id).length} Types
+                            </span>
+                          </td>
+
+                          {/* 6. Candidate Targets */}
+                          <td>
+                            <span style={{ fontWeight: 600, color: 'var(--color-primary)' }}>
+                              {Number(p.candidateTarget || 0).toLocaleString('en-IN')}
+                            </span>
+                          </td>
+
+                          {/* 7. Examination Dates */}
+                          <td>
+                            <div style={{ display: 'flex', flexDirection: 'column', gap: 2, fontSize: '0.8125rem' }}>
+                              <div style={{ display: 'flex', alignItems: 'center', gap: 5 }}>
+                                <Calendar size={13} color="var(--text-muted)" />
+                                <span>{p.examDate ? new Date(p.examDate).toLocaleDateString('en-IN') : 'TBD'}</span>
+                              </div>
+                              {p.examDates && p.examDates.length > 1 && (
+                                <span className="badge badge-purple" style={{ fontSize: '0.625rem', width: 'fit-content' }}>
+                                  +{p.examDates.length - 1} more ({p.examDates.length} shifts)
+                                </span>
+                              )}
                             </div>
-                            {p.examDates && p.examDates.length > 1 && (
-                              <span className="badge badge-purple" style={{ fontSize: '0.625rem', width: 'fit-content' }}>
-                                +{p.examDates.length - 1} more ({p.examDates.length} shifts)
-                              </span>
-                            )}
-                          </div>
-                        </td>
-                        <td>
-                          <div style={{ fontSize: '0.8125rem' }}>
-                            <strong>{p.citiesCount || 0}</strong> cities • <strong>{p.centreTarget || 0}</strong> centres
-                          </div>
-                        </td>
-                        <td>
-                          <span style={{ fontWeight: 600, color: 'var(--color-primary)' }}>
-                            {Number(p.candidateTarget || 0).toLocaleString('en-IN')}
-                          </span>
-                        </td>
-                        <td>
-                          <span className="badge badge-info" style={{ fontSize: '0.6875rem' }}>
-                            {p.stage}
-                          </span>
-                        </td>
-                        <td>
-                          <button
-                            onClick={() => handleToggleProjectStatus(p)}
-                            style={{ background: 'none', border: 'none', cursor: 'pointer', padding: 0 }}
-                            title="Click to toggle status"
-                          >
-                            <StatusBadge status={p.status} />
-                          </button>
-                        </td>
-                        <td style={{ textAlign: 'right' }}>
-                          <button
-                            className="btn btn-secondary btn-sm"
-                            onClick={() => handleOpenEditProject(p)}
-                            title="Edit project parameters"
-                          >
-                            <Edit size={13} /> Edit
-                          </button>
-                        </td>
-                      </tr>
-                    ))
+                          </td>
+
+                          {/* 8. Coverage */}
+                          <td>
+                            <div style={{ fontSize: '0.8125rem' }}>
+                              <strong>{p.citiesCount || 0}</strong> cities • <strong>{p.centreTarget || 0}</strong> centres
+                            </div>
+                          </td>
+
+                          {/* 9. Lifecycle Stage */}
+                          <td>
+                            <span className="badge badge-info" style={{ fontSize: '0.6875rem' }}>
+                              {p.stage}
+                            </span>
+                          </td>
+
+                          {/* 10. Status */}
+                          <td>
+                            <button
+                              onClick={() => handleToggleProjectStatus(p)}
+                              style={{ background: 'none', border: 'none', cursor: 'pointer', padding: 0 }}
+                              title="Click to toggle status"
+                            >
+                              <StatusBadge status={p.status} />
+                            </button>
+                          </td>
+
+                          {/* 11. Actions */}
+                          <td style={{ textAlign: 'right' }}>
+                            <div style={{ display: 'inline-flex', gap: 6 }}>
+                              <button
+                                className="btn btn-secondary btn-sm"
+                                onClick={() => handleOpenViewProject(p)}
+                                title="View Project Details"
+                                style={{ padding: '5px 8px' }}
+                              >
+                                <Eye size={13} />
+                              </button>
+                              <button
+                                className="btn btn-secondary btn-sm"
+                                onClick={() => handleOpenEditProject(p)}
+                                title="Edit project parameters"
+                                style={{ padding: '5px 8px' }}
+                              >
+                                <Edit size={13} />
+                              </button>
+                            </div>
+                          </td>
+                        </tr>
+                      );
+                    })
                   )}
                 </tbody>
               </table>
+            </div>
+
+            {/* Pagination Footer */}
+            <div className="card-footer" style={{
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'space-between',
+              flexWrap: 'wrap',
+              gap: 12,
+              padding: '12px 20px',
+              borderTop: '1px solid rgba(255, 255, 255, 0.08)'
+            }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 10, fontSize: '0.8125rem', color: 'var(--text-muted)' }}>
+                <span>Rows per page:</span>
+                <select
+                  value={projectLimit}
+                  onChange={(e) => {
+                    setProjectLimit(Number(e.target.value));
+                    setProjectPage(1);
+                  }}
+                  className="form-control"
+                  style={{ width: 70, height: 32, padding: '2px 8px', fontSize: '0.8125rem' }}
+                >
+                  <option value={10}>10</option>
+                  <option value={25}>25</option>
+                  <option value={50}>50</option>
+                </select>
+                <span>
+                  Page <strong>{projectPage}</strong> of <strong>{totalProjectPages}</strong>
+                </span>
+              </div>
+
+              <div style={{ display: 'flex', gap: 6 }}>
+                <button
+                  className="btn btn-secondary btn-sm"
+                  disabled={projectPage <= 1 || loading}
+                  onClick={() => setProjectPage(p => Math.max(1, p - 1))}
+                >
+                  Previous
+                </button>
+                {Array.from({ length: Math.min(5, totalProjectPages) }, (_, i) => {
+                  let pNum = i + 1;
+                  if (totalProjectPages > 5 && projectPage > 3) {
+                    pNum = projectPage - 2 + i;
+                    if (pNum > totalProjectPages) pNum = totalProjectPages - (4 - i);
+                  }
+                  return (
+                    <button
+                      key={pNum}
+                      className={`btn btn-sm ${projectPage === pNum ? 'btn-primary' : 'btn-secondary'}`}
+                      onClick={() => setProjectPage(pNum)}
+                      style={{ minWidth: 32, padding: '4px 8px' }}
+                    >
+                      {pNum}
+                    </button>
+                  );
+                })}
+                <button
+                  className="btn btn-secondary btn-sm"
+                  disabled={projectPage >= totalProjectPages || loading}
+                  onClick={() => setProjectPage(p => Math.min(totalProjectPages, p + 1))}
+                >
+                  Next
+                </button>
+              </div>
             </div>
           </div>
         </>
@@ -1528,15 +1524,19 @@ export default function ProjectsPage() {
                     />
                   </div>
                   <div className="form-group">
-                    <label className="form-label">Client Agency *</label>
+                    <label className="form-label">Associated Client *</label>
                     <select
                       className="form-control"
                       required
                       value={projectForm.clientId}
                       onChange={e => setProjectForm({ ...projectForm, clientId: e.target.value })}
                     >
-                      <option value="">Select a client agency...</option>
-                      {clients.map(c => <option key={c.id} value={c.id}>{c.name} — {c.fullName}</option>)}
+                      <option value="">Select an active client...</option>
+                      {clients.map(c => (
+                        <option key={c.id} value={c.id}>
+                          {c.name} {c.fullName ? `(${c.fullName})` : ''} {c.status === 'Inactive' ? '[Inactive]' : ''}
+                        </option>
+                      ))}
                     </select>
                   </div>
                 </div>
@@ -1769,99 +1769,142 @@ export default function ProjectsPage() {
         </div>
       )}
 
-      {/* ── MODAL 2: CLIENT MODAL ──────────────────────────────────────────── */}
-      {showClientModal && (
-        <div className="modal-backdrop" onClick={() => setShowClientModal(false)}>
-          <div className="modal" onClick={e => e.stopPropagation()} style={{ maxWidth: 480 }}>
+      {/* ── VIEW PROJECT MODAL ──────────────────────────────────────────────── */}
+      {showViewProjectModal && viewingProject && (
+        <div className="modal-backdrop" onClick={() => setShowViewProjectModal(false)}>
+          <div className="modal" onClick={e => e.stopPropagation()} style={{ maxWidth: 700 }}>
             <div className="modal-header">
-              <h3 className="modal-title">{editingClient ? `Edit Client: ${clientForm.name}` : 'Register Client Testing Body'}</h3>
-              <button className="btn-ghost" onClick={() => setShowClientModal(false)} style={{ padding: 4 }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                <FolderOpen size={22} color="var(--color-primary)" />
+                <div>
+                  <h3 className="modal-title">{viewingProject.name}</h3>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginTop: 4 }}>
+                    <span style={{
+                      fontFamily: 'monospace',
+                      fontSize: '0.75rem',
+                      background: 'rgba(30, 64, 175, 0.1)',
+                      color: 'var(--color-primary)',
+                      padding: '2px 6px',
+                      borderRadius: 4,
+                      fontWeight: 700
+                    }}>
+                      {viewingProject.projectCode}
+                    </span>
+                    <span className="badge badge-purple" style={{ fontSize: '0.6875rem' }}>
+                      {viewingProject.client?.name || 'Associated Client'}
+                    </span>
+                    <StatusBadge status={viewingProject.status} />
+                  </div>
+                </div>
+              </div>
+              <button
+                className="btn-ghost"
+                onClick={() => setShowViewProjectModal(false)}
+                style={{ padding: 4 }}
+              >
                 <X size={18} />
               </button>
             </div>
-            <form onSubmit={handleSaveClient}>
-              <div className="modal-body" style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
-                <div className="grid-2">
-                  <div className="form-group">
-                    <label className="form-label">Short Code / Acronym *</label>
-                    <input
-                      type="text"
-                      className="form-control"
-                      required
-                      placeholder="e.g. Eduquity / FutureScope"
-                      value={clientForm.name}
-                      onChange={e => setClientForm({ ...clientForm, name: e.target.value })}
-                    />
-                  </div>
-                  <div className="form-group">
-                    <label className="form-label">Client Code (Optional)</label>
-                    <input
-                      type="text"
-                      className="form-control"
-                      placeholder="e.g. CL-EDQ"
-                      value={clientForm.code}
-                      onChange={e => setClientForm({ ...clientForm, code: e.target.value })}
-                    />
+
+            <div className="modal-body" style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
+              {/* Parameters Grid */}
+              <div style={{
+                display: 'grid',
+                gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))',
+                gap: 14,
+                padding: '16px',
+                background: 'rgba(255, 255, 255, 0.03)',
+                borderRadius: 8,
+                border: '1px solid rgba(255, 255, 255, 0.08)'
+              }}>
+                <div>
+                  <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>Associated Client</div>
+                  <div style={{ fontWeight: 600, marginTop: 2 }}>{viewingProject.client?.fullName || viewingProject.client?.name || '—'}</div>
+                </div>
+                <div>
+                  <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>Lifecycle Stage</div>
+                  <div style={{ marginTop: 2 }}>
+                    <span className="badge badge-info">{viewingProject.stage}</span>
                   </div>
                 </div>
-
-                <div className="form-group">
-                  <label className="form-label">Full Organization Name *</label>
-                  <input
-                    type="text"
-                    className="form-control"
-                    required
-                    placeholder="e.g. Eduquity Career Technologies Private Limited"
-                    value={clientForm.fullName}
-                    onChange={e => setClientForm({ ...clientForm, fullName: e.target.value })}
-                  />
+                <div>
+                  <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>Primary Exam Type</div>
+                  <div style={{ fontWeight: 600, marginTop: 2 }}>{viewingProject.examType || 'CBT'}</div>
                 </div>
-
-                <div className="form-group">
-                  <label className="form-label">Official Contact Email *</label>
-                  <input
-                    type="email"
-                    className="form-control"
-                    required
-                    placeholder="contact@agency.com"
-                    value={clientForm.contactEmail}
-                    onChange={e => setClientForm({ ...clientForm, contactEmail: e.target.value })}
-                  />
+                <div>
+                  <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>Target Candidates</div>
+                  <div style={{ fontWeight: 700, color: 'var(--color-primary)', marginTop: 2 }}>
+                    {Number(viewingProject.candidateTarget || 0).toLocaleString('en-IN')}
+                  </div>
                 </div>
-
-                <div className="form-group">
-                  <label className="form-label">Description</label>
-                  <textarea
-                    className="form-control"
-                    rows={2}
-                    placeholder="Agency profile, mandates..."
-                    value={clientForm.description}
-                    onChange={e => setClientForm({ ...clientForm, description: e.target.value })}
-                  />
+                <div>
+                  <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>Coverage Target</div>
+                  <div style={{ marginTop: 2, fontSize: '0.8125rem' }}>
+                    <strong>{viewingProject.citiesCount || 0}</strong> Cities • <strong>{viewingProject.centreTarget || 0}</strong> Centres
+                  </div>
                 </div>
-
-                <div className="form-group">
-                  <label className="form-label">Status</label>
-                  <select
-                    className="form-control"
-                    value={clientForm.status}
-                    onChange={e => setClientForm({ ...clientForm, status: e.target.value })}
-                  >
-                    <option value="Active">Active</option>
-                    <option value="Inactive">Inactive</option>
-                  </select>
+                <div>
+                  <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>Scheduled Exam Date</div>
+                  <div style={{ marginTop: 2, fontSize: '0.8125rem' }}>
+                    {viewingProject.examDate ? new Date(viewingProject.examDate).toLocaleDateString('en-IN') : 'TBD'}
+                  </div>
                 </div>
               </div>
-              <div className="modal-footer">
-                <button type="button" className="btn btn-secondary" onClick={() => setShowClientModal(false)}>
-                  Cancel
-                </button>
-                <button type="submit" className="btn btn-primary" disabled={submitting}>
-                  {submitting ? <Loader2 size={14} className="animate-spin" /> : <Check size={14} />}
-                  <span>{editingClient ? 'Save Changes' : 'Save Client'}</span>
-                </button>
-              </div>
-            </form>
+
+              {viewingProject.description && (
+                <div>
+                  <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)', marginBottom: 4 }}>Scope & Objectives</div>
+                  <div style={{ fontSize: '0.8125rem', padding: '10px 14px', background: 'rgba(255,255,255,0.02)', borderRadius: 6, border: '1px solid rgba(255,255,255,0.06)' }}>
+                    {viewingProject.description}
+                  </div>
+                </div>
+              )}
+
+              {/* Exam Shifts */}
+              {viewingProject.examDates && viewingProject.examDates.length > 0 && (
+                <div>
+                  <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)', marginBottom: 6 }}>Configured Examination Shifts</div>
+                  <div className="table-wrapper" style={{ maxHeight: 180, overflowY: 'auto' }}>
+                    <table>
+                      <thead>
+                        <tr>
+                          <th>Date</th>
+                          <th>Shift</th>
+                          <th>Timings</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {viewingProject.examDates.map((ed, idx) => (
+                          <tr key={ed.id || idx}>
+                            <td>{ed.examDate ? new Date(ed.examDate).toLocaleDateString('en-IN') : '—'}</td>
+                            <td><span className="badge badge-purple">{ed.shift}</span></td>
+                            <td>{ed.startTime || '09:00 AM'} – {ed.endTime || '12:00 PM'}</td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                </div>
+              )}
+            </div>
+
+            <div className="modal-footer" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+              <button
+                className="btn btn-secondary btn-sm"
+                onClick={() => {
+                  setShowViewProjectModal(false);
+                  handleOpenEditProject(viewingProject);
+                }}
+              >
+                <Edit size={13} /> Edit Project
+              </button>
+              <button
+                className="btn btn-primary btn-sm"
+                onClick={() => setShowViewProjectModal(false)}
+              >
+                Close
+              </button>
+            </div>
           </div>
         </div>
       )}

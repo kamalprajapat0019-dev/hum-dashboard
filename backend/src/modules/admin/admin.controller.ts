@@ -579,6 +579,16 @@ export class AdminController {
   }
 
   // ── Client Management ───────────────────────────────────────────────────
+  static async getClientsSummary(_req: AuthenticatedRequest, res: Response): Promise<void> {
+    try {
+      const summary = await AdminService.getClientsSummary();
+      sendSuccess(res, summary);
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : 'Failed to retrieve clients summary';
+      sendError(res, 500, 'CLIENT_SUMMARY_ERROR', msg);
+    }
+  }
+
   static async listClients(req: AuthenticatedRequest, res: Response): Promise<void> {
     try {
       const { page, limit, search, status } = req.query as any;
@@ -597,6 +607,9 @@ export class AdminController {
 
   static async getClientById(req: AuthenticatedRequest, res: Response): Promise<void> {
     try {
+      if (req.params.id === 'summary') {
+        return AdminController.getClientsSummary(req, res);
+      }
       const client = await AdminService.getClientById(req.params.id as string);
       sendSuccess(res, client);
     } catch (err: unknown) {

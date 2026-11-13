@@ -2294,6 +2294,20 @@ export class AdminService {
   }
 
   // ── 7. Client Management ──────────────────────────────────────────────────
+  static async getClientsSummary() {
+    const [totalClients, activeClients, inactiveClients] = await Promise.all([
+      prisma.client.count(),
+      prisma.client.count({ where: { status: 'Active' } }),
+      prisma.client.count({ where: { status: { not: 'Active' } } }),
+    ]);
+
+    return {
+      totalClients,
+      activeClients,
+      inactiveClients,
+    };
+  }
+
   static async listClients(params: { page: number; limit: number; search?: string; status?: string }) {
     const { page, limit, search, status } = params;
     const skip = (page - 1) * limit;
@@ -2303,6 +2317,7 @@ export class AdminService {
       ...(search
         ? {
           OR: [
+            { code: { contains: search } },
             { name: { contains: search } },
             { fullName: { contains: search } },
             { contactEmail: { contains: search } },
@@ -2321,13 +2336,39 @@ export class AdminService {
           _count: {
             select: { projects: true },
           },
+          projects: {
+            select: {
+              id: true,
+              status: true,
+            },
+          },
         },
       }),
       prisma.client.count({ where }),
     ]);
 
+    const mappedClients = clients.map((c: any, idx: number) => {
+      const totalExams = c._count?.projects ?? (c.projects?.length || 0);
+      const activeExams = c.projects ? c.projects.filter((p: any) => p.status === 'Active').length : 0;
+      return {
+        id: c.id,
+        code: c.code || `CLT-${c.id.slice(-4).toUpperCase()}`,
+        name: c.name,
+        fullName: c.fullName,
+        contactEmail: c.contactEmail,
+        description: c.description,
+        isActive: c.isActive,
+        status: c.status || 'Active',
+        createdAt: c.createdAt,
+        updatedAt: c.updatedAt,
+        totalExams,
+        activeExams,
+        serialNumber: skip + idx + 1,
+      };
+    });
+
     return {
-      data: clients,
+      data: mappedClients,
       pagination: {
         total,
         page,
@@ -2342,7 +2383,6 @@ export class AdminService {
       where: { id },
       include: {
         projects: {
-          take: 10,
           orderBy: { createdAt: 'desc' },
           select: {
             id: true,
@@ -2351,6 +2391,10 @@ export class AdminService {
             examType: true,
             stage: true,
             status: true,
+            candidateTarget: true,
+            citiesCount: true,
+            centreTarget: true,
+            examDate: true,
           },
         },
       },
@@ -2360,7 +2404,15 @@ export class AdminService {
       throw new Error('Client not found');
     }
 
-    return client;
+    const totalExams = client.projects.length;
+    const activeExams = client.projects.filter((p: any) => p.status === 'Active').length;
+
+    return {
+      ...client,
+      code: client.code || `CLT-${client.id.slice(-4).toUpperCase()}`,
+      totalExams,
+      activeExams,
+    };
   }
 
   static async createClient(
@@ -2376,14 +2428,38 @@ export class AdminService {
     adminUserId: string,
     adminEmail: string
   ) {
+    const trimmedName = data.name.trim();
+    const cleanEmail = data.contactEmail.trim().toLowerCase();
+    const repName = data.fullName.trim();
+
+    // 1. Check duplicate client name
+    const existingName = await prisma.client.findFirst({
+      where: { name: { equals: trimmedName } },
+    });
+    if (existingName) {
+      throw new Error(`A client organisation with the name "${trimmedName}" already exists`);
+    }
+
+    // 2. Auto-generate immutable Client ID / Code if not provided
+    let finalCode = data.code?.trim().toUpperCase();
+    if (!finalCode) {
+      const count = await prisma.client.count();
+      let candidate = `CLT-${String(count + 1).padStart(3, '0')}`;
+      const codeExists = await prisma.client.findUnique({ where: { code: candidate } });
+      if (codeExists) {
+        candidate = `CLT-${Date.now().toString().slice(-4)}`;
+      }
+      finalCode = candidate;
+    }
+
     return prisma.$transaction(async (tx: any) => {
       const client = await tx.client.create({
         data: {
-          code: data.code,
-          name: data.name,
-          fullName: data.fullName,
-          contactEmail: data.contactEmail,
-          description: data.description,
+          code: finalCode,
+          name: trimmedName,
+          fullName: repName,
+          contactEmail: cleanEmail,
+          description: data.description?.trim() || null,
           isActive: data.isActive ?? true,
           status: data.status || 'Active',
         },
@@ -2396,7 +2472,7 @@ export class AdminService {
           action: 'CLIENT_CREATED',
           entity: 'Client',
           entityId: client.id,
-          details: { name: client.name, fullName: client.fullName },
+          details: { name: client.name, fullName: client.fullName, code: client.code },
         },
       });
 
@@ -2424,9 +2500,20 @@ export class AdminService {
         throw new Error('Client not found');
       }
 
+      // Editing rules:
+      // Client ID: Immutable (never modified)
+      // Client Name: Read-only during normal edit (preserve existing unless explicit rename process)
+      const updatePayload: Prisma.ClientUpdateInput = {
+        fullName: data.fullName !== undefined ? data.fullName.trim() : existing.fullName,
+        contactEmail: data.contactEmail !== undefined ? data.contactEmail.trim().toLowerCase() : existing.contactEmail,
+        description: data.description !== undefined ? data.description.trim() : existing.description,
+        status: data.status !== undefined ? data.status : existing.status,
+        isActive: data.isActive !== undefined ? data.isActive : (data.status === 'Active' ? true : existing.isActive),
+      };
+
       const updated = await tx.client.update({
         where: { id },
-        data,
+        data: updatePayload,
       });
 
       await tx.auditLog.create({
@@ -2436,7 +2523,10 @@ export class AdminService {
           action: 'CLIENT_UPDATED',
           entity: 'Client',
           entityId: id,
-          details: { changes: data },
+          details: {
+            before: { fullName: existing.fullName, contactEmail: existing.contactEmail, status: existing.status },
+            after: { fullName: updated.fullName, contactEmail: updated.contactEmail, status: updated.status },
+          },
         },
       });
 

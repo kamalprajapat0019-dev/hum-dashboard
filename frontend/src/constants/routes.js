@@ -11,6 +11,7 @@ export const ROUTES = {
   ADMIN: {
     DASHBOARD: '/admin',
     USERS: '/admin/users',
+    CLIENTS: '/admin/clients',
     PROJECTS: '/admin/projects',
     CENTRES: '/admin/centres',
     ELIGIBILITY: '/admin/eligibility',

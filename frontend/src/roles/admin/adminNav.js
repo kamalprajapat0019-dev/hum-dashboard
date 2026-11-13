@@ -1,5 +1,5 @@
 import {
-  LayoutDashboard, Users, Briefcase, Building2, ShieldCheck,
+  LayoutDashboard, Users, Briefcase, BriefcaseBusiness, Building2, ShieldCheck,
   Lock, FileText, ClipboardCheck, BookOpen, Calculator,
   CheckSquare, AlertCircle, Bell, BarChart3, Settings
 } from 'lucide-react';
@@ -8,7 +8,8 @@ import { ROUTES } from '../../constants/routes';
 export const adminNav = [
   { label: 'Executive Overview', path: ROUTES.ADMIN.DASHBOARD, icon: LayoutDashboard },
   { label: 'User & Role Mgmt', path: ROUTES.ADMIN.USERS, icon: Users },
-  { label: 'Client & Projects', path: ROUTES.ADMIN.PROJECTS, icon: Briefcase },
+  { label: 'Client Management', path: ROUTES.ADMIN.CLIENTS, icon: Building2 },
+  { label: 'Project Management', path: ROUTES.ADMIN.PROJECTS, icon: BriefcaseBusiness },
   { label: 'Centre Master', path: ROUTES.ADMIN.CENTRES, icon: Building2 },
   { label: 'Eligibility & Blacklist', path: ROUTES.ADMIN.ELIGIBILITY, icon: ShieldCheck },
   { label: 'Booking & Locking', path: ROUTES.ADMIN.BOOKING, icon: Lock },

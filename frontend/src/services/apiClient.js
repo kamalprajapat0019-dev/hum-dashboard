@@ -91,9 +91,39 @@ class ApiClient {
       }
 
       // ── 2. In-Flight Request Deduplication ────────────────────────────────
-      // If an identical request is already active, share its promise
+      // If an identical request is already active, share its promise safely
       if (inFlightRequests.has(cacheKey)) {
-        return inFlightRequests.get(cacheKey);
+        const inFlight = inFlightRequests.get(cacheKey);
+        if (options.signal) {
+          if (options.signal.aborted) {
+            const abortErr = new DOMException('This operation was aborted', 'AbortError');
+            abortErr.name = 'AbortError';
+            throw abortErr;
+          }
+          return new Promise((resolve, reject) => {
+            const onAbort = () => {
+              const abortErr = new DOMException('This operation was aborted', 'AbortError');
+              abortErr.name = 'AbortError';
+              reject(abortErr);
+            };
+            options.signal.addEventListener('abort', onAbort, { once: true });
+            inFlight
+              .then(resolve)
+              .catch((err) => {
+                // If the shared request was aborted by another caller's signal, but our signal is still active,
+                // do NOT fail this caller! Start a fresh request immediately.
+                if ((err?.name === 'AbortError' || err?.message?.includes('aborted')) && !options.signal.aborted) {
+                  inFlightRequests.delete(cacheKey);
+                  return this.request(endpoint, { ...options, bypassCache: true }).then(resolve).catch(reject);
+                }
+                reject(err);
+              })
+              .finally(() => {
+                options.signal.removeEventListener('abort', onAbort);
+              });
+          });
+        }
+        return inFlight;
       }
     }
 
@@ -110,8 +140,12 @@ class ApiClient {
     if (options.signal) {
       if (options.signal.aborted) {
         controller.abort();
+        inFlightRequests.delete(cacheKey);
       } else {
-        options.signal.addEventListener('abort', () => controller.abort());
+        options.signal.addEventListener('abort', () => {
+          controller.abort();
+          inFlightRequests.delete(cacheKey);
+        }, { once: true });
       }
     }
 

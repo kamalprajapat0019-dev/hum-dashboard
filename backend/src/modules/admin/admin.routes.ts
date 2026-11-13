@@ -47,6 +47,7 @@ router.use(requireRole(Role.ADMIN));
 router.get('/analytics', validateRequest({ query: analyticsQuerySchema }), AdminController.getAnalytics);
 
 // Client Management
+router.get('/clients/summary', AdminController.getClientsSummary);
 router.get('/clients', validateRequest({ query: clientQuerySchema }), AdminController.listClients);
 router.post('/clients', validateRequest({ body: createClientSchema }), AdminController.createClient);
 router.get('/clients/:id', AdminController.getClientById);

@@ -73,6 +73,7 @@ export const ENDPOINTS = {
     BLACKLIST: '/admin/eligibility/blacklist',
     OVERRIDE_ELIGIBILITY: '/admin/eligibility/override',
     AUDIT_LOGS: '/admin/audit-logs',
+    CLIENTS_SUMMARY: '/admin/clients/summary',
     CLIENTS: '/admin/clients',
     CLIENT_DETAIL: (id) => `/admin/clients/${id}`,
     CLIENT_STATUS: (id) => `/admin/clients/${id}/status`,

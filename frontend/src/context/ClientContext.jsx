@@ -50,8 +50,11 @@ export function ClientProvider({ children }) {
     if (stored && (stored === VERIFIED_ENTERPRISE_CLIENTS[0].id || stored === VERIFIED_ENTERPRISE_CLIENTS[1].id)) {
       return stored;
     }
-    return VERIFIED_ENTERPRISE_CLIENTS[0].id; // Default to Eduquity
+    const defaultId = VERIFIED_ENTERPRISE_CLIENTS[0].id; // Default to Eduquity
+    storage.set(STORAGE_KEY, defaultId, 'local');
+    return defaultId;
   });
+  const [isClientInitialized, setIsClientInitialized] = useState(true);
   const [loadingClients, setLoadingClients] = useState(false);
   const [clientError, setClientError] = useState(null);
 
@@ -89,17 +92,29 @@ export function ClientProvider({ children }) {
           const validStored = enterpriseClients.find((c) => c.id === storedId);
 
           if (validStored) {
-            setSelectedClientIdState(validStored.id);
+            setSelectedClientIdState((prev) => {
+              if (prev !== validStored.id) {
+                storage.set(STORAGE_KEY, validStored.id, 'local');
+                return validStored.id;
+              }
+              return prev;
+            });
           } else {
             // Default to Eduquity
             const eduquityClient =
               enterpriseClients.find((c) => c.name.toLowerCase().includes('eduquity')) ||
               enterpriseClients[0];
             if (eduquityClient) {
-              setSelectedClientIdState(eduquityClient.id);
-              storage.set(STORAGE_KEY, eduquityClient.id, 'local');
+              setSelectedClientIdState((prev) => {
+                if (prev !== eduquityClient.id) {
+                  storage.set(STORAGE_KEY, eduquityClient.id, 'local');
+                  return eduquityClient.id;
+                }
+                return prev;
+              });
             }
           }
+          setIsClientInitialized(true);
         }
       } else {
         throw new Error(res?.message || 'Failed to retrieve clients list');
@@ -122,12 +137,12 @@ export function ClientProvider({ children }) {
   }, [isAuthorizedToFetchClients, fetchClients]);
 
   const setSelectedClientId = useCallback((clientId) => {
-    setSelectedClientIdState(clientId);
-    if (clientId) {
+    if (!clientId) return;
+    setSelectedClientIdState((prev) => {
+      if (prev === clientId) return prev;
       storage.set(STORAGE_KEY, clientId, 'local');
-    } else {
-      storage.remove(STORAGE_KEY, 'local');
-    }
+      return clientId;
+    });
   }, []);
 
   const selectedClient = useMemo(() => {
@@ -141,11 +156,12 @@ export function ClientProvider({ children }) {
       selectedClient,
       setSelectedClientId,
       loadingClients,
+      isClientInitialized,
       clientError,
       refreshClients: fetchClients,
       ALLOWED_CLIENT_NAMES,
     }),
-    [clients, selectedClientId, selectedClient, setSelectedClientId, loadingClients, clientError, fetchClients]
+    [clients, selectedClientId, selectedClient, setSelectedClientId, loadingClients, isClientInitialized, clientError, fetchClients]
   );
 
   return <ClientContext.Provider value={value}>{children}</ClientContext.Provider>;
@@ -161,6 +177,7 @@ export function useClientFilter() {
       selectedClient: VERIFIED_ENTERPRISE_CLIENTS[0],
       setSelectedClientId: () => {},
       loadingClients: false,
+      isClientInitialized: true,
       clientError: null,
       refreshClients: () => Promise.resolve(),
       ALLOWED_CLIENT_NAMES,
