@@ -1,6 +1,8 @@
 /**
  * Common components bridge (Backward compatibility & shared primitives)
  */
+export { Button } from '../ui/Button';
+export { IconButton } from '../ui/IconButton';
 export { KpiCard } from '../ui/KpiCard';
 export { StatusBadge } from '../ui/StatusBadge';
 export { ProgressRing } from '../ui/ProgressRing';
@@ -8,6 +10,18 @@ export { EmptyState } from '../feedback/EmptyState';
 export { SkeletonRows } from '../feedback/SkeletonRows';
 export { ErrorBoundary } from '../feedback/ErrorBoundary';
 export { default as ClientDropdown } from './ClientDropdown';
+
+// Modals
+export { BaseModal } from '../modals/BaseModal';
+
+// Actions
+export { ActionGroup, ViewAction, EditAction, DeleteAction, DownloadAction } from '../actions';
+
+// Forms
+export { FormField, FormInput, FormSelect, FormTextarea, FormActions } from '../forms';
+
+// Tables
+export { DataTable, TableToolbar, TablePagination, TableEmptyState, TableLoadingState } from '../tables';
 
 /**
  * Section Header

@@ -28,6 +28,7 @@ export const appConfig = {
   },
   auth: {
     tokenStorageKey: 'oem_token',
+    refreshTokenStorageKey: 'oem_refresh_token',
     userStorageKey: 'oem_user',
     sessionTimeoutMinutes: 120,
   },

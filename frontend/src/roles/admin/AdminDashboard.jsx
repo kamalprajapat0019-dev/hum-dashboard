@@ -95,30 +95,24 @@ export default function AdminDashboard() {
 
   // Cascading hierarchy filter states
   const [selectedProjectId, setSelectedProjectId] = useState('');
-  const [selectedExamTypeId, setSelectedExamTypeId] = useState('');
   const [selectedExamId, setSelectedExamId] = useState('');
 
   // Dropdown options lists
   const [availableProjects, setAvailableProjects] = useState([]);
-  const [availableExamTypes, setAvailableExamTypes] = useState([]);
   const [availableExams, setAvailableExams] = useState([]);
 
   const [loadingProjects, setLoadingProjects] = useState(false);
-  const [loadingExamTypes, setLoadingExamTypes] = useState(false);
   const [loadingExams, setLoadingExams] = useState(false);
 
   // Safe normalized arrays
   const safeAvailableProjects = Array.isArray(availableProjects) ? availableProjects : [];
-  const safeAvailableExamTypes = Array.isArray(availableExamTypes) ? availableExamTypes : [];
   const safeAvailableExams = Array.isArray(availableExams) ? availableExams : [];
 
   // When selectedClientId changes: reset downstream & load projects
   useEffect(() => {
     setSelectedProjectId('');
-    setSelectedExamTypeId('');
     setSelectedExamId('');
     setAvailableProjects([]);
-    setAvailableExamTypes([]);
     setAvailableExams([]);
 
     if (selectedClientId) {
@@ -134,43 +128,23 @@ export default function AdminDashboard() {
     }
   }, [selectedClientId]);
 
-  // When selectedProjectId changes: reset downstream & load exam types
+  // When selectedProjectId changes: reset downstream & load exams directly for project
   useEffect(() => {
-    setSelectedExamTypeId('');
     setSelectedExamId('');
-    setAvailableExamTypes([]);
     setAvailableExams([]);
 
     if (selectedProjectId) {
-      setLoadingExamTypes(true);
-      apiClient.get(ENDPOINTS.ADMIN.EXAM_TYPES, { params: { projectId: selectedProjectId, limit: 100 } })
-        .then(res => {
-          if (res?.success && Array.isArray(res.data)) {
-            setAvailableExamTypes(res.data);
-          }
-        })
-        .catch(err => console.error('Failed to load exam types for project:', err))
-        .finally(() => setLoadingExamTypes(false));
-    }
-  }, [selectedProjectId]);
-
-  // When selectedExamTypeId changes: reset downstream & load exams
-  useEffect(() => {
-    setSelectedExamId('');
-    setAvailableExams([]);
-
-    if (selectedExamTypeId) {
       setLoadingExams(true);
-      apiClient.get(ENDPOINTS.ADMIN.EXAMS, { params: { examTypeId: selectedExamTypeId, limit: 100 } })
+      apiClient.get(ENDPOINTS.ADMIN.EXAMS, { params: { projectId: selectedProjectId, limit: 100 } })
         .then(res => {
           if (res?.success && Array.isArray(res.data)) {
             setAvailableExams(res.data);
           }
         })
-        .catch(err => console.error('Failed to load exams for exam type:', err))
+        .catch(err => console.error('Failed to load exams for project:', err))
         .finally(() => setLoadingExams(false));
     }
-  }, [selectedExamTypeId]);
+  }, [selectedProjectId]);
 
   const [liveData, setLiveData] = useState(null);
   const [projectsList, setProjectsList] = useState([]);
@@ -218,12 +192,10 @@ export default function AdminDashboard() {
 
     const analyticsParams = { clientId: selectedClientId };
     if (selectedProjectId) analyticsParams.projectId = selectedProjectId;
-    if (selectedExamTypeId) analyticsParams.examTypeId = selectedExamTypeId;
     if (selectedExamId) analyticsParams.examId = selectedExamId;
 
     const projectsParams = { clientId: selectedClientId, limit: 10 };
     if (selectedProjectId) projectsParams.projectId = selectedProjectId;
-    if (selectedExamTypeId) projectsParams.examTypeId = selectedExamTypeId;
 
     try {
       const [analyticsRes, projectsRes] = await Promise.allSettled([
@@ -280,13 +252,13 @@ export default function AdminDashboard() {
         setIsRefreshing(false);
       }
     }
-  }, [selectedClientId, selectedProjectId, selectedExamTypeId, selectedExamId]);
+  }, [selectedClientId, selectedProjectId, selectedExamId]);
 
   useEffect(() => {
     if (selectedClientId) {
       fetchDashboardData(false);
     }
-  }, [selectedClientId, selectedProjectId, selectedExamTypeId, selectedExamId, fetchDashboardData]);
+  }, [selectedClientId, selectedProjectId, selectedExamId, fetchDashboardData]);
 
   // Aggregate values directly from MySQL response - ZERO fake fallbacks
   const isDataLoading = loading || (!liveData && !error);
@@ -436,41 +408,8 @@ export default function AdminDashboard() {
             </select>
           </div>
 
-          {/* Exam Type Selector */}
-          {selectedProjectId && (
-            <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-              <ChevronRight size={14} color="#94a3b8" />
-              <span style={{ fontSize: '0.75rem', color: 'var(--text-muted, #64748b)', fontWeight: 500 }}>Exam Type:</span>
-              <select
-                value={selectedExamTypeId}
-                onChange={(e) => setSelectedExamTypeId(e.target.value)}
-                disabled={loadingExamTypes || safeAvailableExamTypes.length === 0}
-                style={{
-                  fontSize: '0.8125rem',
-                  padding: '5px 10px',
-                  borderRadius: '6px',
-                  border: '1px solid var(--border-default, #cbd5e1)',
-                  background: '#ffffff',
-                  color: 'var(--text-primary, #0f172a)',
-                  outline: 'none',
-                  cursor: safeAvailableExamTypes.length === 0 ? 'not-allowed' : 'pointer',
-                  fontWeight: selectedExamTypeId ? 600 : 400,
-                  maxWidth: '100%',
-                  minWidth: 0,
-                }}
-              >
-                <option value="">All Exam Types ({safeAvailableExamTypes.length})</option>
-                {safeAvailableExamTypes.map((et) => (
-                  <option key={et?.id} value={et?.id}>
-                    {et?.examCode} – {et?.examTypeName}
-                  </option>
-                ))}
-              </select>
-            </div>
-          )}
-
           {/* Exam Instance Selector */}
-          {selectedExamTypeId && (
+          {selectedProjectId && (
             <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
               <ChevronRight size={14} color="#94a3b8" />
               <span style={{ fontSize: '0.75rem', color: 'var(--text-muted, #64748b)', fontWeight: 500 }}>Exam:</span>
@@ -505,11 +444,10 @@ export default function AdminDashboard() {
 
         {/* Clear Filters button & Active Filter Breadcrumb */}
         <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-          {(selectedProjectId || selectedExamTypeId || selectedExamId) && (
+          {(selectedProjectId || selectedExamId) && (
             <button
               onClick={() => {
                 setSelectedProjectId('');
-                setSelectedExamTypeId('');
                 setSelectedExamId('');
               }}
               className="btn btn-sm"
@@ -538,8 +476,6 @@ export default function AdminDashboard() {
           }}>
             {selectedExamId
               ? safeAvailableExams.find(e => e?.id === selectedExamId)?.examName || 'Filtered Exam'
-              : selectedExamTypeId
-              ? safeAvailableExamTypes.find(et => et?.id === selectedExamTypeId)?.examTypeName || 'Filtered Type'
               : selectedProjectId
               ? safeAvailableProjects.find(p => p?.id === selectedProjectId)?.name || 'Filtered Project'
               : `${selectedClient?.name || 'Eduquity'} (Full Portfolio)`}

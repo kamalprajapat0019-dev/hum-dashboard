@@ -8,7 +8,8 @@ import { apiClient } from '@/services/apiClient';
 import { ENDPOINTS } from '@/services/endpoints';
 import { useAuth } from '@/context/AuthContext';
 import { useClient } from '@/context/ClientContext';
-import { StatusBadge } from '@/components/common';
+import { normalizeRole, ROLES } from '@/constants/roles';
+import { StatusBadge, ActionGroup, ViewAction, EditAction } from '@/components/common';
 import CentreProfileModal from './components/CentreProfileModal';
 
 const STATUS_OPTIONS = [
@@ -21,6 +22,8 @@ const STATUS_OPTIONS = [
   'Auditor Assigned',
   'Audited',
   'Allocated',
+  'Approved',
+  'Active',
   'Rejected',
   'Blacklisted',
 ];
@@ -29,7 +32,15 @@ const REGION_OPTIONS = ['All', 'North', 'South', 'East', 'West', 'Central', 'Nor
 
 export default function CentresPage() {
   const { user } = useAuth();
-  const { selectedClientId, setSelectedClientId, clients, selectedClient } = useClient();
+  const { clients } = useClient();
+
+  // Role permissions for Centre Master actions
+  const userRoleNormalized = normalizeRole(user?.role);
+  const canEdit =
+    userRoleNormalized === ROLES.ADMIN ||
+    userRoleNormalized === ROLES.OPERATIONS ||
+    user?.role === 'ADMIN' ||
+    user?.role === 'OPERATIONS';
 
   const [centres, setCentres] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -41,9 +52,10 @@ export default function CentresPage() {
   const [totalPages, setTotalPages] = useState(1);
   const [totalRecords, setTotalRecords] = useState(0);
 
-  // Search & Filter state (5 OEMP filters: Client, Region, State, City, Status)
+  // Search & Filter state (Local exclusively to Centre Master table)
   const [search, setSearch] = useState('');
   const [debouncedSearch, setDebouncedSearch] = useState('');
+  const [clientFilter, setClientFilter] = useState('');
   const [regionFilter, setRegionFilter] = useState('All');
   const [statusFilter, setStatusFilter] = useState('All');
   const [stateFilter, setStateFilter] = useState('');
@@ -80,13 +92,11 @@ export default function CentresPage() {
     };
   }, [search, stateFilter, cityFilter]);
 
-  // Load Status Summary Cards
+  // Load Status Summary Cards (Independent unfiltered authorized dataset)
   const loadSummary = useCallback(async () => {
     setLoadingSummary(true);
     try {
-      const res = await apiClient.get(ENDPOINTS.ADMIN.CENTRES_SUMMARY, {
-        params: { clientId: selectedClientId || undefined },
-      });
+      const res = await apiClient.get(ENDPOINTS.ADMIN.CENTRES_SUMMARY);
       if (res && res.success && res.data) {
         setSummary(res.data);
       }
@@ -95,9 +105,9 @@ export default function CentresPage() {
     } finally {
       setLoadingSummary(false);
     }
-  }, [selectedClientId]);
+  }, []);
 
-  // Load Centre Master Listing Table
+  // Load Centre Master Listing Table (Scoped exclusively to local table filters)
   const loadCentres = useCallback(async () => {
     setLoading(true);
     setError(null);
@@ -111,7 +121,7 @@ export default function CentresPage() {
           status: statusFilter !== 'All' ? statusFilter : undefined,
           stateId: debouncedState.trim() || undefined,
           cityId: debouncedCity.trim() || undefined,
-          clientId: selectedClientId || undefined,
+          clientId: clientFilter || undefined,
         },
       });
 
@@ -131,7 +141,7 @@ export default function CentresPage() {
     } finally {
       setLoading(false);
     }
-  }, [page, limit, debouncedSearch, regionFilter, statusFilter, debouncedState, debouncedCity, selectedClientId]);
+  }, [page, limit, debouncedSearch, regionFilter, statusFilter, debouncedState, debouncedCity, clientFilter]);
 
   useEffect(() => {
     loadSummary();
@@ -161,6 +171,11 @@ export default function CentresPage() {
       setLoadingProfile(false);
     }
   };
+
+  // Local client filter object for table header display
+  const filteredClientObj = useMemo(() => {
+    return clients?.find((c) => c.id === clientFilter) || null;
+  }, [clients, clientFilter]);
 
   // Export to CSV
   const handleExport = () => {
@@ -195,9 +210,9 @@ export default function CentresPage() {
           <div>
             <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
               <h1 className="page-header__title">Centre Master — Examination Venues</h1>
-              {selectedClient && (
+              {filteredClientObj && (
                 <span className="badge badge-subtle" style={{ background: '#eff6ff', color: '#1e40af', fontWeight: 600 }}>
-                  Client: {selectedClient.name}
+                  Client: {filteredClientObj.name}
                 </span>
               )}
             </div>
@@ -212,10 +227,10 @@ export default function CentresPage() {
                 loadSummary();
                 loadCentres();
               }}
-              disabled={loading}
+              disabled={loading || loadingSummary}
               title="Refresh Records"
             >
-              <RefreshCw size={13} className={loading ? 'animate-spin' : ''} /> Refresh
+              <RefreshCw size={13} className={(loading || loadingSummary) ? 'animate-spin' : ''} /> Refresh
             </button>
             <button
               className="btn btn-secondary btn-sm"
@@ -359,146 +374,6 @@ export default function CentresPage() {
         </div>
       </div>
 
-      {/* ── Search & Filters Bar (Phase 2.C) ── */}
-      <div
-        className="card"
-        style={{
-          padding: '16px 20px',
-          marginBottom: 20,
-          background: 'var(--color-bg-card, #ffffff)',
-        }}
-      >
-        <div style={{ display: 'flex', flexWrap: 'wrap', gap: 12, alignItems: 'center' }}>
-          {/* Search by Centre ID, Centre Name, City */}
-          <div style={{ flex: '1 1 200px', minWidth: 180, position: 'relative' }}>
-            <Search
-              size={15}
-              style={{
-                position: 'absolute',
-                left: 12,
-                top: '50%',
-                transform: 'translateY(-50%)',
-                color: 'var(--text-muted, #94a3b8)',
-              }}
-            />
-            <input
-              type="text"
-              className="form-control"
-              style={{ paddingLeft: 36, height: 38 }}
-              placeholder="Search ID, Name, City..."
-              value={search}
-              onChange={(e) => setSearch(e.target.value)}
-            />
-          </div>
-
-          {/* Client Filter */}
-          <div style={{ minWidth: 140 }}>
-            <select
-              className="form-control"
-              style={{ height: 38 }}
-              value={selectedClientId || ''}
-              onChange={(e) => {
-                if (setSelectedClientId) setSelectedClientId(e.target.value || null);
-                setPage(1);
-              }}
-            >
-              <option value="">All Clients</option>
-              {clients?.map((cl) => (
-                <option key={cl.id} value={cl.id}>
-                  {cl.name}
-                </option>
-              ))}
-            </select>
-          </div>
-
-          {/* Region Filter */}
-          <div style={{ minWidth: 120 }}>
-            <select
-              className="form-control"
-              style={{ height: 38 }}
-              value={regionFilter}
-              onChange={(e) => {
-                setRegionFilter(e.target.value);
-                setPage(1);
-              }}
-            >
-              <option value="All">All Regions</option>
-              {REGION_OPTIONS.filter((r) => r !== 'All').map((r) => (
-                <option key={r} value={r}>
-                  {r}
-                </option>
-              ))}
-            </select>
-          </div>
-
-          {/* State Filter */}
-          <div style={{ minWidth: 120 }}>
-            <input
-              type="text"
-              className="form-control"
-              style={{ height: 38 }}
-              placeholder="Filter State..."
-              value={stateFilter}
-              onChange={(e) => setStateFilter(e.target.value)}
-            />
-          </div>
-
-          {/* City Filter */}
-          <div style={{ minWidth: 120 }}>
-            <input
-              type="text"
-              className="form-control"
-              style={{ height: 38 }}
-              placeholder="Filter City..."
-              value={cityFilter}
-              onChange={(e) => setCityFilter(e.target.value)}
-            />
-          </div>
-
-          {/* Workflow Status Filter */}
-          <div style={{ minWidth: 140 }}>
-            <select
-              className="form-control"
-              style={{ height: 38 }}
-              value={statusFilter}
-              onChange={(e) => {
-                setStatusFilter(e.target.value);
-                setPage(1);
-              }}
-            >
-              <option value="All">All Statuses</option>
-              {STATUS_OPTIONS.filter((s) => s !== 'All').map((s) => (
-                <option key={s} value={s}>
-                  {s}
-                </option>
-              ))}
-            </select>
-          </div>
-
-          {/* Reset Filters */}
-          {(search || selectedClientId || regionFilter !== 'All' || statusFilter !== 'All' || stateFilter || cityFilter) && (
-            <button
-              className="btn btn-ghost btn-sm"
-              onClick={() => {
-                setSearch('');
-                setDebouncedSearch('');
-                if (setSelectedClientId) setSelectedClientId(null);
-                setRegionFilter('All');
-                setStatusFilter('All');
-                setStateFilter('');
-                setDebouncedState('');
-                setCityFilter('');
-                setDebouncedCity('');
-                setPage(1);
-              }}
-              style={{ color: '#64748b' }}
-            >
-              <X size={14} /> Clear
-            </button>
-          )}
-        </div>
-      </div>
-
       {/* ── Error Banner ── */}
       {error && (
         <div
@@ -530,10 +405,162 @@ export default function CentresPage() {
         </div>
       )}
 
-      {/* ── Section 1.2: Centre Master Overview Listing Table ── */}
-      <div className="card" style={{ overflow: 'hidden' }}>
+      {/* ── Section 1.2: Unified Centre Master Data Container (Filters + Table + Pagination) ── */}
+      <div
+        className="card"
+        style={{
+          background: 'var(--color-bg-card, #ffffff)',
+          border: '1px solid var(--border-color, #e2e8f0)',
+          borderRadius: '10px',
+          boxShadow: '0 1px 3px rgba(0,0,0,0.05)',
+          overflow: 'hidden',
+          marginBottom: 24,
+        }}
+      >
+        {/* 1. Filter Toolbar at the top */}
+        <div
+          style={{
+            padding: '16px 20px',
+            background: 'var(--color-bg-card, #ffffff)',
+          }}
+        >
+          <div style={{ display: 'flex', flexWrap: 'wrap', gap: 12, alignItems: 'center' }}>
+            {/* Search by Centre ID, Centre Name, City */}
+            <div style={{ flex: '1 1 200px', minWidth: 180, position: 'relative' }}>
+              <Search
+                size={15}
+                style={{
+                  position: 'absolute',
+                  left: 12,
+                  top: '50%',
+                  transform: 'translateY(-50%)',
+                  color: 'var(--text-muted, #94a3b8)',
+                }}
+              />
+              <input
+                type="text"
+                className="form-control"
+                style={{ paddingLeft: 36, height: 38 }}
+                placeholder="Search ID, Name, City..."
+                value={search}
+                onChange={(e) => setSearch(e.target.value)}
+              />
+            </div>
+
+            {/* Client Filter (Local to Centre Master table only) */}
+            <div style={{ minWidth: 140 }}>
+              <select
+                className="form-control"
+                style={{ height: 38 }}
+                value={clientFilter}
+                onChange={(e) => {
+                  setClientFilter(e.target.value);
+                  setPage(1);
+                }}
+              >
+                <option value="">All Clients</option>
+                {clients?.map((cl) => (
+                  <option key={cl.id} value={cl.id}>
+                    {cl.name}
+                  </option>
+                ))}
+              </select>
+            </div>
+
+            {/* Region Filter */}
+            <div style={{ minWidth: 120 }}>
+              <select
+                className="form-control"
+                style={{ height: 38 }}
+                value={regionFilter}
+                onChange={(e) => {
+                  setRegionFilter(e.target.value);
+                  setPage(1);
+                }}
+              >
+                <option value="All">All Regions</option>
+                {REGION_OPTIONS.filter((r) => r !== 'All').map((r) => (
+                  <option key={r} value={r}>
+                    {r}
+                  </option>
+                ))}
+              </select>
+            </div>
+
+            {/* State Filter */}
+            <div style={{ minWidth: 120 }}>
+              <input
+                type="text"
+                className="form-control"
+                style={{ height: 38 }}
+                placeholder="Filter State..."
+                value={stateFilter}
+                onChange={(e) => setStateFilter(e.target.value)}
+              />
+            </div>
+
+            {/* City Filter */}
+            <div style={{ minWidth: 120 }}>
+              <input
+                type="text"
+                className="form-control"
+                style={{ height: 38 }}
+                placeholder="Filter City..."
+                value={cityFilter}
+                onChange={(e) => setCityFilter(e.target.value)}
+              />
+            </div>
+
+            {/* Workflow Status Filter */}
+            <div style={{ minWidth: 140 }}>
+              <select
+                className="form-control"
+                style={{ height: 38 }}
+                value={statusFilter}
+                onChange={(e) => {
+                  setStatusFilter(e.target.value);
+                  setPage(1);
+                }}
+              >
+                <option value="All">All Statuses</option>
+                {STATUS_OPTIONS.filter((s) => s !== 'All').map((s) => (
+                  <option key={s} value={s}>
+                    {s}
+                  </option>
+                ))}
+              </select>
+            </div>
+
+            {/* Reset Filters (Resets only local Centre Master table filters) */}
+            {(search || clientFilter || regionFilter !== 'All' || statusFilter !== 'All' || stateFilter || cityFilter) && (
+              <button
+                className="btn btn-ghost btn-sm"
+                onClick={() => {
+                  setSearch('');
+                  setDebouncedSearch('');
+                  setClientFilter('');
+                  setRegionFilter('All');
+                  setStatusFilter('All');
+                  setStateFilter('');
+                  setDebouncedState('');
+                  setCityFilter('');
+                  setDebouncedCity('');
+                  setPage(1);
+                }}
+                style={{ color: '#64748b' }}
+              >
+                <X size={14} /> Clear
+              </button>
+            )}
+          </div>
+        </div>
+
+        {/* 2. Subtle horizontal divider below the filters */}
+        <div style={{ borderTop: '1px solid var(--border-color, #e2e8f0)' }} />
+
+        {/* 3. Centre Master Data Table immediately below the divider */}
         <div className="table-responsive">
-          <table className="table">
+          <table className="table" style={{ marginBottom: 0 }}>
             <thead>
               <tr>
                 <th style={{ width: 60 }}>S. No.</th>
@@ -544,7 +571,7 @@ export default function CentresPage() {
                 <th>City</th>
                 <th style={{ textAlign: 'right' }}>Total Nodes</th>
                 <th>Status</th>
-                <th style={{ textAlign: 'center', width: 120 }}>Actions</th>
+                <th style={{ textAlign: 'center', minWidth: 160 }}>Actions</th>
               </tr>
             </thead>
             <tbody>
@@ -606,27 +633,19 @@ export default function CentresPage() {
                       <td>
                         <StatusBadge status={c.centreStatus || c.centre_status || 'Draft'} />
                       </td>
-                      <td style={{ textAlign: 'center' }}>
-                        <div style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}>
-                          <button
-                            className="btn btn-sm btn-secondary"
+                      <td style={{ textAlign: 'center', whiteSpace: 'nowrap' }}>
+                        <ActionGroup align="center">
+                          <ViewAction
                             onClick={() => handleViewProfile(c.id, false)}
-                            style={{ display: 'inline-flex', alignItems: 'center', gap: 4, fontSize: '0.8125rem', padding: '4px 8px' }}
-                            title="View Complete Centre Profile"
-                          >
-                            <Eye size={13} /> View
-                          </button>
-                          {(user?.role === 'ADMIN' || user?.role === 'OPERATIONS') && (
-                            <button
-                              className="btn btn-sm btn-secondary"
+                            tooltip="View Complete Centre Profile"
+                          />
+                          {canEdit && (
+                            <EditAction
                               onClick={() => handleViewProfile(c.id, true)}
-                              style={{ display: 'inline-flex', alignItems: 'center', gap: 4, fontSize: '0.8125rem', padding: '4px 8px', color: '#2563eb' }}
-                              title="Edit Centre Details"
-                            >
-                              <Edit size={13} /> Edit
-                            </button>
+                              tooltip="Edit Centre Details"
+                            />
                           )}
-                        </div>
+                        </ActionGroup>
                       </td>
                     </tr>
                   );
@@ -703,6 +722,7 @@ export default function CentresPage() {
       {/* ── Centre Full Profile Modal (8-Tab Admin Review) ── */}
       {selectedCentreProfile && (
         <CentreProfileModal
+          key={`${selectedCentreProfile.id}_${isEditMode ? 'edit' : 'view'}`}
           centre={selectedCentreProfile}
           initialEditMode={isEditMode}
           onClose={() => {
@@ -716,7 +736,7 @@ export default function CentresPage() {
               handleViewProfile(selectedCentreProfile.id, isEditMode);
             }
           }}
-          currentUserRole={user?.role || 'ADMIN'}
+          currentUserRole={userRoleNormalized === ROLES.ADMIN ? 'ADMIN' : (userRoleNormalized === ROLES.OPERATIONS ? 'OPERATIONS' : (user?.role || 'ADMIN'))}
         />
       )}
     </div>

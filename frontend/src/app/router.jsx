@@ -116,6 +116,7 @@ export function AppRouter() {
       <Route path={ROUTES.ADMIN.USERS} element={<ProtectedRoute allowedRoles={[ROLES.ADMIN]}><DashboardLayout><UsersPage /></DashboardLayout></ProtectedRoute>} />
       <Route path={ROUTES.ADMIN.CLIENTS} element={<ProtectedRoute allowedRoles={[ROLES.ADMIN]}><DashboardLayout><ClientsPage /></DashboardLayout></ProtectedRoute>} />
       <Route path={ROUTES.ADMIN.PROJECTS} element={<ProtectedRoute allowedRoles={[ROLES.ADMIN]}><DashboardLayout><ProjectsPage /></DashboardLayout></ProtectedRoute>} />
+      <Route path="/admin/exams/:id" element={<ProtectedRoute allowedRoles={[ROLES.ADMIN]}><DashboardLayout><ProjectsPage /></DashboardLayout></ProtectedRoute>} />
       <Route path={ROUTES.ADMIN.CENTRES} element={<ProtectedRoute allowedRoles={[ROLES.ADMIN]}><DashboardLayout><CentresPage /></DashboardLayout></ProtectedRoute>} />
       <Route path={ROUTES.ADMIN.ELIGIBILITY} element={<ProtectedRoute allowedRoles={[ROLES.ADMIN]}><DashboardLayout><EligibilityPage /></DashboardLayout></ProtectedRoute>} />
       <Route path={ROUTES.ADMIN.BOOKING} element={<ProtectedRoute allowedRoles={[ROLES.ADMIN]}><DashboardLayout><BookingLockingPage /></DashboardLayout></ProtectedRoute>} />
@@ -136,6 +137,7 @@ export function AppRouter() {
         </ProtectedRoute>
       } />
       <Route path={ROUTES.PM.SETUP} element={<ProtectedRoute allowedRoles={[ROLES.PM, ROLES.ADMIN]}><DashboardLayout><ProjectsPage /></DashboardLayout></ProtectedRoute>} />
+      <Route path="/pm/exams/:id" element={<ProtectedRoute allowedRoles={[ROLES.PM, ROLES.ADMIN]}><DashboardLayout><ProjectsPage /></DashboardLayout></ProtectedRoute>} />
       <Route path={ROUTES.PM.PIPELINE} element={<ProtectedRoute allowedRoles={[ROLES.PM, ROLES.ADMIN]}><DashboardLayout><BookingLockingPage /></DashboardLayout></ProtectedRoute>} />
       <Route path={ROUTES.PM.ELIGIBILITY} element={<ProtectedRoute allowedRoles={[ROLES.PM, ROLES.ADMIN]}><DashboardLayout><EligibilityPage /></DashboardLayout></ProtectedRoute>} />
       <Route path={ROUTES.PM.CONSENT} element={<ProtectedRoute allowedRoles={[ROLES.PM, ROLES.ADMIN]}><DashboardLayout><ConsentManagementPage /></DashboardLayout></ProtectedRoute>} />

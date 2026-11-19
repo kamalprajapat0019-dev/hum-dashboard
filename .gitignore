@@ -29,3 +29,9 @@ scratch/
 frontend/scratch/
 *.zip
 
+# Uploaded Files & Temporary Storage
+storage/
+backend/storage/
+backend/backend/
+
+

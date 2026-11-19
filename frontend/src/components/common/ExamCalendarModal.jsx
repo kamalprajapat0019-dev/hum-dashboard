@@ -14,7 +14,9 @@ const MONTH_NAMES = [
   'July', 'August', 'September', 'October', 'November', 'December'
 ];
 
-export default function ExamCalendarModal({ onClose }) {
+export default function ExamCalendarModal({ isOpen = true, onClose }) {
+  if (!isOpen) return null;
+
   const { selectedClientId, selectedClient } = useClientFilter();
 
   const [selectedYear, setSelectedYear] = useState(2027);
@@ -32,11 +34,15 @@ export default function ExamCalendarModal({ onClose }) {
 
   // Prevent background scrolling and support Escape key
   useEffect(() => {
+    if (!isOpen) return;
+
     const prevOverflow = document.body.style.overflow;
     document.body.style.overflow = 'hidden';
 
     const handleKeyDown = (e) => {
       if (e.key === 'Escape') {
+        e.preventDefault();
+        e.stopPropagation();
         onClose?.();
       }
     };
@@ -46,7 +52,7 @@ export default function ExamCalendarModal({ onClose }) {
       document.body.style.overflow = prevOverflow;
       window.removeEventListener('keydown', handleKeyDown);
     };
-  }, [onClose]);
+  }, [isOpen, onClose]);
 
   // Load Live Calendar Examinations from Database
   const loadCalendarData = useCallback(async () => {
@@ -90,8 +96,10 @@ export default function ExamCalendarModal({ onClose }) {
   }, [selectedYear, selectedClientId, selectedInspection?.date]);
 
   useEffect(() => {
-    loadCalendarData();
-  }, [loadCalendarData]);
+    if (isOpen) {
+      loadCalendarData();
+    }
+  }, [isOpen, loadCalendarData]);
 
   // Filter exams by agency filter if applied
   const filteredExams = exams.filter((ex) => {
@@ -301,7 +309,13 @@ export default function ExamCalendarModal({ onClose }) {
   return createPortal(
     <div
       className="calendar-modal-overlay"
-      onClick={onClose}
+      onClick={(e) => {
+        if (e.target === e.currentTarget) {
+          e.preventDefault();
+          e.stopPropagation();
+          onClose?.();
+        }
+      }}
       role="dialog"
       aria-modal="true"
       aria-labelledby="calendar-modal-title"
@@ -436,8 +450,13 @@ export default function ExamCalendarModal({ onClose }) {
             </button>
 
             <button
+              type="button"
               className="btn-ghost"
-              onClick={onClose}
+              onClick={(e) => {
+                e.preventDefault();
+                e.stopPropagation();
+                onClose?.();
+              }}
               aria-label="Close examination calendar"
               title="Close"
               style={{ padding: 6, borderRadius: '50%', cursor: 'pointer' }}
@@ -783,7 +802,7 @@ export default function ExamCalendarModal({ onClose }) {
                         }}
                       >
                         <div>
-                          <span style={{ color: 'var(--text-muted)' }}>Examination Type</span>
+                          <span style={{ color: 'var(--text-muted)' }}>Delivery Mode</span>
                           <div style={{ fontWeight: 600 }}>{ex.examType}</div>
                         </div>
                         <div>

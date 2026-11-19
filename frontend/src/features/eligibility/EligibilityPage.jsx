@@ -7,7 +7,7 @@ import {
 import { apiClient } from '@/services/apiClient';
 import { ENDPOINTS } from '@/services/endpoints';
 import { useAuth } from '@/context/AuthContext';
-import { StatusBadge } from '@/components/common';
+import { StatusBadge, ActionGroup, Button } from '@/components/common';
 
 export default function EligibilityPage() {
   const { user } = useAuth();
@@ -344,31 +344,35 @@ export default function EligibilityPage() {
                         </span>
                       </td>
                       <td style={{ textAlign: 'right' }}>
-                        <div style={{ display: 'inline-flex', gap: 6 }}>
+                        <ActionGroup>
                           {isBlacklisted ? (
-                            <button
-                              className="btn btn-secondary btn-sm"
+                            <Button
+                              variant="secondary"
+                              size="sm"
+                              icon={<ShieldCheck size={13} />}
                               style={{ color: 'var(--color-success, #16a34a)' }}
                               onClick={() => {
                                 setActiveCentre(c);
                                 setShowOverrideModal(true);
                               }}
                             >
-                              <ShieldCheck size={13} /> Override
-                            </button>
+                              Override
+                            </Button>
                           ) : (
-                            <button
-                              className="btn btn-secondary btn-sm"
+                            <Button
+                              variant="secondary"
+                              size="sm"
+                              icon={<AlertOctagon size={13} />}
                               style={{ color: 'var(--color-danger, #dc2626)' }}
                               onClick={() => {
                                 setActiveCentre(c);
                                 setShowBlacklistModal(true);
                               }}
                             >
-                              <AlertOctagon size={13} /> Blacklist
-                            </button>
+                              Blacklist
+                            </Button>
                           )}
-                        </div>
+                        </ActionGroup>
                       </td>
                     </tr>
                   );

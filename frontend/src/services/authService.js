@@ -80,18 +80,21 @@ export const authService = {
       });
 
       if (response && response.success && response.data) {
-        const { token, user } = response.data;
+        const { token, refreshToken, user } = response.data;
         // Normalize role to canonical frontend ROLES enum
         const canonicalRole = normalizeRole(user.role);
         const clientUser = { ...user, role: canonicalRole };
 
-        storage.set(appConfig.auth.userStorageKey, clientUser, 'session');
-        storage.set(appConfig.auth.tokenStorageKey, token, 'session');
+        storage.set(appConfig.auth.userStorageKey, clientUser);
+        storage.set(appConfig.auth.tokenStorageKey, token);
+        if (refreshToken) {
+          storage.set(appConfig.auth.refreshTokenStorageKey, refreshToken);
+        }
         return { success: true, user: clientUser };
       }
     } catch (apiErr) {
-      // If backend responded with 401 or validation error, return the actual error message
-      if (apiErr.status === 401 || apiErr.status === 400 || apiErr.status === 403) {
+      // If backend responded with 401, 400, 403, or any status code, return the actual error
+      if (apiErr.status) {
         return {
           success: false,
           error: apiErr.data?.error?.message || apiErr.message || 'Invalid email or password',
@@ -112,8 +115,8 @@ export const authService = {
       return { success: false, error: 'Invalid email or password' };
     }
     const { password: _, ...safeUser } = found;
-    storage.set(appConfig.auth.userStorageKey, safeUser, 'session');
-    storage.set(appConfig.auth.tokenStorageKey, `mock_jwt_${safeUser.id}_${Date.now()}`, 'session');
+    storage.set(appConfig.auth.userStorageKey, safeUser);
+    storage.set(appConfig.auth.tokenStorageKey, `mock_jwt_${safeUser.id}_${Date.now()}`);
     return { success: true, user: safeUser };
   },
 
@@ -123,8 +126,9 @@ export const authService = {
     } catch {
       // Ignore API errors on logout
     }
-    storage.remove(appConfig.auth.userStorageKey, 'session');
-    storage.remove(appConfig.auth.tokenStorageKey, 'session');
+    storage.remove(appConfig.auth.userStorageKey);
+    storage.remove(appConfig.auth.tokenStorageKey);
+    storage.remove(appConfig.auth.refreshTokenStorageKey);
   },
 
   getCurrentUser() {

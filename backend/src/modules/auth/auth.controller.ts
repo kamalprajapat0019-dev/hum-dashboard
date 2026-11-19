@@ -17,6 +17,7 @@ export class AuthController {
 
       sendSuccess(res, {
         token: result.token,
+        refreshToken: result.refreshToken,
         user: result.user,
       });
     } catch (err: unknown) {
@@ -47,6 +48,30 @@ export class AuthController {
 
   static async logout(_req: AuthenticatedRequest, res: Response): Promise<void> {
     sendSuccess(res, { message: 'Logged out successfully' });
+  }
+
+  static async refreshToken(req: Request, res: Response): Promise<void> {
+    try {
+      const refreshToken = req.body?.refreshToken || req.headers['x-refresh-token'];
+      if (!refreshToken || typeof refreshToken !== 'string') {
+        sendError(res, 400, 'MISSING_REFRESH_TOKEN', 'Refresh token is required');
+        return;
+      }
+
+      const result = await AuthService.refreshToken(refreshToken);
+      if (!result.success) {
+        sendError(res, 401, result.code, result.message);
+        return;
+      }
+
+      sendSuccess(res, {
+        token: result.token,
+        refreshToken: result.refreshToken,
+      });
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : 'Token refresh failed';
+      sendError(res, 500, 'REFRESH_ERROR', msg);
+    }
   }
 
   static async verifyResetToken(req: Request, res: Response): Promise<void> {

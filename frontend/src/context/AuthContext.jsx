@@ -1,7 +1,7 @@
 /**
  * Auth Context — Role-based access control & session provider
  */
-import { createContext, useContext, useState, useCallback } from 'react';
+import { createContext, useContext, useState, useEffect, useCallback } from 'react';
 import { ROLES, ROLE_LABELS, ROLE_COLORS } from '../constants/roles';
 import { authService, DEMO_USERS } from '../services/authService';
 
@@ -13,6 +13,14 @@ export function AuthProvider({ children }) {
   const [user, setUser] = useState(() => {
     return authService.getCurrentUser();
   });
+
+  useEffect(() => {
+    const handleExpired = () => {
+      setUser(null);
+    };
+    window.addEventListener('oem:session-expired', handleExpired);
+    return () => window.removeEventListener('oem:session-expired', handleExpired);
+  }, []);
 
   const login = useCallback(async (email, password) => {
     const result = await authService.login(email, password);

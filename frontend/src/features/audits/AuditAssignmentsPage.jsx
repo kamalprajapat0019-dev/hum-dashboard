@@ -6,6 +6,7 @@ import {
 } from 'lucide-react';
 import { AuditStore, ProjectStore, CentreStore, UserStore, appendAuditLog } from '@/services/dataService';
 import { useAuth } from '@/context/AuthContext';
+import { ActionGroup, Button } from '@/components/common';
 
 export default function AuditAssignmentsPage({ isPmView = false }) {
   const { user } = useAuth();
@@ -366,13 +367,17 @@ export default function AuditAssignmentsPage({ isPmView = false }) {
                         </span>
                       </td>
                       <td style={{ padding: '14px 16px', textAlign: 'right' }}>
-                        <button 
-                          className="btn btn-secondary btn-sm"
-                          onClick={() => openInspection(a)}
-                          style={{ display: 'inline-flex', alignItems: 'center', gap: 6, fontSize: 12 }}
-                        >
-                          <Eye size={14} /> {isPassed ? 'Review Audit' : 'Conduct / Edit'}
-                        </button>
+                        <ActionGroup>
+                          <Button 
+                            variant="secondary"
+                            size="sm"
+                            icon={<Eye size={13} />}
+                            onClick={() => openInspection(a)}
+                            style={{ fontSize: 12 }}
+                          >
+                            {isPassed ? 'Review Audit' : 'Conduct / Edit'}
+                          </Button>
+                        </ActionGroup>
                       </td>
                     </tr>
                   );

@@ -2,16 +2,30 @@
  * Safe Browser Storage Helpers
  */
 
+/**
+ * Safe Browser Storage Helpers
+ */
+
+const AUTH_KEYS = ['oem_token', 'oem_refresh_token', 'oem_user'];
+
 export const storage = {
   get(key, storageType = 'session') {
     try {
-      const store = storageType === 'local' ? window.localStorage : window.sessionStorage;
-      const item = store.getItem(key);
+      if (storageType === 'local') {
+        const item = window.localStorage.getItem(key);
+        if (!item) return null;
+        try { return JSON.parse(item); } catch { return item; }
+      }
+
+      // Default: Check sessionStorage first, fall back to localStorage
+      let item = window.sessionStorage.getItem(key);
+      if (!item) {
+        item = window.localStorage.getItem(key);
+      }
       if (!item) return null;
       try {
         return JSON.parse(item);
       } catch {
-        // Safe fallback for legacy or plain string entries stored without JSON.stringify
         return item;
       }
     } catch (e) {
@@ -22,8 +36,11 @@ export const storage = {
 
   set(key, value, storageType = 'session') {
     try {
-      const store = storageType === 'local' ? window.localStorage : window.sessionStorage;
-      store.setItem(key, JSON.stringify(value));
+      const serialized = JSON.stringify(value);
+      if (storageType === 'local' || AUTH_KEYS.includes(key)) {
+        window.localStorage.setItem(key, serialized);
+      }
+      window.sessionStorage.setItem(key, serialized);
       return true;
     } catch (e) {
       console.warn(`[storage] Error saving key "${key}":`, e);
@@ -31,19 +48,31 @@ export const storage = {
     }
   },
 
-  remove(key, storageType = 'session') {
+  remove(key, storageType) {
     try {
-      const store = storageType === 'local' ? window.localStorage : window.sessionStorage;
-      store.removeItem(key);
+      if (storageType === 'local') {
+        window.localStorage.removeItem(key);
+      } else if (storageType === 'session') {
+        window.sessionStorage.removeItem(key);
+      } else {
+        window.sessionStorage.removeItem(key);
+        window.localStorage.removeItem(key);
+      }
     } catch (e) {
       console.warn(`[storage] Error removing key "${key}":`, e);
     }
   },
 
-  clear(storageType = 'session') {
+  clear(storageType) {
     try {
-      const store = storageType === 'local' ? window.localStorage : window.sessionStorage;
-      store.clear();
+      if (storageType === 'local') {
+        window.localStorage.clear();
+      } else if (storageType === 'session') {
+        window.sessionStorage.clear();
+      } else {
+        window.sessionStorage.clear();
+        window.localStorage.clear();
+      }
     } catch (e) {
       console.warn(`[storage] Error clearing storage:`, e);
     }

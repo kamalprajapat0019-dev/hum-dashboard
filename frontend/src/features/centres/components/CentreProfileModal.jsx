@@ -1,13 +1,31 @@
 import { useState } from 'react';
 import {
-  X, CheckCircle, AlertTriangle, ShieldCheck, FileText, Building2,
-  Zap, Lock, CreditCard, History, UserCheck, Eye, EyeOff, Check,
-  Clock, Download, RefreshCw, AlertCircle, Ban, Send, Calendar,
-  MapPin, Phone, Mail, Award, CheckCircle2, Edit, Save, Copy
+  X, CheckCircle, AlertTriangle, FileText, Building2,
+  Zap, Lock, CreditCard, History, UserCheck, Check,
+  AlertCircle, Send, Edit
 } from 'lucide-react';
 import { StatusBadge } from '@/components/common';
 import { apiClient } from '@/services/apiClient';
 import { ENDPOINTS } from '@/services/endpoints';
+import {
+  BasicTab,
+  PersonnelTab,
+  DocsTab,
+  BuildingTab,
+  PowerTab,
+  SafetyTab,
+  BankTab,
+  HistoryTab,
+} from './profile-tabs';
+import {
+  ApproveModal,
+  RejectModal,
+  AuditorModal,
+  DocActionModal,
+  BankActionModal,
+  InviteModal,
+  DocPreviewModal,
+} from './profile-dialogs';
 
 export default function CentreProfileModal({
   centre,
@@ -16,6 +34,9 @@ export default function CentreProfileModal({
   currentUserRole = 'ADMIN',
   initialEditMode = false,
 }) {
+  const roleUpper = (currentUserRole || 'ADMIN').toUpperCase();
+  const isPrivileged = roleUpper === 'ADMIN' || roleUpper === 'OPERATIONS' || currentUserRole === 'admin' || currentUserRole === 'operations_executive';
+
   const [activeTab, setActiveTab] = useState('basic'); // basic | personnel | docs | building | power | safety | bank | history
   const [isEditing, setIsEditing] = useState(initialEditMode);
   const [savingEdit, setSavingEdit] = useState(false);
@@ -93,7 +114,7 @@ export default function CentreProfileModal({
     }
     setInviting(true);
     try {
-      const endpoint = currentUserRole === 'ADMIN' ? ENDPOINTS.ADMIN.USER_INVITE : ENDPOINTS.CENTRE_PORTAL.INVITE_USER;
+      const endpoint = (roleUpper === 'ADMIN' || currentUserRole === 'admin') ? ENDPOINTS.ADMIN.USER_INVITE : ENDPOINTS.CENTRE_PORTAL.INVITE_USER;
       const res = await apiClient.post(endpoint, {
         name: inviteForm.name.trim(),
         email: inviteForm.email.trim().toLowerCase(),
@@ -114,6 +135,15 @@ export default function CentreProfileModal({
     }
   };
 
+  const handleCopyLink = () => {
+    if (inviteResult?.registrationUrl) {
+      navigator.clipboard.writeText(inviteResult.registrationUrl);
+      setCopiedInviteUrl(true);
+      showNotification('Invitation link copied to clipboard!');
+      setTimeout(() => setCopiedInviteUrl(false), 3000);
+    }
+  };
+
   if (!centre) return null;
 
   const inf = centre.infrastructure || {};
@@ -123,21 +153,20 @@ export default function CentreProfileModal({
   const capacity = centre.capacity || {};
   const history = centre.activityHistory || [];
 
+  // Categorize personnel contacts
   const owner = contacts.find((c) => c.personType === 'Owner') || {};
-  const cs = contacts.find((c) => c.personType === 'Centre CS' || c.personType === 'TCA') || {};
+  const cs = contacts.find((c) => c.personType === 'Centre Head / Venue CS' || c.personType === 'TCA') || {};
   const it = contacts.find((c) => c.personType === 'IT Person') || {};
   const electrician = contacts.find((c) => c.personType === 'Electrician') || {};
 
-  // Handle Application Approval
+  // Handlers for Admin Operations
   const handleApprove = async () => {
-    setLoadingAction(true);
     try {
-      await apiClient.post(ENDPOINTS.ADMIN.APPROVE_CENTRE(centre.id), {
-        remarks: approveRemarks,
-      });
-      showNotification('Centre application approved successfully. Status is now Ready to Book.');
+      setLoadingAction(true);
+      await apiClient.post(ENDPOINTS.ADMIN.CENTRE_APPROVE(centre.id), { remarks: approveRemarks });
+      showNotification('Centre Application Approved successfully!');
       setShowApproveModal(false);
-      if (onRefresh) onRefresh();
+      onRefresh?.();
     } catch (err) {
       showNotification(err.message || 'Failed to approve application', 'error');
     } finally {
@@ -145,20 +174,17 @@ export default function CentreProfileModal({
     }
   };
 
-  // Handle Application Rejection
   const handleReject = async () => {
     if (!rejectReason.trim()) {
       showNotification('Rejection reason is mandatory.', 'error');
       return;
     }
-    setLoadingAction(true);
     try {
-      await apiClient.post(ENDPOINTS.ADMIN.REJECT_CENTRE(centre.id), {
-        reason: rejectReason,
-      });
-      showNotification('Centre application rejected.', 'success');
+      setLoadingAction(true);
+      await apiClient.post(ENDPOINTS.ADMIN.CENTRE_REJECT(centre.id), { reason: rejectReason.trim() });
+      showNotification('Centre Application has been rejected.', 'success');
       setShowRejectModal(false);
-      if (onRefresh) onRefresh();
+      onRefresh?.();
     } catch (err) {
       showNotification(err.message || 'Failed to reject application', 'error');
     } finally {
@@ -166,22 +192,21 @@ export default function CentreProfileModal({
     }
   };
 
-  // Handle Auditor Assignment
   const handleAssignAuditor = async () => {
-    if (!selectedAuditorId) {
-      showNotification('Please select an auditor.', 'error');
+    if (!selectedAuditorId.trim()) {
+      showNotification('Auditor ID is required.', 'error');
       return;
     }
-    setLoadingAction(true);
     try {
-      await apiClient.post(ENDPOINTS.ADMIN.ASSIGN_AUDITOR(centre.id), {
-        auditorId: selectedAuditorId,
-        auditDate,
-        remarks: auditRemarks,
+      setLoadingAction(true);
+      await apiClient.post(ENDPOINTS.ADMIN.CENTRE_ASSIGN_AUDITOR(centre.id), {
+        auditorId: selectedAuditorId.trim(),
+        auditDate: auditDate ? new Date(auditDate).toISOString() : undefined,
+        remarks: auditRemarks || undefined,
       });
-      showNotification('Auditor assigned successfully.');
+      showNotification('Verification Auditor assigned successfully!');
       setShowAuditorModal(false);
-      if (onRefresh) onRefresh();
+      onRefresh?.();
     } catch (err) {
       showNotification(err.message || 'Failed to assign auditor', 'error');
     } finally {
@@ -189,69 +214,76 @@ export default function CentreProfileModal({
     }
   };
 
-  // Handle Document Verification / Rejection
   const handleDocAction = async () => {
-    if (showDocActionModal.action === 'reject' && !docRejectionReason.trim()) {
-      showNotification('Rejection reason is mandatory.', 'error');
+    if (!showDocActionModal) return;
+    const { doc, action } = showDocActionModal;
+    if (action === 'reject' && !docRejectionReason.trim()) {
+      showNotification('Rejection reason is mandatory when rejecting a document.', 'error');
       return;
     }
-    setLoadingAction(true);
+
     try {
-      await apiClient.post(ENDPOINTS.ADMIN.VERIFY_DOC(centre.id), {
-        documentId: showDocActionModal.doc.id,
-        status: showDocActionModal.action === 'verify' ? 'Verified' : 'Rejected',
-        remarks: docRemarks,
-        rejectionReason: docRejectionReason,
+      setLoadingAction(true);
+      await apiClient.post(ENDPOINTS.ADMIN.CENTRE_VERIFY_DOC(centre.id), {
+        documentId: doc.id,
+        status: action === 'verify' ? 'Verified' : 'Rejected',
+        remarks: docRemarks.trim() || undefined,
+        rejectionReason: action === 'reject' ? docRejectionReason.trim() : undefined,
       });
-      showNotification(`Document ${showDocActionModal.action === 'verify' ? 'verified' : 'rejected'} successfully.`);
+      showNotification(`Document ${action === 'verify' ? 'verified' : 'rejected'} successfully!`);
       setShowDocActionModal(null);
-      if (onRefresh) onRefresh();
+      onRefresh?.();
     } catch (err) {
-      showNotification(err.message || 'Document verification update failed', 'error');
+      showNotification(err.message || 'Failed to update document status', 'error');
     } finally {
       setLoadingAction(false);
     }
   };
 
-  // Handle Bank Verification / Rejection
   const handleBankAction = async () => {
-    if (showBankActionModal === 'reject' && !bankRejectionReason.trim()) {
-      showNotification('Rejection reason is mandatory.', 'error');
+    if (!showBankActionModal) return;
+    const isReject = (typeof showBankActionModal === 'object' && showBankActionModal.action === 'reject') || showBankActionModal === 'reject';
+    if (isReject && !bankRejectionReason.trim()) {
+      showNotification('Rejection reason is mandatory when rejecting bank details.', 'error');
       return;
     }
-    setLoadingAction(true);
+
     try {
-      await apiClient.post(ENDPOINTS.ADMIN.VERIFY_BANK(centre.id), {
-        status: showBankActionModal === 'verify' ? 'Verified' : 'Rejected',
-        remarks: bankRemarks,
-        rejectionReason: bankRejectionReason,
+      setLoadingAction(true);
+      await apiClient.post(ENDPOINTS.ADMIN.CENTRE_VERIFY_BANK(centre.id), {
+        status: !isReject ? 'Verified' : 'Rejected',
+        remarks: bankRemarks.trim() || undefined,
+        rejectionReason: isReject ? bankRejectionReason.trim() : undefined,
       });
-      showNotification(`Bank account ${showBankActionModal === 'verify' ? 'verified and approved' : 'rejected'}.`);
+      showNotification(`Bank details ${!isReject ? 'approved & verified' : 'rejected'} successfully!`);
       setShowBankActionModal(null);
-      if (onRefresh) onRefresh();
+      onRefresh?.();
     } catch (err) {
-      showNotification(err.message || 'Bank verification update failed', 'error');
+      showNotification(err.message || 'Failed to update bank status', 'error');
     } finally {
       setLoadingAction(false);
     }
   };
 
-  // Handle Save Centre Edits (Admin / Operations)
   const handleSaveEdit = async () => {
-    setSavingEdit(true);
+    if (!editForm.centreName.trim()) {
+      showNotification('Centre Name is required.', 'error');
+      return;
+    }
     try {
+      setSavingEdit(true);
       await apiClient.put(ENDPOINTS.ADMIN.CENTRE_DETAIL(centre.id), {
-        centreName: editForm.centreName,
+        centreName: editForm.centreName.trim(),
         centreCategory: editForm.centreCategory,
-        centreAddress: editForm.centreAddress,
-        stateName: editForm.stateName,
-        cityName: editForm.cityName,
-        pincode: editForm.pincode,
+        centreAddress: editForm.centreAddress.trim(),
+        stateName: editForm.stateName.trim(),
+        cityName: editForm.cityName.trim(),
+        pincode: editForm.pincode.trim(),
         organizationType: editForm.organizationType,
       });
-      showNotification('Centre details updated successfully.', 'success');
+      showNotification('Centre details updated successfully!');
       setIsEditing(false);
-      if (onRefresh) onRefresh();
+      onRefresh?.();
     } catch (err) {
       showNotification(err.message || 'Failed to update centre details', 'error');
     } finally {
@@ -260,41 +292,40 @@ export default function CentreProfileModal({
   };
 
   const tabs = [
-    { id: 'basic', label: '1. Basic Information', icon: Building2 },
-    { id: 'personnel', label: '2. Personnel', icon: UserCheck },
-    { id: 'docs', label: `3. Documents (${docs.length})`, icon: FileText },
-    { id: 'building', label: '4. Facilities', icon: Building2 },
-    { id: 'power', label: '5. Power & Network', icon: Zap },
-    { id: 'safety', label: '6. Safety & Security', icon: ShieldCheck },
-    { id: 'bank', label: '7. Bank Details', icon: CreditCard },
-    { id: 'history', label: '8. Activity History', icon: History },
+    { id: 'basic', label: 'Basic Info', icon: Building2 },
+    { id: 'personnel', label: 'Key Personnel', icon: UserCheck },
+    { id: 'docs', label: `Documents (${docs.length})`, icon: FileText },
+    { id: 'building', label: 'Building & Labs', icon: Building2 },
+    { id: 'power', label: 'Power & Network', icon: Zap },
+    { id: 'safety', label: 'Safety & Perimeter', icon: Lock },
+    { id: 'bank', label: 'Bank & Commercials', icon: CreditCard },
+    { id: 'history', label: 'Audit Trail', icon: History },
   ];
 
   return (
-    <div className="modal-backdrop" onClick={onClose} style={{ zIndex: 1100 }}>
+    <div className="modal-backdrop" style={{ zIndex: 1100 }} onClick={onClose}>
       <div
         className="modal modal-xl"
         onClick={(e) => e.stopPropagation()}
         style={{
-          maxWidth: '1080px',
+          maxWidth: 1100,
           maxHeight: '92vh',
           display: 'flex',
           flexDirection: 'column',
-          borderRadius: '12px',
           overflow: 'hidden',
-          background: 'var(--color-bg-card, #ffffff)',
-          boxShadow: '0 25px 50px -12px rgba(0, 0, 0, 0.25)',
+          padding: 0,
         }}
       >
         {/* Modal Header */}
         <div
           style={{
-            padding: '18px 24px',
+            padding: '20px 24px',
             borderBottom: '1px solid var(--border-color, #e2e8f0)',
             display: 'flex',
             alignItems: 'center',
             justifyContent: 'space-between',
             background: 'var(--color-bg-subtle, #f8fafc)',
+            gap: 16,
           }}
         >
           <div style={{ display: 'flex', alignItems: 'center', gap: 14 }}>
@@ -302,9 +333,9 @@ export default function CentreProfileModal({
               style={{
                 width: 44,
                 height: 44,
-                borderRadius: 10,
-                background: '#eff6ff',
-                color: '#1e40af',
+                borderRadius: 8,
+                background: '#1e40af',
+                color: '#fff',
                 display: 'flex',
                 alignItems: 'center',
                 justifyContent: 'center',
@@ -312,25 +343,25 @@ export default function CentreProfileModal({
                 fontSize: '1.1rem',
               }}
             >
-              <Building2 size={24} />
+              {centre.centreName?.charAt(0) || 'C'}
             </div>
             <div>
-              <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-                <h2 style={{ margin: 0, fontSize: '1.25rem', fontWeight: 700, color: 'var(--color-text-primary, #0f172a)' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                <h3 style={{ margin: 0, fontSize: '1.2rem', fontWeight: 700, color: 'var(--text-primary, #0f172a)' }}>
                   {centre.centreName}
-                </h2>
+                </h3>
                 <span
                   style={{
-                    padding: '2px 8px',
-                    borderRadius: 4,
-                    background: '#f1f5f9',
                     fontFamily: 'monospace',
                     fontSize: '0.8125rem',
-                    fontWeight: 600,
-                    color: '#334155',
+                    fontWeight: 700,
+                    background: '#e0e7ff',
+                    color: '#3730a3',
+                    padding: '2px 8px',
+                    borderRadius: 4,
                   }}
                 >
-                  {centre.centreCode}
+                  {centre.centreCode || centre.id}
                 </span>
                 <StatusBadge status={centre.centreStatus} />
               </div>
@@ -342,7 +373,7 @@ export default function CentreProfileModal({
 
           <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
             {/* Quick Admin Actions */}
-            {(currentUserRole === 'ADMIN' || currentUserRole === 'OPERATIONS') && (
+            {isPrivileged && (
               <button
                 className="btn btn-sm btn-secondary"
                 onClick={() => {
@@ -465,619 +496,66 @@ export default function CentreProfileModal({
 
         {/* Tab Contents */}
         <div style={{ flex: 1, overflowY: 'auto', padding: '24px' }}>
-          {/* 1. Basic Information Tab - Edit Mode */}
-          {activeTab === 'basic' && isEditing && (
-            <div className="card" style={{ padding: 20 }}>
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 }}>
-                <h4 style={{ margin: 0, fontSize: '1rem', fontWeight: 600, color: '#1e40af' }}>
-                  Edit Centre Information (Authorized Admin / Operations)
-                </h4>
-                <div style={{ display: 'flex', gap: 8 }}>
-                  <button
-                    className="btn btn-sm btn-secondary"
-                    onClick={() => setIsEditing(false)}
-                    disabled={savingEdit}
-                  >
-                    Cancel
-                  </button>
-                  <button
-                    className="btn btn-sm btn-primary"
-                    onClick={handleSaveEdit}
-                    disabled={savingEdit}
-                    style={{ display: 'flex', alignItems: 'center', gap: 6 }}
-                  >
-                    <Save size={14} /> {savingEdit ? 'Saving...' : 'Save Changes'}
-                  </button>
-                </div>
-              </div>
-
-              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(260px, 1fr))', gap: 16 }}>
-                <div>
-                  <label className="form-label" style={{ fontWeight: 600, fontSize: '0.8125rem' }}>Centre Name (As per Document)</label>
-                  <input
-                    type="text"
-                    className="form-control"
-                    value={editForm.centreName}
-                    onChange={(e) => setEditForm({ ...editForm, centreName: e.target.value })}
-                  />
-                </div>
-
-                <div>
-                  <label className="form-label" style={{ fontWeight: 600, fontSize: '0.8125rem' }}>Centre Category</label>
-                  <select
-                    className="form-control"
-                    value={editForm.centreCategory}
-                    onChange={(e) => setEditForm({ ...editForm, centreCategory: e.target.value })}
-                  >
-                    {['College', 'School', 'University', 'Government Institution', 'Private Educational Institution', 'Dedicated Examination Centre', 'Other'].map((cat) => (
-                      <option key={cat} value={cat}>{cat}</option>
-                    ))}
-                  </select>
-                </div>
-
-                <div>
-                  <label className="form-label" style={{ fontWeight: 600, fontSize: '0.8125rem' }}>Organization Type</label>
-                  <select
-                    className="form-control"
-                    value={editForm.organizationType}
-                    onChange={(e) => setEditForm({ ...editForm, organizationType: e.target.value })}
-                  >
-                    {['Trust', 'Society', 'Partnership', 'Company', 'Individual', 'Other'].map((org) => (
-                      <option key={org} value={org}>{org}</option>
-                    ))}
-                  </select>
-                </div>
-
-                <div>
-                  <label className="form-label" style={{ fontWeight: 600, fontSize: '0.8125rem' }}>State</label>
-                  <input
-                    type="text"
-                    className="form-control"
-                    value={editForm.stateName}
-                    onChange={(e) => setEditForm({ ...editForm, stateName: e.target.value })}
-                  />
-                </div>
-
-                <div>
-                  <label className="form-label" style={{ fontWeight: 600, fontSize: '0.8125rem' }}>City</label>
-                  <input
-                    type="text"
-                    className="form-control"
-                    value={editForm.cityName}
-                    onChange={(e) => setEditForm({ ...editForm, cityName: e.target.value })}
-                  />
-                </div>
-
-                <div>
-                  <label className="form-label" style={{ fontWeight: 600, fontSize: '0.8125rem' }}>PIN Code</label>
-                  <input
-                    type="text"
-                    className="form-control"
-                    value={editForm.pincode}
-                    maxLength={6}
-                    onChange={(e) => setEditForm({ ...editForm, pincode: e.target.value })}
-                  />
-                </div>
-
-                <div style={{ gridColumn: '1 / -1' }}>
-                  <label className="form-label" style={{ fontWeight: 600, fontSize: '0.8125rem' }}>Full Centre Address</label>
-                  <textarea
-                    className="form-control"
-                    rows={2}
-                    value={editForm.centreAddress}
-                    onChange={(e) => setEditForm({ ...editForm, centreAddress: e.target.value })}
-                  />
-                </div>
-              </div>
-            </div>
+          {activeTab === 'basic' && (
+            <BasicTab
+              centre={centre}
+              capacity={capacity}
+              inf={inf}
+              isEditing={isEditing}
+              setIsEditing={setIsEditing}
+              editForm={editForm}
+              setEditForm={setEditForm}
+              handleSaveEdit={handleSaveEdit}
+              savingEdit={savingEdit}
+            />
           )}
 
-          {/* 1. Basic Information Tab - View Mode */}
-          {activeTab === 'basic' && !isEditing && (
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: 20 }}>
-              <div className="card" style={{ padding: 16 }}>
-                <h4 style={{ margin: '0 0 14px', fontSize: '0.9375rem', fontWeight: 600, color: '#1e40af' }}>
-                  Venue Identification & Location
-                </h4>
-                <div style={{ display: 'flex', flexDirection: 'column', gap: 10, fontSize: '0.875rem' }}>
-                  <div><span style={{ color: '#64748b' }}>Category:</span> <strong>{centre.centreCategory || 'Educational Institution'}</strong></div>
-                  <div><span style={{ color: '#64748b' }}>Region:</span> <strong>{centre.regionId || 'North'}</strong></div>
-                  <div><span style={{ color: '#64748b' }}>Full Address:</span> <div>{centre.centreAddress}</div></div>
-                  <div><span style={{ color: '#64748b' }}>Jurisdiction:</span> <strong>{centre.cityName}, {centre.stateName} (PIN: {centre.pincode})</strong></div>
-                  {centre.taluka && <div><span style={{ color: '#64748b' }}>Taluka:</span> <strong>{centre.taluka}</strong></div>}
-                  <div><span style={{ color: '#64748b' }}>Edu Code:</span> {centre.eduCode || '—'}</div>
-                  <div><span style={{ color: '#64748b' }}>TC Code:</span> {centre.tcCode || '—'}</div>
-                  <div><span style={{ color: '#64748b' }}>Venue Classification:</span> {centre.venueStatus}</div>
-                  <div><span style={{ color: '#64748b' }}>Organization Entity:</span> {centre.organizationType}</div>
-                </div>
-              </div>
-
-              <div className="card" style={{ padding: 16 }}>
-                <h4 style={{ margin: '0 0 14px', fontSize: '0.9375rem', fontWeight: 600, color: '#1e40af' }}>
-                  Capacity & Prior Experience
-                </h4>
-                <div style={{ display: 'flex', flexDirection: 'column', gap: 10, fontSize: '0.875rem' }}>
-                  <div><span style={{ color: '#64748b' }}>Declared Total Nodes:</span> <strong style={{ fontSize: '1.05rem', color: '#1e40af' }}>{capacity.examNodes || centre.totalNodes || 0} nodes</strong></div>
-                  <div><span style={{ color: '#64748b' }}>Buffer Percentage:</span> {capacity.bufferPercent || 10}%</div>
-                  <div><span style={{ color: '#64748b' }}>Registration Desks:</span> {capacity.regDeskCount || 2}</div>
-                  <div><span style={{ color: '#64748b' }}>Server Units:</span> {capacity.serverCount || 1}</div>
-                  <div><span style={{ color: '#64748b' }}>Previous CBT Exam Conducted?</span> <strong>{centre.previousExamConducted ? 'Yes' : 'No'}</strong></div>
-                  {centre.previousEduExam && (
-                    <div><span style={{ color: '#64748b' }}>Prior Exam Details:</span> <div>{centre.previousEduExam}</div></div>
-                  )}
-                </div>
-              </div>
-
-              <div className="card" style={{ padding: 16 }}>
-                <h4 style={{ margin: '0 0 14px', fontSize: '0.9375rem', fontWeight: 600, color: '#1e40af' }}>
-                  Official Contact & Transit
-                </h4>
-                <div style={{ display: 'flex', flexDirection: 'column', gap: 10, fontSize: '0.875rem' }}>
-                  <div><span style={{ color: '#64748b' }}>Official Email:</span> {centre.officialEmail || '—'}</div>
-                  <div><span style={{ color: '#64748b' }}>Official Mobile:</span> {centre.officialMobile || '—'}</div>
-                  <div><span style={{ color: '#64748b' }}>Alternate Mobile:</span> {centre.alternateMobile || '—'}</div>
-                  <div><span style={{ color: '#64748b' }}>Landline with STD:</span> {centre.phoneStd || '—'}</div>
-                  <div><span style={{ color: '#64748b' }}>Nearby Bus Stand:</span> {inf.busStandNearby ? `Yes (${inf.busStandName || 'Nearby'})` : 'No'}</div>
-                  <div><span style={{ color: '#64748b' }}>Nearby Metro Station:</span> {inf.metroNearby ? `Yes (${inf.metroStationName || 'Nearby'})` : 'No'}</div>
-                  <div><span style={{ color: '#64748b' }}>Distance from Highway:</span> {inf.distanceFromMainRoad !== null ? `${inf.distanceFromMainRoad} km` : '—'}</div>
-                  <div><span style={{ color: '#64748b' }}>PH Friendly Centre:</span> {inf.phFriendly ? `Yes (${inf.phCandidateCount || 0} candidates)` : 'No'}</div>
-                </div>
-              </div>
-            </div>
-          )}
-
-          {/* 2. Key Personnel Tab */}
           {activeTab === 'personnel' && (
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(260px, 1fr))', gap: 16 }}>
-              {[
-                { title: 'Centre Owner / Authorized Head', data: owner, roleBadge: 'Owner' },
-                { title: 'Centre Superintendent (CS / TCA)', data: cs, roleBadge: 'Centre Head' },
-                { title: 'Centre IT Person / Technical Lead', data: it, roleBadge: 'IT Lead' },
-                { title: 'Dedicated Electrician', data: electrician, roleBadge: 'Electrician' },
-              ].map((p, idx) => (
-                <div key={idx} className="card" style={{ padding: 16 }}>
-                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}>
-                    <h4 style={{ margin: 0, fontSize: '0.9375rem', fontWeight: 600 }}>{p.title}</h4>
-                    <span style={{ fontSize: '0.75rem', padding: '2px 8px', borderRadius: 4, background: '#f1f5f9', fontWeight: 600 }}>
-                      {p.roleBadge}
-                    </span>
-                  </div>
-                  {p.data.fullName ? (
-                    <div style={{ display: 'flex', flexDirection: 'column', gap: 8, fontSize: '0.875rem' }}>
-                      <div><span style={{ color: '#64748b' }}>Name:</span> <strong>{p.data.fullName}</strong></div>
-                      <div><span style={{ color: '#64748b' }}>Mobile:</span> {p.data.contactNumber}</div>
-                      {p.data.email && <div><span style={{ color: '#64748b' }}>Email:</span> {p.data.email}</div>}
-                      {p.data.aadhaarNumber && (
-                        <div>
-                          <span style={{ color: '#64748b' }}>Aadhaar:</span>{' '}
-                          <code style={{ background: '#f8fafc', padding: '1px 6px', borderRadius: 4 }}>
-                            {p.data.aadhaarNumber.length > 4 ? `XXXX-XXXX-${p.data.aadhaarNumber.slice(-4)}` : p.data.aadhaarNumber}
-                          </code>
-                        </div>
-                      )}
-                      {p.data.fatherName && <div><span style={{ color: '#64748b' }}>Father's Name:</span> {p.data.fatherName}</div>}
-                      {p.data.permanentAddress && <div><span style={{ color: '#64748b' }}>Address:</span> {p.data.permanentAddress}</div>}
-                      <button
-                        type="button"
-                        className="btn btn-sm btn-outline-primary"
-                        onClick={() => handleOpenInvite(p.data)}
-                        style={{ marginTop: 8, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6, width: '100%' }}
-                      >
-                        <Send size={13} /> Invite as Centre Portal User
-                      </button>
-                    </div>
-                  ) : (
-                    <div style={{ fontSize: '0.8125rem', color: '#94a3b8', padding: '12px 0' }}>
-                      No personnel record submitted for this role.
-                    </div>
-                  )}
-                </div>
-              ))}
-            </div>
+            <PersonnelTab
+              owner={owner}
+              cs={cs}
+              it={it}
+              electrician={electrician}
+              handleOpenInvite={handleOpenInvite}
+            />
           )}
 
-          {/* 3. Document Management Tab */}
           {activeTab === 'docs' && (
-            <div>
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 }}>
-                <div>
-                  <h3 style={{ margin: 0, fontSize: '1.05rem', fontWeight: 700 }}>Submitted Supporting Documents</h3>
-                  <p style={{ margin: '3px 0 0', fontSize: '0.8125rem', color: '#64748b' }}>
-                    Review, download, verify or reject uploaded certificates and agreements.
-                  </p>
-                </div>
-              </div>
-
-              {docs.length === 0 ? (
-                <div className="card" style={{ padding: 32, textAlign: 'center', color: '#64748b' }}>
-                  No documents have been uploaded for this centre application yet.
-                </div>
-              ) : (
-                <div className="table-responsive">
-                  <table className="table">
-                    <thead>
-                      <tr>
-                        <th>S. No.</th>
-                        <th>Document Name</th>
-                        <th>Document Type</th>
-                        <th>Version</th>
-                        <th>Uploaded On</th>
-                        <th>Verification Status</th>
-                        <th>Admin Remarks</th>
-                        <th style={{ textAlign: 'right' }}>Actions</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {docs.map((doc, idx) => (
-                        <tr key={doc.id}>
-                          <td>{idx + 1}</td>
-                          <td>
-                            <strong>{doc.documentName || doc.documentType}</strong>
-                            <div style={{ fontSize: '0.75rem', color: '#64748b' }}>{doc.fileName}</div>
-                          </td>
-                          <td><span className="badge badge-subtle">{doc.documentType}</span></td>
-                          <td>v{doc.version}</td>
-                          <td>{doc.createdAt ? new Date(doc.createdAt).toLocaleDateString() : '—'}</td>
-                          <td>
-                            {doc.status === 'Verified' && <span className="badge badge-success" style={{ display: 'inline-flex', alignItems: 'center', gap: 4 }}><Check size={12} /> Verified</span>}
-                            {doc.status === 'Pending' && <span className="badge badge-warning" style={{ display: 'inline-flex', alignItems: 'center', gap: 4 }}><Clock size={12} /> Pending</span>}
-                            {doc.status === 'Rejected' && <span className="badge badge-danger" style={{ display: 'inline-flex', alignItems: 'center', gap: 4 }}><X size={12} /> Rejected</span>}
-                          </td>
-                          <td style={{ fontSize: '0.8125rem', color: doc.status === 'Rejected' ? '#dc2626' : '#64748b' }}>
-                            {doc.rejectionReason || doc.remarks || '—'}
-                          </td>
-                          <td style={{ textAlign: 'right' }}>
-                            <div style={{ display: 'inline-flex', gap: 6 }}>
-                              {doc.fileUrl && (
-                                <button
-                                  className="btn btn-xs btn-secondary"
-                                  onClick={() => setPreviewDocUrl(doc.fileUrl)}
-                                  title="Preview Document"
-                                >
-                                  <Eye size={12} />
-                                </button>
-                              )}
-
-                              {doc.status !== 'Verified' && (
-                                <button
-                                  className="btn btn-xs btn-primary"
-                                  onClick={() => {
-                                    setShowDocActionModal({ doc, action: 'verify' });
-                                    setDocRemarks('');
-                                    setDocRejectionReason('');
-                                  }}
-                                  style={{ background: '#16a34a', borderColor: '#16a34a', color: '#fff' }}
-                                  title="Verify Document"
-                                >
-                                  <Check size={12} /> Verify
-                                </button>
-                              )}
-
-                              {doc.status !== 'Rejected' && (
-                                <button
-                                  className="btn btn-xs btn-secondary"
-                                  onClick={() => {
-                                    setShowDocActionModal({ doc, action: 'reject' });
-                                    setDocRemarks('');
-                                    setDocRejectionReason('');
-                                  }}
-                                  style={{ color: '#dc2626', borderColor: '#fca5a5' }}
-                                  title="Reject Document"
-                                >
-                                  <X size={12} /> Reject
-                                </button>
-                              )}
-                            </div>
-                          </td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                </div>
-              )}
-            </div>
+            <DocsTab
+              docs={docs}
+              setPreviewDocUrl={setPreviewDocUrl}
+              setShowDocActionModal={setShowDocActionModal}
+              setDocRemarks={setDocRemarks}
+              setDocRejectionReason={setDocRejectionReason}
+            />
           )}
 
-          {/* 4. Facilities Tab */}
           {activeTab === 'building' && (
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: 20 }}>
-              <div className="card" style={{ padding: 16 }}>
-                <h4 style={{ margin: '0 0 14px', fontSize: '0.9375rem', fontWeight: 600, color: '#1e40af' }}>
-                  Building & Layout
-                </h4>
-                <div style={{ display: 'flex', flexDirection: 'column', gap: 10, fontSize: '0.875rem' }}>
-                  <div><span style={{ color: '#64748b' }}>Number of Floors:</span> <strong>{inf.noOfFloors || 1}</strong></div>
-                  <div><span style={{ color: '#64748b' }}>Building Structure:</span> {inf.buildingType || 'Independent Building'}</div>
-                  <div><span style={{ color: '#64748b' }}>Passenger Lifts:</span> {inf.noOfLifts || 0}</div>
-                  <div><span style={{ color: '#64748b' }}>Entry Gates:</span> {inf.noOfEntryGates || 1}</div>
-                  <div><span style={{ color: '#64748b' }}>Exit Gates:</span> {inf.noOfExitGates || 1}</div>
-                  <div><span style={{ color: '#64748b' }}>Separate Entry/Exit:</span> {inf.separateEntryExit ? 'Yes' : 'No'}</div>
-                  <div><span style={{ color: '#64748b' }}>Building Wing / Details:</span> {inf.buildingNameWing || 'Main Wing'}</div>
-                </div>
-              </div>
-
-              <div className="card" style={{ padding: 16 }}>
-                <h4 style={{ margin: '0 0 14px', fontSize: '0.9375rem', fontWeight: 600, color: '#1e40af' }}>
-                  Sanitation & CCTV Surveillance
-                </h4>
-                <div style={{ display: 'flex', flexDirection: 'column', gap: 10, fontSize: '0.875rem' }}>
-                  <div><span style={{ color: '#64748b' }}>Washrooms on Each Floor:</span> {inf.washroomsEachFloor || 1}</div>
-                  <div><span style={{ color: '#64748b' }}>Male Washrooms (per floor):</span> {inf.maleWashroomsEachFloor || 1}</div>
-                  <div><span style={{ color: '#64748b' }}>Female Washrooms (per floor):</span> {inf.femaleWashroomsEachFloor || 1}</div>
-                  <div><span style={{ color: '#64748b' }}>Active CCTV Cameras:</span> <strong>{inf.noOfCctvCameras || 0} units</strong></div>
-                  <div><span style={{ color: '#64748b' }}>CCTV Lobby Coverage:</span> {inf.cctvLobby ? 'Yes' : 'No'}</div>
-                  <div><span style={{ color: '#64748b' }}>Drinking Water Area:</span> {inf.drinkingWater ? 'Available' : 'Not verified'}</div>
-                  <div><span style={{ color: '#64748b' }}>AC in Examination Labs:</span> {inf.acAvailable ? 'Available' : 'No'}</div>
-                </div>
-              </div>
-
-              <div className="card" style={{ padding: 16 }}>
-                <h4 style={{ margin: '0 0 14px', fontSize: '0.9375rem', fontWeight: 600, color: '#1e40af' }}>
-                  Server Room Infrastructure
-                </h4>
-                <div style={{ display: 'flex', flexDirection: 'column', gap: 10, fontSize: '0.875rem' }}>
-                  <div><span style={{ color: '#64748b' }}>Dedicated Server Room:</span> {inf.serverRoomAvailable ? 'Yes' : 'No'}</div>
-                  <div><span style={{ color: '#64748b' }}>AC in Server Room:</span> {inf.acInServerRoom ? 'Yes' : 'No'}</div>
-                  <div><span style={{ color: '#64748b' }}>UPS / Power Points:</span> {inf.serverRoomUpsNetwork ? 'Available' : 'No'}</div>
-                  <div><span style={{ color: '#64748b' }}>Access-Controlled Room:</span> {inf.dedicatedServerRoom ? 'Yes' : 'No'}</div>
-                  <div><span style={{ color: '#64748b' }}>Locker / Baggage Facility:</span> {inf.lockerFacility ? 'Yes' : 'No'}</div>
-                  <div><span style={{ color: '#64748b' }}>Reception & Waiting Area:</span> {inf.receptionArea ? 'Yes' : 'No'}</div>
-                </div>
-              </div>
-            </div>
+            <BuildingTab inf={inf} />
           )}
 
-          {/* 5. Power & Network Tab */}
           {activeTab === 'power' && (
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: 20 }}>
-              <div className="card" style={{ padding: 16 }}>
-                <h4 style={{ margin: '0 0 14px', fontSize: '0.9375rem', fontWeight: 600, color: '#1e40af' }}>
-                  Power Backup Resilience
-                </h4>
-                <div style={{ display: 'flex', flexDirection: 'column', gap: 10, fontSize: '0.875rem' }}>
-                  <div><span style={{ color: '#64748b' }}>Online UPS Available?</span> <strong>{inf.upsAvailable ? 'Yes' : 'No'}</strong></div>
-                  {inf.upsAvailable && <div><span style={{ color: '#64748b' }}>UPS Capacity:</span> <strong>{inf.upsCapacityKva || 0} KVA</strong></div>}
-                  <div><span style={{ color: '#64748b' }}>Primary GENSET:</span> <strong>{inf.gensetAvailable ? `Yes (${inf.gensetCapacityKva || 0} KVA)` : 'No'}</strong></div>
-                  <div><span style={{ color: '#64748b' }}>Backup Secondary GENSET:</span> <strong>{inf.backupGensetAvailable ? `Yes (${inf.backupGensetCapacityKva || 0} KVA)` : 'No'}</strong></div>
-                </div>
-              </div>
-
-              <div className="card" style={{ padding: 16 }}>
-                <h4 style={{ margin: '0 0 14px', fontSize: '0.9375rem', fontWeight: 600, color: '#1e40af' }}>
-                  Network Connectivity & LAN
-                </h4>
-                <div style={{ display: 'flex', flexDirection: 'column', gap: 10, fontSize: '0.875rem' }}>
-                  <div><span style={{ color: '#64748b' }}>1 GBPS Core Switch:</span> <strong>{inf.coreSwitch1Gbps ? 'Available' : 'No'}</strong></div>
-                  <div><span style={{ color: '#64748b' }}>Primary Internet Line:</span> <strong>{inf.primaryInternet ? 'Active' : 'No'}</strong></div>
-                  <div><span style={{ color: '#64748b' }}>Secondary Backup ISP:</span> <strong>{inf.backupInternet ? 'Active' : 'No'}</strong></div>
-                  <div><span style={{ color: '#64748b' }}>IP Scanning Compatible:</span> <strong>{inf.ipScanningAvailable ? 'Yes' : 'No'}</strong></div>
-                  <div><span style={{ color: '#64748b' }}>Network Topology Diagram:</span> {inf.networkDiagramAvailable ? 'Available' : 'No'}</div>
-                  <div><span style={{ color: '#64748b' }}>LAN Architecture:</span> {inf.lanType || 'Single LAN'}</div>
-                </div>
-              </div>
-            </div>
+            <PowerTab inf={inf} capacity={capacity} />
           )}
 
-          {/* 6. Safety & Security Tab */}
           {activeTab === 'safety' && (
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: 20 }}>
-              <div className="card" style={{ padding: 16 }}>
-                <h4 style={{ margin: '0 0 14px', fontSize: '0.9375rem', fontWeight: 600, color: '#1e40af' }}>
-                  Fire Safety & Evacuation
-                </h4>
-                <div style={{ display: 'flex', flexDirection: 'column', gap: 10, fontSize: '0.875rem' }}>
-                  <div><span style={{ color: '#64748b' }}>Fire Extinguishers:</span> <strong>{inf.noOfFireExtinguishers || 0} units</strong></div>
-                  <div><span style={{ color: '#64748b' }}>Extinguisher on Each Floor:</span> {inf.fireExtinguisherEachFloor ? 'Yes' : 'No'}</div>
-                  <div><span style={{ color: '#64748b' }}>Fire Emergency Access:</span> {inf.fireEmergencyAccessible ? 'Clear' : 'Blocked'}</div>
-                  <div><span style={{ color: '#64748b' }}>Designated Assembly Area:</span> {inf.assemblyArea ? 'Yes' : 'No'}</div>
-                  <div><span style={{ color: '#64748b' }}>Emergency Safety Signage:</span> {inf.safetySignage ? 'Installed' : 'Missing'}</div>
-                  <div><span style={{ color: '#64748b' }}>First Aid Kits:</span> {inf.firstAidKit ? 'Available' : 'No'}</div>
-                </div>
-              </div>
-
-              <div className="card" style={{ padding: 16 }}>
-                <h4 style={{ margin: '0 0 14px', fontSize: '0.9375rem', fontWeight: 600, color: '#1e40af' }}>
-                  Premises Security & Hygiene
-                </h4>
-                <div style={{ display: 'flex', flexDirection: 'column', gap: 10, fontSize: '0.875rem' }}>
-                  <div><span style={{ color: '#64748b' }}>Safe Neighborhood:</span> {inf.safeArea ? 'Yes' : 'No'}</div>
-                  <div><span style={{ color: '#64748b' }}>Safe During Early/Late Hours:</span> {inf.safeLateHours ? 'Yes' : 'No'}</div>
-                  <div><span style={{ color: '#64748b' }}>Adequate Hygiene & Cleanliness:</span> {inf.adequateHygiene ? 'Compliant' : 'Non-compliant'}</div>
-                  <div><span style={{ color: '#64748b' }}>Third-Party Risk Insurance:</span> {inf.insuranceCoverage ? 'Covered' : 'Not insured'}</div>
-                </div>
-              </div>
-            </div>
+            <SafetyTab inf={inf} />
           )}
 
-          {/* 7. Bank Details Tab */}
           {activeTab === 'bank' && (
-            <div>
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 }}>
-                <div>
-                  <h3 style={{ margin: 0, fontSize: '1.05rem', fontWeight: 700 }}>Beneficiary Bank Account Details</h3>
-                  <p style={{ margin: '3px 0 0', fontSize: '0.8125rem', color: '#64748b' }}>
-                    Secured financial profile for commercial clearance and payment disbursements.
-                  </p>
-                </div>
-                <div style={{ display: 'flex', gap: 8 }}>
-                  {bank.verificationStatus !== 'Verified' && (
-                    <button
-                      className="btn btn-sm btn-primary"
-                      onClick={() => setShowBankActionModal('verify')}
-                      style={{ background: '#16a34a', borderColor: '#16a34a', color: '#fff' }}
-                    >
-                      <Check size={14} /> Verify Bank Account
-                    </button>
-                  )}
-                  {bank.verificationStatus !== 'Rejected' && (
-                    <button
-                      className="btn btn-sm btn-secondary"
-                      onClick={() => setShowBankActionModal('reject')}
-                      style={{ color: '#dc2626', borderColor: '#fca5a5' }}
-                    >
-                      <X size={14} /> Reject Bank Details
-                    </button>
-                  )}
-                </div>
-              </div>
-
-              {!bank.accountNumber ? (
-                <div className="card" style={{ padding: 32, textAlign: 'center', color: '#64748b' }}>
-                  No bank account details have been submitted for this centre.
-                </div>
-              ) : (
-                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(320px, 1fr))', gap: 20 }}>
-                  <div className="card" style={{ padding: 20 }}>
-                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 }}>
-                      <span style={{ fontSize: '0.8125rem', fontWeight: 600, color: '#64748b' }}>Account Details</span>
-                      <span className={`badge ${bank.verificationStatus === 'Verified' ? 'badge-success' : bank.verificationStatus === 'Rejected' ? 'badge-danger' : 'badge-warning'}`}>
-                        {bank.verificationStatus || 'Submitted'}
-                      </span>
-                    </div>
-
-                    <div style={{ display: 'flex', flexDirection: 'column', gap: 12, fontSize: '0.875rem' }}>
-                      <div>
-                        <div style={{ fontSize: '0.75rem', color: '#64748b' }}>Beneficiary / Account Name</div>
-                        <div style={{ fontWeight: 600, fontSize: '1rem', marginTop: 2 }}>{bank.accountName}</div>
-                      </div>
-
-                      <div>
-                        <div style={{ fontSize: '0.75rem', color: '#64748b' }}>Bank & Branch</div>
-                        <div style={{ fontWeight: 600, marginTop: 2 }}>{bank.bankName} — {bank.branchName}</div>
-                      </div>
-
-                      <div>
-                        <div style={{ fontSize: '0.75rem', color: '#64748b', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-                          <span>Account Number</span>
-                          <button
-                            type="button"
-                            onClick={() => setShowFullAccount(!showFullAccount)}
-                            style={{ background: 'none', border: 'none', color: '#1e40af', cursor: 'pointer', fontSize: '0.75rem', display: 'flex', alignItems: 'center', gap: 4 }}
-                          >
-                            {showFullAccount ? <EyeOff size={12} /> : <Eye size={12} />}
-                            {showFullAccount ? 'Mask' : 'Show full'}
-                          </button>
-                        </div>
-                        <div style={{ fontFamily: 'monospace', fontWeight: 700, fontSize: '1.05rem', letterSpacing: '0.05em', marginTop: 2 }}>
-                          {showFullAccount ? (bank.accountNumber || '—') : (bank.accountNumber?.length > 4 ? `XXXX XXXX ${bank.accountNumber.slice(-4)}` : bank.accountNumber)}
-                        </div>
-                      </div>
-
-                      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
-                        <div>
-                          <div style={{ fontSize: '0.75rem', color: '#64748b' }}>IFSC Code</div>
-                          <div style={{ fontFamily: 'monospace', fontWeight: 700, marginTop: 2 }}>{bank.ifscCode}</div>
-                        </div>
-                        <div>
-                          <div style={{ fontSize: '0.75rem', color: '#64748b' }}>Account Type</div>
-                          <div style={{ fontWeight: 600, marginTop: 2 }}>{bank.accountType}</div>
-                        </div>
-                      </div>
-
-                      <div>
-                        <div style={{ fontSize: '0.75rem', color: '#64748b' }}>Payment Clearance Status</div>
-                        <div style={{ fontWeight: 600, color: bank.isPaymentEligible ? '#16a34a' : '#d97706', marginTop: 2 }}>
-                          {bank.isPaymentEligible ? 'Payment Eligible' : 'Awaiting Full Verification'}
-                        </div>
-                      </div>
-
-                      {bank.rejectionReason && (
-                        <div style={{ background: '#fef2f2', border: '1px solid #fecaca', padding: '10px 12px', borderRadius: 6, color: '#991b1b', fontSize: '0.8125rem' }}>
-                          <strong>Rejection Reason:</strong> {bank.rejectionReason}
-                        </div>
-                      )}
-                    </div>
-                  </div>
-
-                  {/* Supporting Bank Proof Previews */}
-                  <div className="card" style={{ padding: 20 }}>
-                    <h4 style={{ margin: '0 0 14px', fontSize: '0.9375rem', fontWeight: 600 }}>Supporting Bank Proofs</h4>
-                    <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
-                      {bank.cancelledChequeUrl && (
-                        <div style={{ border: '1px solid #e2e8f0', borderRadius: 8, padding: 12, display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-                          <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-                            <FileText size={20} color="#1e40af" />
-                            <div>
-                              <div style={{ fontWeight: 600, fontSize: '0.875rem' }}>Cancelled Cheque Copy</div>
-                              <div style={{ fontSize: '0.75rem', color: '#64748b' }}>Uploaded bank proof</div>
-                            </div>
-                          </div>
-                          <button
-                            className="btn btn-xs btn-secondary"
-                            onClick={() => setPreviewDocUrl(bank.cancelledChequeUrl)}
-                          >
-                            <Eye size={12} /> View
-                          </button>
-                        </div>
-                      )}
-
-                      {bank.passbookUrl && (
-                        <div style={{ border: '1px solid #e2e8f0', borderRadius: 8, padding: 12, display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-                          <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-                            <FileText size={20} color="#1e40af" />
-                            <div>
-                              <div style={{ fontWeight: 600, fontSize: '0.875rem' }}>Bank Passbook (Front Page)</div>
-                              <div style={{ fontSize: '0.75rem', color: '#64748b' }}>Uploaded bank proof</div>
-                            </div>
-                          </div>
-                          <button
-                            className="btn btn-xs btn-secondary"
-                            onClick={() => setPreviewDocUrl(bank.passbookUrl)}
-                          >
-                            <Eye size={12} /> View
-                          </button>
-                        </div>
-                      )}
-
-                      {!bank.cancelledChequeUrl && !bank.passbookUrl && (
-                        <div style={{ fontSize: '0.8125rem', color: '#94a3b8', fontStyle: 'italic' }}>
-                          No cheque or passbook file attached directly to bank record. Check Documents tab for uploaded proofs.
-                        </div>
-                      )}
-                    </div>
-                  </div>
-                </div>
-              )}
-            </div>
+            <BankTab
+              bank={bank}
+              showFullAccount={showFullAccount}
+              setShowFullAccount={setShowFullAccount}
+              setPreviewDocUrl={setPreviewDocUrl}
+              setShowBankActionModal={setShowBankActionModal}
+              setBankRemarks={setBankRemarks}
+              setBankRejectionReason={setBankRejectionReason}
+            />
           )}
 
-          {/* 8. Activity History Tab */}
           {activeTab === 'history' && (
-            <div>
-              <h3 style={{ margin: '0 0 14px', fontSize: '1.05rem', fontWeight: 700 }}>Centre Audit & Activity Trail</h3>
-              {history.length === 0 ? (
-                <div className="card" style={{ padding: 32, textAlign: 'center', color: '#64748b' }}>
-                  No recent audit history recorded for this centre.
-                </div>
-              ) : (
-                <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
-                  {history.map((log) => (
-                    <div
-                      key={log.id}
-                      style={{
-                        padding: '12px 16px',
-                        background: '#f8fafc',
-                        border: '1px solid #e2e8f0',
-                        borderRadius: 8,
-                        display: 'flex',
-                        alignItems: 'center',
-                        justifyContent: 'space-between',
-                      }}
-                    >
-                      <div>
-                        <div style={{ fontWeight: 600, fontSize: '0.875rem', color: '#0f172a' }}>{log.action}</div>
-                        <div style={{ fontSize: '0.8125rem', color: '#64748b', marginTop: 2 }}>
-                          by <strong>{log.user?.name || log.userEmail || 'System'}</strong> ({log.user?.role || 'SYSTEM'})
-                        </div>
-                      </div>
-                      <div style={{ fontSize: '0.75rem', color: '#94a3b8' }}>
-                        {new Date(log.createdAt).toLocaleString()}
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              )}
-            </div>
+            <HistoryTab history={history} />
           )}
         </div>
 
@@ -1099,386 +577,76 @@ export default function CentreProfileModal({
       </div>
 
       {/* ── Dialog Modals for Admin Actions ── */}
+      <ApproveModal
+        isOpen={showApproveModal}
+        onClose={() => setShowApproveModal(false)}
+        centreName={centre.centreName}
+        remarks={approveRemarks}
+        setRemarks={setApproveRemarks}
+        onConfirm={handleApprove}
+        loading={loadingAction}
+      />
 
-      {/* Approve Application Modal */}
-      {showApproveModal && (
-        <div className="modal-backdrop" style={{ zIndex: 1200 }} onClick={() => setShowApproveModal(false)}>
-          <div className="modal" style={{ maxWidth: 440 }} onClick={(e) => e.stopPropagation()}>
-            <div className="modal-header">
-              <h3 className="modal-title">Approve Centre Application</h3>
-              <button className="btn-ghost" onClick={() => setShowApproveModal(false)}><X size={16} /></button>
-            </div>
-            <div className="modal-body">
-              <p style={{ fontSize: '0.875rem', color: '#64748b' }}>
-                Are you sure you want to approve <strong>{centre.centreName}</strong>? This will transition the centre status to <strong>Ready to Book</strong>.
-              </p>
-              <div className="form-group" style={{ marginTop: 12 }}>
-                <label className="form-label">Approval Remarks (Optional)</label>
-                <textarea
-                  className="form-control"
-                  rows={3}
-                  value={approveRemarks}
-                  onChange={(e) => setApproveRemarks(e.target.value)}
-                  placeholder="e.g. Infrastructure verified and documents validated."
-                />
-              </div>
-            </div>
-            <div className="modal-footer">
-              <button className="btn btn-secondary" onClick={() => setShowApproveModal(false)} disabled={loadingAction}>Cancel</button>
-              <button className="btn btn-primary" onClick={handleApprove} disabled={loadingAction} style={{ background: '#16a34a', borderColor: '#16a34a', color: '#fff' }}>
-                {loadingAction ? 'Approving...' : 'Confirm Approval'}
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
+      <RejectModal
+        isOpen={showRejectModal}
+        onClose={() => setShowRejectModal(false)}
+        reason={rejectReason}
+        setReason={setRejectReason}
+        onConfirm={handleReject}
+        loading={loadingAction}
+      />
 
-      {/* Reject Application Modal */}
-      {showRejectModal && (
-        <div className="modal-backdrop" style={{ zIndex: 1200 }} onClick={() => setShowRejectModal(false)}>
-          <div className="modal" style={{ maxWidth: 440 }} onClick={(e) => e.stopPropagation()}>
-            <div className="modal-header">
-              <h3 className="modal-title" style={{ color: '#dc2626' }}>Reject Centre Application</h3>
-              <button className="btn-ghost" onClick={() => setShowRejectModal(false)}><X size={16} /></button>
-            </div>
-            <div className="modal-body">
-              <p style={{ fontSize: '0.875rem', color: '#64748b' }}>
-                A mandatory rejection reason is required and will be communicated to the Centre User for correction.
-              </p>
-              <div className="form-group" style={{ marginTop: 12 }}>
-                <label className="form-label" style={{ color: '#991b1b', fontWeight: 600 }}>Rejection Reason *</label>
-                <textarea
-                  className="form-control"
-                  rows={3}
-                  value={rejectReason}
-                  onChange={(e) => setRejectReason(e.target.value)}
-                  placeholder="Specify why this application is rejected..."
-                  required
-                />
-              </div>
-            </div>
-            <div className="modal-footer">
-              <button className="btn btn-secondary" onClick={() => setShowRejectModal(false)} disabled={loadingAction}>Cancel</button>
-              <button className="btn btn-primary" onClick={handleReject} disabled={loadingAction} style={{ background: '#dc2626', borderColor: '#dc2626', color: '#fff' }}>
-                {loadingAction ? 'Rejecting...' : 'Reject Application'}
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
+      <AuditorModal
+        isOpen={showAuditorModal}
+        onClose={() => setShowAuditorModal(false)}
+        auditorId={selectedAuditorId}
+        setAuditorId={setSelectedAuditorId}
+        auditDate={auditDate}
+        setAuditDate={setAuditDate}
+        remarks={auditRemarks}
+        setRemarks={setAuditRemarks}
+        onConfirm={handleAssignAuditor}
+        loading={loadingAction}
+      />
 
-      {/* Assign Auditor Modal */}
-      {showAuditorModal && (
-        <div className="modal-backdrop" style={{ zIndex: 1200 }} onClick={() => setShowAuditorModal(false)}>
-          <div className="modal" style={{ maxWidth: 460 }} onClick={(e) => e.stopPropagation()}>
-            <div className="modal-header">
-              <h3 className="modal-title">Assign Verification Auditor</h3>
-              <button className="btn-ghost" onClick={() => setShowAuditorModal(false)}><X size={16} /></button>
-            </div>
-            <div className="modal-body">
-              <div className="form-group">
-                <label className="form-label">Auditor ID or Email *</label>
-                <input
-                  type="text"
-                  className="form-control"
-                  value={selectedAuditorId}
-                  onChange={(e) => setSelectedAuditorId(e.target.value)}
-                  placeholder="Enter Auditor User ID (e.g. auditor user id)"
-                  required
-                />
-              </div>
-              <div className="form-group" style={{ marginTop: 12 }}>
-                <label className="form-label">Scheduled Audit Date</label>
-                <input
-                  type="date"
-                  className="form-control"
-                  value={auditDate}
-                  onChange={(e) => setAuditDate(e.target.value)}
-                />
-              </div>
-              <div className="form-group" style={{ marginTop: 12 }}>
-                <label className="form-label">Audit Instructions</label>
-                <textarea
-                  className="form-control"
-                  rows={2}
-                  value={auditRemarks}
-                  onChange={(e) => setAuditRemarks(e.target.value)}
-                  placeholder="e.g. Verify server room CCTV and power backup generator."
-                />
-              </div>
-            </div>
-            <div className="modal-footer">
-              <button className="btn btn-secondary" onClick={() => setShowAuditorModal(false)} disabled={loadingAction}>Cancel</button>
-              <button className="btn btn-primary" onClick={handleAssignAuditor} disabled={loadingAction}>
-                {loadingAction ? 'Assigning...' : 'Assign Auditor'}
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
+      <DocActionModal
+        modalState={showDocActionModal}
+        onClose={() => setShowDocActionModal(null)}
+        remarks={docRemarks}
+        setRemarks={setDocRemarks}
+        rejectionReason={docRejectionReason}
+        setRejectionReason={setDocRejectionReason}
+        onConfirm={handleDocAction}
+        loading={loadingAction}
+      />
 
-      {/* Document Action Modal */}
-      {showDocActionModal && (
-        <div className="modal-backdrop" style={{ zIndex: 1200 }} onClick={() => setShowDocActionModal(null)}>
-          <div className="modal" style={{ maxWidth: 440 }} onClick={(e) => e.stopPropagation()}>
-            <div className="modal-header">
-              <h3 className="modal-title">
-                {showDocActionModal.action === 'verify' ? 'Verify Document' : 'Reject Document'}
-              </h3>
-              <button className="btn-ghost" onClick={() => setShowDocActionModal(null)}><X size={16} /></button>
-            </div>
-            <div className="modal-body">
-              <div style={{ marginBottom: 12, fontSize: '0.875rem' }}>
-                Document: <strong>{showDocActionModal.doc.documentName || showDocActionModal.doc.documentType}</strong>
-              </div>
-              {showDocActionModal.action === 'reject' ? (
-                <div className="form-group">
-                  <label className="form-label" style={{ color: '#991b1b', fontWeight: 600 }}>Rejection Reason *</label>
-                  <textarea
-                    className="form-control"
-                    rows={3}
-                    value={docRejectionReason}
-                    onChange={(e) => setDocRejectionReason(e.target.value)}
-                    placeholder="Specify why document is rejected (e.g. blurred, expired)..."
-                    required
-                  />
-                </div>
-              ) : (
-                <div className="form-group">
-                  <label className="form-label">Verification Remarks (Optional)</label>
-                  <textarea
-                    className="form-control"
-                    rows={3}
-                    value={docRemarks}
-                    onChange={(e) => setDocRemarks(e.target.value)}
-                    placeholder="e.g. Validated against official database."
-                  />
-                </div>
-              )}
-            </div>
-            <div className="modal-footer">
-              <button className="btn btn-secondary" onClick={() => setShowDocActionModal(null)} disabled={loadingAction}>Cancel</button>
-              <button
-                className="btn btn-primary"
-                onClick={handleDocAction}
-                disabled={loadingAction}
-                style={{
-                  background: showDocActionModal.action === 'verify' ? '#16a34a' : '#dc2626',
-                  borderColor: showDocActionModal.action === 'verify' ? '#16a34a' : '#dc2626',
-                  color: '#fff',
-                }}
-              >
-                {loadingAction ? 'Processing...' : showDocActionModal.action === 'verify' ? 'Mark Verified' : 'Reject Document'}
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
+      <BankActionModal
+        modalState={showBankActionModal}
+        onClose={() => setShowBankActionModal(null)}
+        remarks={bankRemarks}
+        setRemarks={setBankRemarks}
+        rejectionReason={bankRejectionReason}
+        setRejectionReason={setBankRejectionReason}
+        onConfirm={handleBankAction}
+        loading={loadingAction}
+      />
 
-      {/* Bank Action Modal */}
-      {showBankActionModal && (
-        <div className="modal-backdrop" style={{ zIndex: 1200 }} onClick={() => setShowBankActionModal(null)}>
-          <div className="modal" style={{ maxWidth: 440 }} onClick={(e) => e.stopPropagation()}>
-            <div className="modal-header">
-              <h3 className="modal-title">
-                {showBankActionModal === 'verify' ? 'Approve & Verify Bank Details' : 'Reject Bank Details'}
-              </h3>
-              <button className="btn-ghost" onClick={() => setShowBankActionModal(null)}><X size={16} /></button>
-            </div>
-            <div className="modal-body">
-              {showBankActionModal === 'reject' ? (
-                <div className="form-group">
-                  <label className="form-label" style={{ color: '#991b1b', fontWeight: 600 }}>Rejection Reason *</label>
-                  <textarea
-                    className="form-control"
-                    rows={3}
-                    value={bankRejectionReason}
-                    onChange={(e) => setBankRejectionReason(e.target.value)}
-                    placeholder="Specify reason (e.g. beneficiary name mismatch, invalid IFSC)..."
-                    required
-                  />
-                </div>
-              ) : (
-                <div className="form-group">
-                  <p style={{ fontSize: '0.875rem', color: '#64748b' }}>
-                    Verifying this bank account will enable this centre for commercial settlement and payment disbursements.
-                  </p>
-                  <label className="form-label" style={{ marginTop: 10 }}>Approval Remarks (Optional)</label>
-                  <textarea
-                    className="form-control"
-                    rows={2}
-                    value={bankRemarks}
-                    onChange={(e) => setBankRemarks(e.target.value)}
-                    placeholder="e.g. Account name matches registered centre name."
-                  />
-                </div>
-              )}
-            </div>
-            <div className="modal-footer">
-              <button className="btn btn-secondary" onClick={() => setShowBankActionModal(null)} disabled={loadingAction}>Cancel</button>
-              <button
-                className="btn btn-primary"
-                onClick={handleBankAction}
-                disabled={loadingAction}
-                style={{
-                  background: showBankActionModal === 'verify' ? '#16a34a' : '#dc2626',
-                  borderColor: showBankActionModal === 'verify' ? '#16a34a' : '#dc2626',
-                  color: '#fff',
-                }}
-              >
-                {loadingAction ? 'Saving...' : showBankActionModal === 'verify' ? 'Approve Bank' : 'Reject Bank'}
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
+      <InviteModal
+        isOpen={showInviteModal}
+        onClose={() => setShowInviteModal(false)}
+        centre={centre}
+        inviteForm={inviteForm}
+        setInviteForm={setInviteForm}
+        inviteResult={inviteResult}
+        inviting={inviting}
+        handleSendInvite={handleSendInvite}
+        handleCopyLink={handleCopyLink}
+      />
 
-      {/* Centre User Invitation Modal */}
-      {showInviteModal && (
-        <div className="modal-backdrop" style={{ zIndex: 1250 }} onClick={() => setShowInviteModal(false)}>
-          <div className="modal" style={{ maxWidth: 520 }} onClick={(e) => e.stopPropagation()}>
-            <div className="modal-header">
-              <h3 className="modal-title" style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                <Send size={18} style={{ color: '#2563eb' }} /> Invite Centre User
-              </h3>
-              <button className="btn-ghost" onClick={() => setShowInviteModal(false)}><X size={16} /></button>
-            </div>
-            {inviteResult ? (
-              <div className="modal-body" style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
-                <div style={{ background: '#f0fdf4', border: '1px solid #bbf7d0', padding: 16, borderRadius: 8 }}>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: 8, color: '#166534', fontWeight: 600, marginBottom: 6 }}>
-                    <CheckCircle2 size={18} /> Invitation Generated Successfully!
-                  </div>
-                  <p style={{ margin: 0, fontSize: '0.875rem', color: '#15803d' }}>
-                    An onboarding activation link has been created for <strong>{inviteResult.invitation?.email}</strong>.
-                    This link is valid for <strong>7 days</strong>.
-                  </p>
-                </div>
-
-                <div>
-                  <label className="form-label" style={{ fontWeight: 600, fontSize: '0.8125rem' }}>Activation URL</label>
-                  <div style={{ display: 'flex', gap: 8 }}>
-                    <input
-                      type="text"
-                      className="form-control"
-                      readOnly
-                      value={`${window.location.origin}/activate-account?token=${inviteResult.invitation?.token}`}
-                      style={{ fontSize: '0.8125rem', fontFamily: 'monospace', background: '#f8fafc' }}
-                    />
-                    <button
-                      className="btn btn-secondary"
-                      type="button"
-                      onClick={() => {
-                        navigator.clipboard.writeText(`${window.location.origin}/activate-account?token=${inviteResult.invitation?.token}`);
-                        setCopiedInviteUrl(true);
-                        setTimeout(() => setCopiedInviteUrl(false), 2000);
-                      }}
-                    >
-                      {copiedInviteUrl ? <Check size={14} style={{ color: '#16a34a' }} /> : <Copy size={14} />}
-                    </button>
-                  </div>
-                </div>
-
-                <div className="modal-footer" style={{ padding: '12px 0 0', margin: 0 }}>
-                  <button className="btn btn-primary" onClick={() => setShowInviteModal(false)} style={{ width: '100%' }}>
-                    Done
-                  </button>
-                </div>
-              </div>
-            ) : (
-              <form onSubmit={handleSendInvite}>
-                <div className="modal-body" style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
-                  <div style={{ background: '#f8fafc', padding: '10px 14px', borderRadius: 6, fontSize: '0.8125rem', border: '1px solid #e2e8f0' }}>
-                    <div style={{ color: '#64748b' }}>Assigned Venue:</div>
-                    <strong style={{ color: '#0f172a' }}>{centre.centreName} ({centre.centreCode || centre.id})</strong>
-                  </div>
-
-                  <div className="form-group">
-                    <label className="form-label" style={{ fontWeight: 600 }}>Contact Person Name *</label>
-                    <input
-                      type="text"
-                      className="form-control"
-                      value={inviteForm.name}
-                      onChange={(e) => setInviteForm({ ...inviteForm, name: e.target.value })}
-                      placeholder="e.g. Dr. Ramesh Kumar"
-                      required
-                    />
-                  </div>
-
-                  <div className="form-group">
-                    <label className="form-label" style={{ fontWeight: 600 }}>Email Address *</label>
-                    <input
-                      type="email"
-                      className="form-control"
-                      value={inviteForm.email}
-                      onChange={(e) => setInviteForm({ ...inviteForm, email: e.target.value })}
-                      placeholder="e.g. superintendent@centre.edu.in"
-                      required
-                    />
-                  </div>
-
-                  <div className="form-group">
-                    <label className="form-label">Mobile Number (Optional)</label>
-                    <input
-                      type="tel"
-                      className="form-control"
-                      value={inviteForm.phone}
-                      onChange={(e) => setInviteForm({ ...inviteForm, phone: e.target.value })}
-                      placeholder="e.g. +91 9876543210"
-                    />
-                  </div>
-
-                  <div className="form-group">
-                    <label className="form-label">Operational Notes / Scope Instructions (Optional)</label>
-                    <textarea
-                      className="form-control"
-                      rows={2}
-                      value={inviteForm.notes}
-                      onChange={(e) => setInviteForm({ ...inviteForm, notes: e.target.value })}
-                      placeholder="e.g. Authorized to submit seating dossiers and lab infrastructure."
-                    />
-                  </div>
-                </div>
-
-                <div className="modal-footer">
-                  <button type="button" className="btn btn-secondary" onClick={() => setShowInviteModal(false)} disabled={inviting}>
-                    Cancel
-                  </button>
-                  <button type="submit" className="btn btn-primary" disabled={inviting} style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-                    <Send size={14} /> {inviting ? 'Generating Invitation...' : 'Send Invitation'}
-                  </button>
-                </div>
-              </form>
-            )}
-          </div>
-        </div>
-      )}
-
-      {/* Document Full Preview Modal */}
-      {previewDocUrl && (
-        <div className="modal-backdrop" style={{ zIndex: 1300 }} onClick={() => setPreviewDocUrl(null)}>
-          <div className="modal modal-lg" onClick={(e) => e.stopPropagation()} style={{ maxWidth: 800, height: '80vh', display: 'flex', flexDirection: 'column' }}>
-            <div className="modal-header">
-              <h3 className="modal-title">Document Preview</h3>
-              <button className="btn-ghost" onClick={() => setPreviewDocUrl(null)}><X size={16} /></button>
-            </div>
-            <div className="modal-body" style={{ flex: 1, padding: 0, overflow: 'hidden' }}>
-              {previewDocUrl.startsWith('data:image/') || previewDocUrl.match(/\.(jpeg|jpg|png|gif)$/i) ? (
-                <img src={previewDocUrl} alt="Preview" style={{ width: '100%', height: '100%', objectFit: 'contain' }} />
-              ) : (
-                <iframe src={previewDocUrl} title="Document Preview" style={{ width: '100%', height: '100%', border: 'none' }} />
-              )}
-            </div>
-            <div className="modal-footer">
-              <a href={previewDocUrl} download="document" className="btn btn-sm btn-secondary" target="_blank" rel="noreferrer">
-                <Download size={14} /> Open in New Tab
-              </a>
-              <button className="btn btn-sm btn-primary" onClick={() => setPreviewDocUrl(null)}>Close Preview</button>
-            </div>
-          </div>
-        </div>
-      )}
+      <DocPreviewModal
+        previewUrl={previewDocUrl}
+        onClose={() => setPreviewDocUrl(null)}
+      />
     </div>
   );
 }
-

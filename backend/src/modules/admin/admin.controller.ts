@@ -1,3 +1,4 @@
+import fs from 'fs';
 import { Response } from 'express';
 import { AuthenticatedRequest } from '../../middleware/auth.middleware.js';
 import { AdminService } from './admin.service.js';
@@ -222,9 +223,30 @@ export class AdminController {
   }
 
   // ── Projects ─────────────────────────────────────────────────────────────
+  static async getProjectSummary(req: AuthenticatedRequest, res: Response): Promise<void> {
+    try {
+      const { clientId } = req.query as { clientId?: string };
+      const summary = await AdminService.getProjectSummary({ clientId });
+      sendSuccess(res, summary);
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : 'Failed to retrieve project summary';
+      sendError(res, 500, 'PROJECT_SUMMARY_ERROR', msg);
+    }
+  }
+
+  static async getNextProjectCode(_req: AuthenticatedRequest, res: Response): Promise<void> {
+    try {
+      const projectCode = await AdminService.getNextProjectCode();
+      sendSuccess(res, { projectCode });
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : 'Failed to generate project code';
+      sendError(res, 500, 'PROJECT_CODE_GEN_ERROR', msg);
+    }
+  }
+
   static async listProjects(req: AuthenticatedRequest, res: Response): Promise<void> {
     try {
-      const { page, limit, search, status, stage, clientId, projectId, examTypeId } = req.query as any;
+      const { page, limit, search, status, stage, clientId, projectId, examTypeId, year } = req.query as any;
       const result = await AdminService.listProjects({
         page: page ? parseInt(page, 10) : 1,
         limit: limit ? parseInt(limit, 10) : 20,
@@ -234,6 +256,7 @@ export class AdminController {
         clientId,
         projectId,
         examTypeId,
+        year,
       });
       sendSuccess(res, result.projects, 200, result.meta);
     } catch (err: unknown) {
@@ -317,8 +340,12 @@ export class AdminController {
   // ── Centres ──────────────────────────────────────────────────────────────
   static async getCentresSummary(req: AuthenticatedRequest, res: Response): Promise<void> {
     try {
-      const { clientId } = req.query as { clientId?: string };
-      const summary = await AdminService.getCentresSummary(clientId);
+      // KPI aggregation must use intended unfiltered dataset and authorized client scope.
+      // Admin sees aggregate across all authorized centres in Centre Master.
+      // Non-admin roles with client restrictions respect their authenticated token's clientId if present.
+      const userAny = req.user as any;
+      const authorizedClientId = userAny?.role !== 'ADMIN' ? (userAny?.clientId || undefined) : undefined;
+      const summary = await AdminService.getCentresSummary(authorizedClientId);
       sendSuccess(res, summary);
     } catch (err: unknown) {
       const msg = err instanceof Error ? err.message : 'Failed to retrieve centre summary';
@@ -328,7 +355,7 @@ export class AdminController {
 
   static async listCentres(req: AuthenticatedRequest, res: Response): Promise<void> {
     try {
-      const { page, limit, search, regionId, stateId, cityId, status, eligibilityStatus } = req.query as any;
+      const { page, limit, search, regionId, stateId, cityId, status, eligibilityStatus, clientId } = req.query as any;
       const result = await AdminService.listCentres({
         page: page || 1,
         limit: limit || 20,
@@ -338,6 +365,7 @@ export class AdminController {
         cityId,
         status,
         eligibilityStatus,
+        clientId,
       });
       sendSuccess(res, result.centres, 200, result.meta);
     } catch (err: unknown) {
@@ -899,6 +927,70 @@ export class AdminController {
     } catch (err: unknown) {
       const msg = err instanceof Error ? err.message : 'Failed to delete exam shift';
       sendError(res, 400, 'EXAM_SHIFT_DELETION_FAILED', msg);
+    }
+  }
+
+  // ── Requirement Sheet Import, View & Download ──────────────────────────
+  static async importRequirementSheet(req: AuthenticatedRequest, res: Response): Promise<void> {
+    try {
+      const result = await AdminService.importRequirementSheet(
+        req.params.id as string,
+        req.body,
+        req.user!.userId,
+        req.user!.email
+      );
+      sendSuccess(res, result);
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : 'Failed to import requirement sheet';
+      sendError(res, 400, 'REQUIREMENT_IMPORT_FAILED', msg);
+    }
+  }
+
+  static async getExamRequirementSheet(req: AuthenticatedRequest, res: Response): Promise<void> {
+    try {
+      const result = await AdminService.getExamRequirementSheet(
+        req.params.id as string,
+        req.user!.userId
+      );
+      sendSuccess(res, result);
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : 'Failed to retrieve requirement sheet';
+      sendError(res, 404, 'REQUIREMENT_SHEET_NOT_FOUND', msg);
+    }
+  }
+
+  static async downloadExamRequirementSheet(req: AuthenticatedRequest, res: Response): Promise<void> {
+    try {
+      const fileInfo = await AdminService.downloadExamRequirementSheet(
+        req.params.id as string
+      );
+      res.setHeader('Content-Type', fileInfo.mimeType);
+      res.setHeader('Content-Disposition', `attachment; filename="${encodeURIComponent(fileInfo.fileName)}"`);
+      const fileStream = fs.createReadStream(fileInfo.filePath);
+      fileStream.pipe(res);
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : 'Requirement workbook not found for download';
+      sendError(res, 404, 'FILE_NOT_FOUND', msg);
+    }
+  }
+
+  static async getExamSummary(req: AuthenticatedRequest, res: Response): Promise<void> {
+    try {
+      const summary = await AdminService.getExamSummary(req.params.id as string);
+      sendSuccess(res, summary);
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : 'Failed to retrieve examination summary';
+      sendError(res, 404, 'EXAM_SUMMARY_ERROR', msg);
+    }
+  }
+
+  static async syncExamSummary(req: AuthenticatedRequest, res: Response): Promise<void> {
+    try {
+      const summary = await AdminService.syncExamSummary(req.params.id as string);
+      sendSuccess(res, summary, 200);
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : 'Failed to synchronize examination summary';
+      sendError(res, 400, 'EXAM_SUMMARY_SYNC_ERROR', msg);
     }
   }
 }

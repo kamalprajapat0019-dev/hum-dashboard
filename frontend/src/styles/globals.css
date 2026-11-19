@@ -991,6 +991,19 @@ select.form-control { cursor: pointer; }
   }
 }
 
+/* ---- Manpower Requirement Form Grid ---- */
+.manpower-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 14px;
+}
+@media (max-width: 640px) {
+  .manpower-grid {
+    grid-template-columns: 1fr !important;
+    gap: 12px;
+  }
+}
+
 /* ---- Examination Calendar Modal (Viewport Centered & Portal-safe) ---- */
 .calendar-modal-overlay {
   position: fixed;

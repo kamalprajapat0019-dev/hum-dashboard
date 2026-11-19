@@ -31,9 +31,105 @@ function getDefaultTtl(url) {
   return 10000; // 10s default
 }
 
+function parseJwt(token) {
+  try {
+    if (!token || typeof token !== 'string') return null;
+    const parts = token.split('.');
+    if (parts.length !== 3) return null;
+    const base64Url = parts[1];
+    const base64 = base64Url.replace(/-/g, '+').replace(/_/g, '/');
+    const jsonPayload = decodeURIComponent(
+      atob(base64)
+        .split('')
+        .map((c) => '%' + ('00' + c.charCodeAt(0).toString(16)).slice(-2))
+        .join('')
+    );
+    return JSON.parse(jsonPayload);
+  } catch {
+    return null;
+  }
+}
+
+function isTokenExpired(token, bufferSeconds = 30) {
+  const decoded = parseJwt(token);
+  if (!decoded || !decoded.exp) return false;
+  return decoded.exp * 1000 <= Date.now() + bufferSeconds * 1000;
+}
+
+function isPublicAuthEndpoint(endpoint) {
+  if (!endpoint || typeof endpoint !== 'string') return false;
+  return (
+    endpoint.includes('/auth/login') ||
+    endpoint.includes('/auth/refresh') ||
+    endpoint.includes('/auth/verify-reset-token') ||
+    endpoint.includes('/auth/reset-password') ||
+    endpoint.includes('/auth/verify-invitation') ||
+    endpoint.includes('/auth/activate-account')
+  );
+}
+
+let refreshPromise = null;
+
+async function refreshAccessToken(client) {
+  if (refreshPromise) {
+    return refreshPromise;
+  }
+
+  refreshPromise = (async () => {
+    try {
+      const refreshToken = storage.get(appConfig.auth.refreshTokenStorageKey);
+      if (!refreshToken) {
+        throw new Error('No refresh token available');
+      }
+
+      const refreshUrl = client.buildUrl('/auth/refresh');
+      const response = await fetch(refreshUrl, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Accept: 'application/json',
+        },
+        body: JSON.stringify({ refreshToken }),
+      });
+
+      if (!response.ok) {
+        throw new Error(`Refresh failed with status ${response.status}`);
+      }
+
+      const resData = await response.json();
+      if (!resData.success || !resData.data?.token) {
+        throw new Error(resData.error?.message || 'Invalid refresh token response');
+      }
+
+      const newToken = resData.data.token;
+      const newRefreshToken = resData.data.refreshToken;
+      storage.set(appConfig.auth.tokenStorageKey, newToken);
+      if (newRefreshToken) {
+        storage.set(appConfig.auth.refreshTokenStorageKey, newRefreshToken);
+      }
+      return newToken;
+    } catch (err) {
+      storage.remove(appConfig.auth.tokenStorageKey);
+      storage.remove(appConfig.auth.refreshTokenStorageKey);
+      storage.remove(appConfig.auth.userStorageKey);
+      if (typeof window !== 'undefined') {
+        window.dispatchEvent(new CustomEvent('oem:session-expired', { detail: { reason: err.message } }));
+        if (window.location && !window.location.pathname.includes('/login')) {
+          window.location.href = '/login?expired=1';
+        }
+      }
+      throw err;
+    } finally {
+      refreshPromise = null;
+    }
+  })();
+
+  return refreshPromise;
+}
+
 /**
  * Enterprise HTTP Client with Request Deduplication, In-Memory Response Caching,
- * Safe Content-Type Validation, and Production-Grade Error Handling.
+ * Safe Content-Type Validation, Proactive/Reactive Token Refresh, and Production-Grade Error Handling.
  */
 class ApiClient {
   constructor(config = {}) {
@@ -72,9 +168,26 @@ class ApiClient {
   }
 
   async request(endpoint, options = {}) {
+    const isPublicAuth = isPublicAuthEndpoint(endpoint);
+    let token = isPublicAuth ? null : storage.get(appConfig.auth.tokenStorageKey);
+
+    // Proactive Token Refresh: Refresh ahead of time if token expires within 30s
+    if (!isPublicAuth && token && isTokenExpired(token, 30) && !options._retry) {
+      try {
+        const refreshedToken = await refreshAccessToken(this);
+        if (refreshedToken) {
+          token = refreshedToken;
+        }
+      } catch {
+        const expiredErr = new Error('Session token is invalid or has expired');
+        expiredErr.status = 401;
+        expiredErr.isAuthError = true;
+        throw expiredErr;
+      }
+    }
+
     const url = this.buildUrl(endpoint, options.params);
     const method = (options.method || 'GET').toUpperCase();
-    const token = storage.get(appConfig.auth.tokenStorageKey, 'session');
 
     // ── 1. Cache Lookup for GET requests ───────────────────────────────────
     const isGet = method === 'GET';
@@ -201,6 +314,22 @@ class ApiClient {
 
         // Handle HTTP error statuses with valid JSON error bodies
         if (!response.ok) {
+          // Reactive Refresh on 401 Unauthorized for protected endpoints
+          if (response.status === 401 && !isPublicAuth && !options._retry) {
+            try {
+              const newToken = await refreshAccessToken(this);
+              if (newToken) {
+                return await this.request(endpoint, {
+                  ...options,
+                  _retry: true,
+                  bypassCache: true,
+                });
+              }
+            } catch {
+              // Refresh failed, proceed to error throw below
+            }
+          }
+
           let errorBody = {};
           try {
             errorBody = await response.json();
@@ -328,6 +457,32 @@ class ApiClient {
   async delete(endpoint, headers = {}) {
     this.clearCache('/admin/');
     return this.request(endpoint, { method: 'DELETE', headers });
+  }
+
+  async downloadBlob(endpoint, fallbackFilename = 'document.xlsx') {
+    const token = storage.get(appConfig.auth.tokenStorageKey);
+    const url = buildApiUrl(endpoint);
+    const res = await fetch(url, {
+      headers: token ? { Authorization: `Bearer ${token}` } : {},
+    });
+    if (!res.ok) {
+      throw new Error(`Failed to download file (${res.status} ${res.statusText})`);
+    }
+    const blob = await res.blob();
+    const disposition = res.headers.get('content-disposition');
+    let filename = fallbackFilename;
+    if (disposition && disposition.includes('filename=')) {
+      const match = disposition.match(/filename="?([^";]+)"?/);
+      if (match && match[1]) filename = decodeURIComponent(match[1]);
+    }
+    const blobUrl = window.URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = blobUrl;
+    a.download = filename;
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+    window.URL.revokeObjectURL(blobUrl);
   }
 }
 

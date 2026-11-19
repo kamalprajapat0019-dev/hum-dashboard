@@ -1,7 +1,20 @@
 import crypto from 'crypto';
+import fs from 'fs';
+import path from 'path';
+import * as XLSX from 'xlsx';
 import { prisma } from '../../config/database.js';
 import { hashPassword } from '../../utils/hasher.js';
 import { Role, UserStatus, Prisma } from '@prisma/client';
+import { ExamSummaryEngine, ExamSummaryResult } from './exam-summary.engine.js';
+
+function getRequirementSheetStorageDir(): string {
+  const base = process.cwd().endsWith('backend') ? process.cwd() : path.resolve(process.cwd(), 'backend');
+  const dir = path.resolve(base, 'storage', 'examination_workbooks');
+  if (!fs.existsSync(dir)) {
+    fs.mkdirSync(dir, { recursive: true });
+  }
+  return dir;
+}
 
 export class AdminService {
   // ── 1. Analytics & Executive KPI Aggregation ──────────────────────────────
@@ -1232,6 +1245,126 @@ export class AdminService {
   }
 
   // ── 3. Project Management ────────────────────────────────────────────────
+  static extractFinancialYear(project: any): string {
+    if (project.description) {
+      try {
+        const meta = JSON.parse(project.description);
+        if (meta && typeof meta === 'object' && meta.financialYear) {
+          return meta.financialYear;
+        }
+      } catch {}
+    }
+    const refDate = project.examDate || project.startDate || project.createdAt;
+    if (refDate) {
+      const d = new Date(refDate);
+      const year = d.getFullYear();
+      const month = d.getMonth() + 1;
+      if (month >= 4) {
+        return `${year}-${String(year + 1).slice(-2)}`;
+      } else {
+        return `${year - 1}-${String(year).slice(-2)}`;
+      }
+    }
+    return '2026-27';
+  }
+
+  static extractCandidateTarget(project: any): number {
+    let sum = 0;
+    let hasExams = false;
+    if (project.examTypes && Array.isArray(project.examTypes)) {
+      for (const et of project.examTypes) {
+        if (et.exams && Array.isArray(et.exams)) {
+          for (const ex of et.exams) {
+            hasExams = true;
+            let count = 0;
+            if (ex.description) {
+              try {
+                const meta = JSON.parse(ex.description);
+                if (meta && typeof meta === 'object' && meta.candidateRequiredCount) {
+                  count = Number(meta.candidateRequiredCount) || 0;
+                }
+              } catch {}
+            }
+            sum += count;
+          }
+        }
+      }
+    }
+    if (!hasExams || sum === 0) {
+      return project.candidateTarget || 0;
+    }
+    return sum;
+  }
+
+  static async getNextProjectCode(): Promise<string> {
+    const projects = await prisma.project.findMany({
+      select: { projectCode: true },
+      orderBy: { projectCode: 'desc' },
+    });
+
+    let maxNum = 0;
+    const regex = /^PRJ-(\d{4})$/;
+    for (const p of projects) {
+      const match = p.projectCode.match(regex);
+      if (match) {
+        const num = parseInt(match[1], 10);
+        if (num > maxNum) maxNum = num;
+      }
+    }
+
+    const nextNum = maxNum + 1;
+    return `PRJ-${String(nextNum).padStart(4, '0')}`;
+  }
+
+  static async getProjectSummary(params: { clientId?: string }) {
+    const { clientId } = params;
+    const where: Prisma.ProjectWhereInput = {
+      ...(clientId && clientId !== 'All' ? { clientId } : {}),
+    };
+
+    const [totalProjects, activeProjects, projectsForCandidates, distinctYears] = await Promise.all([
+      prisma.project.count({ where }),
+      prisma.project.count({ where: { ...where, status: 'Active' } }),
+      prisma.project.findMany({
+        where,
+        select: {
+          id: true,
+          candidateTarget: true,
+          examTypes: {
+            select: {
+              exams: {
+                select: {
+                  id: true,
+                  description: true,
+                },
+              },
+            },
+          },
+        },
+      }),
+      prisma.exam.findMany({
+        select: { examYear: true },
+        distinct: ['examYear'],
+        orderBy: { examYear: 'asc' },
+      }),
+    ]);
+
+    let candidateTentativeCount = 0;
+    for (const p of projectsForCandidates) {
+      candidateTentativeCount += this.extractCandidateTarget(p);
+    }
+
+    const availableYears = distinctYears.map((y) => y.examYear).filter(Boolean);
+
+    return {
+      totalProjects,
+      activeProjects,
+      activeRatio: `${activeProjects} / ${totalProjects}`,
+      candidateTentativeCount,
+      availableYears,
+    };
+  }
+
   static async listProjects(params: {
     page: number;
     limit: number;
@@ -1241,16 +1374,34 @@ export class AdminService {
     clientId?: string;
     projectId?: string;
     examTypeId?: string;
+    year?: string | number;
   }) {
-    const { page, limit, search, status, stage, clientId, projectId, examTypeId } = params;
+    const { page, limit, search, status, stage, clientId, projectId, examTypeId, year } = params;
     const skip = (page - 1) * limit;
 
+    let yearFilter: Prisma.ExamTypeListRelationFilter | undefined = undefined;
+    if (year && year !== 'All') {
+      const numericYear = parseInt(String(year), 10);
+      if (!isNaN(numericYear)) {
+        yearFilter = {
+          some: {
+            exams: {
+              some: {
+                examYear: numericYear,
+              },
+            },
+          },
+        };
+      }
+    }
+
     const where: Prisma.ProjectWhereInput = {
-      ...(status ? { status } : {}),
+      ...(status && status !== 'All' ? { status } : {}),
       ...(stage ? { stage } : {}),
-      ...(clientId ? { clientId } : {}),
+      ...(clientId && clientId !== 'All' ? { clientId } : {}),
       ...(projectId ? { id: projectId } : {}),
       ...(examTypeId ? { examTypes: { some: { id: examTypeId } } } : {}),
+      ...(yearFilter ? { examTypes: yearFilter } : {}),
       ...(search
         ? {
           OR: [
@@ -1262,7 +1413,7 @@ export class AdminService {
         : {}),
     };
 
-    const [projects, total] = await Promise.all([
+    const [rawProjects, total] = await Promise.all([
       prisma.project.findMany({
         where,
         skip,
@@ -1272,11 +1423,35 @@ export class AdminService {
           client: { select: { id: true, name: true, fullName: true } },
           projectManager: { select: { id: true, name: true, email: true } },
           examDates: { orderBy: { examDate: 'asc' } },
+          examTypes: {
+            include: {
+              exams: {
+                select: {
+                  id: true,
+                  examName: true,
+                  examCode: true,
+                  examYear: true,
+                  description: true,
+                  status: true,
+                },
+              },
+            },
+          },
           _count: { select: { bookings: true, audits: true, examTypes: true, examDates: true } },
         },
       }),
       prisma.project.count({ where }),
     ]);
+
+    const projects = rawProjects.map((p) => {
+      const candidateTarget = this.extractCandidateTarget(p);
+      const financialYear = this.extractFinancialYear(p);
+      return {
+        ...p,
+        candidateTarget,
+        financialYear,
+      };
+    });
 
     return {
       projects,
@@ -1291,19 +1466,57 @@ export class AdminService {
 
   static async createProject(
     data: Prisma.ProjectUncheckedCreateInput & {
+      financialYear?: string;
       examDates?: Array<{ examDate: string; shift?: string; startTime?: string; endTime?: string }>;
     },
     adminUserId: string,
     adminEmail: string
   ) {
-    const existing = await prisma.project.findUnique({
-      where: { projectCode: data.projectCode },
+    if (!data.clientId) {
+      throw new Error('Associated client is mandatory');
+    }
+    const client = await prisma.client.findUnique({
+      where: { id: data.clientId },
     });
-    if (existing) {
-      throw new Error(`Project code "${data.projectCode}" is already in use`);
+    if (!client) {
+      throw new Error('Selected client does not exist or is invalid');
     }
 
-    const { examDates, ...projectInput } = data;
+    let projectCode = (data.projectCode || '').trim();
+    if (!projectCode || projectCode === 'AUTO' || projectCode.startsWith('PRJ-0000') || projectCode === '') {
+      projectCode = await this.getNextProjectCode();
+    }
+
+    let collision = await prisma.project.findUnique({ where: { projectCode } });
+    let safetyCounter = 0;
+    while (collision && safetyCounter < 100) {
+      const match = projectCode.match(/^PRJ-(\d{4})$/);
+      const nextNum = (match ? parseInt(match[1], 10) : 0) + 1;
+      projectCode = `PRJ-${String(nextNum).padStart(4, '0')}`;
+      collision = await prisma.project.findUnique({ where: { projectCode } });
+      safetyCounter++;
+    }
+
+    const { examDates, financialYear, ...projectInput } = data;
+
+    let meta: any = {};
+    if (projectInput.description) {
+      try {
+        meta = JSON.parse(projectInput.description);
+        if (typeof meta !== 'object' || meta === null) {
+          meta = { text: projectInput.description };
+        }
+      } catch {
+        meta = { text: projectInput.description };
+      }
+    }
+    if (financialYear) {
+      meta.financialYear = financialYear;
+    }
+    const description = Object.keys(meta).length > 0 ? JSON.stringify(meta) : (projectInput.description || null);
+
+    const examType = projectInput.examType || 'Standard Examination';
+    const status = projectInput.status || 'Active';
 
     let primaryExamDate = projectInput.examDate ? new Date(projectInput.examDate as string) : undefined;
     if (examDates && examDates.length > 0 && !primaryExamDate) {
@@ -1333,6 +1546,10 @@ export class AdminService {
       const project = await tx.project.create({
         data: {
           ...projectInput,
+          projectCode,
+          examType,
+          status,
+          description,
           examDate: primaryExamDate,
           examDates: datesToCreate.length > 0 ? {
             create: datesToCreate,
@@ -1355,7 +1572,10 @@ export class AdminService {
         },
       });
 
-      return project;
+      return {
+        ...project,
+        financialYear: financialYear || '2026-27',
+      };
     });
   }
 
@@ -1366,19 +1586,136 @@ export class AdminService {
         client: true,
         projectManager: { select: { id: true, name: true, email: true } },
         examDates: { orderBy: { examDate: 'asc' } },
+        examTypes: {
+          include: {
+            exams: {
+              include: {
+                dates: {
+                  orderBy: { examDate: 'asc' },
+                  include: {
+                    shifts: {
+                      orderBy: { shiftNumber: 'asc' },
+                      include: {
+                        bookings: {
+                          select: {
+                            id: true,
+                            systemsBooked: true,
+                            status: true,
+                            centre: { select: { id: true, centreName: true, cityName: true, stateName: true } },
+                          },
+                        },
+                      },
+                    },
+                  },
+                },
+              },
+            },
+          },
+        },
         bookings: { include: { centre: true } },
         audits: { include: { centre: true, auditor: { select: { name: true } } } },
       },
     });
+
     if (!project) {
       throw new Error('Project not found');
     }
-    return project;
+
+    const projectObj: any = project;
+    const examinations: Array<any> = [];
+    let totalExamCandidates = 0;
+
+    for (const et of projectObj.examTypes || []) {
+      for (const ex of et.exams || []) {
+        let candidateRequiredCount = 0;
+        let lifecycleStage = ex.status;
+        let coverage = 0;
+        if (ex.description) {
+          try {
+            const meta = JSON.parse(ex.description);
+            if (meta && typeof meta === 'object') {
+              if (meta.candidateRequiredCount) candidateRequiredCount = Number(meta.candidateRequiredCount);
+              if (meta.lifecycleStage) lifecycleStage = meta.lifecycleStage;
+              if (meta.coverage) coverage = meta.coverage;
+            }
+          } catch {}
+        }
+        totalExamCandidates += candidateRequiredCount;
+
+        let totalAllocatedInExam = 0;
+        const formattedDates = (ex.dates || []).map((d: any) => {
+          const formattedShifts = (d.shifts || []).map((s: any) => {
+            const shiftAllocation = (s.bookings || []).reduce(
+              (acc: number, b: any) => acc + (b.systemsBooked || 0),
+              0
+            );
+            totalAllocatedInExam += shiftAllocation;
+            return {
+              id: s.id,
+              shiftName: s.shiftName,
+              shiftNumber: s.shiftNumber,
+              startTime: s.startTime,
+              endTime: s.endTime,
+              reportingTime: s.reportingTime,
+              status: s.status,
+              candidateAllocation: shiftAllocation,
+              bookingsCount: (s.bookings || []).length,
+              bookings: s.bookings,
+            };
+          });
+
+          return {
+            id: d.id,
+            examDate: d.examDate,
+            reportingTime: d.reportingTime,
+            status: d.status,
+            shifts: formattedShifts,
+            shiftsCount: formattedShifts.length,
+          };
+        });
+
+        const totalShiftsCount = formattedDates.reduce((acc: number, d: any) => acc + d.shiftsCount, 0);
+
+        examinations.push({
+          id: ex.id,
+          examName: ex.examName,
+          examCode: ex.examCode,
+          examYear: ex.examYear,
+          status: ex.status,
+          lifecycleStage,
+          coverage,
+          candidateRequiredCount,
+          totalAllocatedInExam,
+          examTypeId: et.id,
+          examTypeName: et.examTypeName,
+          examTypeCode: et.examCode,
+          dates: formattedDates,
+          datesCount: formattedDates.length,
+          shiftsCount: totalShiftsCount,
+        });
+      }
+    }
+
+    const financialYear = this.extractFinancialYear(project);
+    const candidateTarget = examinations.length > 0 && totalExamCandidates > 0
+      ? totalExamCandidates
+      : (project.candidateTarget || 0);
+
+    return {
+      ...project,
+      financialYear,
+      candidateTarget,
+      totalCandidateTarget: candidateTarget,
+      examinations,
+      examinationsCount: examinations.length,
+    };
   }
 
   static async updateProject(
     id: string,
-    data: Prisma.ProjectUpdateInput & {
+    data: (Prisma.ProjectUncheckedUpdateInput | Prisma.ProjectUpdateInput) & {
+      clientId?: string;
+      financialYear?: string;
       examDates?: Array<{ id?: string; examDate: string; shift?: string; startTime?: string; endTime?: string }>;
     },
     adminUserId: string,
@@ -1389,7 +1726,37 @@ export class AdminService {
       throw new Error('Project not found');
     }
 
-    const { examDates, ...projectData } = data;
+    delete (data as any).projectCode;
+
+    if (data.clientId) {
+      const client = await prisma.client.findUnique({
+        where: { id: data.clientId as string },
+      });
+      if (!client) {
+        throw new Error('Selected client does not exist');
+      }
+    }
+
+    const { examDates, financialYear, ...projectData } = data;
+
+    if (financialYear !== undefined || projectData.description !== undefined) {
+      let meta: any = {};
+      const currentDesc = projectData.description !== undefined ? projectData.description : existing.description;
+      if (currentDesc) {
+        try {
+          meta = JSON.parse(currentDesc as string);
+          if (typeof meta !== 'object' || meta === null) {
+            meta = { text: currentDesc };
+          }
+        } catch {
+          meta = { text: currentDesc };
+        }
+      }
+      if (financialYear) {
+        meta.financialYear = financialYear;
+      }
+      projectData.description = JSON.stringify(meta);
+    }
 
     return prisma.$transaction(async (tx: any) => {
       if (examDates !== undefined) {
@@ -1521,6 +1888,25 @@ export class AdminService {
       CSIR: '#16a34a',
     };
 
+    // Also fetch exams for these projects to associate examination names and metadata
+    const activeProjectIdsList = Array.from(new Set(examDates.map((item: any) => item.projectId)));
+    const relatedExams = activeProjectIdsList.length > 0
+      ? await prisma.exam.findMany({
+          where: {
+            examType: {
+              projectId: { in: activeProjectIdsList },
+            },
+          },
+          include: {
+            dates: {
+              include: {
+                shifts: true,
+              },
+            },
+          },
+        })
+      : [];
+
     const exams = examDates.map((item: any) => {
       const clientName = item.project.client?.name || 'Eduquity';
       const color =
@@ -1528,11 +1914,48 @@ export class AdminService {
         (clientName.toLowerCase().includes('spark') ? '#d97706' : '#1e40af');
       const isoDate = item.examDate.toISOString().split('T')[0];
 
+      // Match exam for this project, date, and shift
+      const matchingExam = relatedExams.find((ex: any) => {
+        if (ex.examType?.projectId !== item.projectId) return false;
+        return (ex.dates || []).some((d: any) => {
+          const dIso = d.examDate.toISOString().split('T')[0];
+          if (dIso !== isoDate) return false;
+          return (d.shifts || []).some(
+            (s: any) => (s.shiftName || '').toLowerCase() === (item.shift || '').toLowerCase()
+          );
+        });
+      });
+
+      let examMeta: any = {};
+      if (matchingExam?.description) {
+        try {
+          examMeta = JSON.parse(matchingExam.description);
+          if (typeof examMeta !== 'object' || examMeta === null) examMeta = {};
+        } catch {
+          examMeta = {};
+        }
+      }
+
+      const examName = matchingExam?.examName || item.project.name;
+      const candidateTarget =
+        examMeta.candidateRequiredCount ||
+        examMeta.summary?.candidateTarget ||
+        item.project.candidateTarget ||
+        0;
+      const citiesCount =
+        examMeta.coverage ||
+        examMeta.summary?.coverageCount ||
+        item.project.citiesCount ||
+        1;
+
       return {
         id: item.id,
+        examId: matchingExam?.id,
         projectId: item.projectId,
         projectCode: item.project.projectCode,
-        name: item.project.name,
+        name: examName,
+        examName,
+        examCode: matchingExam?.examCode,
         projectName: item.project.name,
         client: clientName,
         clientId: item.project.clientId,
@@ -1544,14 +1967,14 @@ export class AdminService {
         shift: item.shift || 'Shift 1',
         startTime: item.startTime || '09:00 AM',
         endTime: item.endTime || '12:00 PM',
-        candidateTarget: item.project.candidateTarget || 0,
-        candidates: Number(item.project.candidateTarget || 0).toLocaleString(),
+        candidateTarget,
+        candidates: Number(candidateTarget).toLocaleString(),
         centreTarget: item.project.centreTarget || 0,
         centres: item.project.centreTarget || 0,
-        citiesCount: item.project.citiesCount || 1,
-        cities: item.project.citiesCount || 1,
+        citiesCount,
+        cities: citiesCount,
         stage: item.project.stage || 'Setup',
-        status: item.project.status || 'Active',
+        status: matchingExam?.status || item.project.status || 'Active',
         slaHealth: item.project.slaHealth || 'OnTrack',
         color,
       };
@@ -1616,28 +2039,63 @@ export class AdminService {
     cityId?: string;
     status?: string;
     eligibilityStatus?: string;
+    clientId?: string;
   }) {
-    const { page, limit, search, regionId, stateId, cityId, status, eligibilityStatus } = params;
+    const { page, limit, search, regionId, stateId, cityId, status, eligibilityStatus, clientId } = params;
     const skip = (page - 1) * limit;
 
-    const where: Prisma.CentreWhereInput = {
-      ...(status ? { centreStatus: status } : {}),
-      ...(eligibilityStatus ? { eligibilityStatus } : {}),
-      ...(regionId ? { regionId } : {}),
-      ...(stateId ? { stateId } : {}),
-      ...(cityId ? { cityId } : {}),
-      ...(search
-        ? {
-          OR: [
-            { centreName: { contains: search } },
-            { centreCode: { contains: search } },
-            { eduCode: { contains: search } },
-            { tcCode: { contains: search } },
-            { cityName: { contains: search } },
-          ],
-        }
-        : {}),
-    };
+    const conditions: Prisma.CentreWhereInput[] = [];
+
+    if (status && status !== 'All') {
+      conditions.push({ centreStatus: status });
+    }
+    if (eligibilityStatus && eligibilityStatus !== 'All') {
+      conditions.push({ eligibilityStatus });
+    }
+    if (regionId && regionId !== 'All') {
+      conditions.push({ regionId });
+    }
+    if (stateId && stateId.trim()) {
+      const s = stateId.trim();
+      conditions.push({
+        OR: [
+          { stateId: { contains: s } },
+          { stateName: { contains: s } },
+        ],
+      });
+    }
+    if (cityId && cityId.trim()) {
+      const c = cityId.trim();
+      conditions.push({
+        OR: [
+          { cityId: { contains: c } },
+          { cityName: { contains: c } },
+        ],
+      });
+    }
+    if (clientId && clientId.trim()) {
+      const cid = clientId.trim();
+      conditions.push({
+        OR: [
+          { bookings: { some: { project: { clientId: cid } } } },
+          { audits: { some: { project: { clientId: cid } } } },
+        ],
+      });
+    }
+    if (search && search.trim()) {
+      const term = search.trim();
+      conditions.push({
+        OR: [
+          { centreName: { contains: term } },
+          { centreCode: { contains: term } },
+          { eduCode: { contains: term } },
+          { tcCode: { contains: term } },
+          { cityName: { contains: term } },
+        ],
+      });
+    }
+
+    const where: Prisma.CentreWhereInput = conditions.length > 0 ? { AND: conditions } : {};
 
     const [centres, total] = await Promise.all([
       prisma.centre.findMany({
@@ -1660,7 +2118,7 @@ export class AdminService {
         total,
         page,
         limit,
-        totalPages: Math.ceil(total / limit),
+        totalPages: Math.ceil(total / limit) || 1,
       },
     };
   }
@@ -2927,6 +3385,95 @@ export class AdminService {
     return exam;
   }
 
+  // ── Examination Calendar Synchronization ───────────────────────────────────
+  static async syncCalendarForExam(examId: string) {
+    const exam = await prisma.exam.findUnique({
+      where: { id: examId },
+      include: {
+        examType: {
+          include: {
+            project: true,
+          },
+        },
+        dates: {
+          include: {
+            shifts: true,
+          },
+        },
+      },
+    });
+
+    if (!exam || !exam.examType?.project) return;
+    const projectId = exam.examType.project.id;
+
+    // 1. Upsert current examination dates and shifts into ProjectExamDate
+    for (const d of exam.dates) {
+      const targetDateObj = new Date(d.examDate);
+      if (isNaN(targetDateObj.getTime())) continue;
+
+      for (const s of d.shifts) {
+        const shiftName = s.shiftName || `Shift ${s.shiftNumber || 1}`;
+
+        await prisma.projectExamDate.upsert({
+          where: {
+            projectId_examDate_shift: {
+              projectId,
+              examDate: targetDateObj,
+              shift: shiftName,
+            },
+          },
+          update: {
+            startTime: s.startTime || '09:00 AM',
+            endTime: s.endTime || '12:00 PM',
+          },
+          create: {
+            projectId,
+            examDate: targetDateObj,
+            shift: shiftName,
+            startTime: s.startTime || '09:00 AM',
+            endTime: s.endTime || '12:00 PM',
+          },
+        });
+      }
+    }
+
+    // 2. Safely clean up stale dates for this project that are no longer part of any exam under this project and have no bookings
+    const projectExams = await prisma.exam.findMany({
+      where: { examType: { projectId } },
+      include: { dates: { include: { shifts: true } } },
+    });
+
+    const activeProjectScheduleKeys = new Set<string>();
+    for (const ex of projectExams) {
+      for (const d of ex.dates) {
+        const iso = d.examDate.toISOString().split('T')[0];
+        for (const s of d.shifts) {
+          activeProjectScheduleKeys.add(`${iso}__${s.shiftName}`);
+        }
+      }
+    }
+
+    const currentProjectDates = await prisma.projectExamDate.findMany({
+      where: { projectId },
+    });
+
+    for (const ped of currentProjectDates) {
+      const pedIso = ped.examDate.toISOString().split('T')[0];
+      const key = `${pedIso}__${ped.shift}`;
+      if (!activeProjectScheduleKeys.has(key)) {
+        const bookingsCount = await prisma.booking.count({
+          where: {
+            projectId,
+            status: { notIn: ['Cancelled', 'Rejected'] },
+          },
+        });
+        if (bookingsCount === 0) {
+          await prisma.projectExamDate.delete({ where: { id: ped.id } }).catch(() => {});
+        }
+      }
+    }
+  }
+
   static async createExam(
     data: {
       examTypeId: string;
@@ -2935,11 +3482,30 @@ export class AdminService {
       examYear?: number;
       description?: string;
       status?: string;
+      registrationDesk?: number | string;
+      bufferNodes?: number | string;
+      manpower?: any;
+      requirementSheet?: any;
+      dates?: Array<{
+        examDate: string;
+        displayDate?: string;
+        shifts?: Array<{
+          shiftName: string;
+          shiftNumber: number;
+          startTime?: string;
+          endTime?: string;
+          reportingTime?: string;
+        }>;
+      }>;
+      notes?: string;
     },
     adminUserId: string,
     adminEmail: string
   ) {
-    const examType = await prisma.examType.findUnique({ where: { id: data.examTypeId } });
+    const examType = await prisma.examType.findUnique({
+      where: { id: data.examTypeId },
+      include: { project: true },
+    });
     if (!examType) {
       throw new Error('Exam type not found');
     }
@@ -2956,14 +3522,61 @@ export class AdminService {
       throw new Error(`Exam code "${data.examCode}" already exists for this exam type`);
     }
 
-    return prisma.$transaction(async (tx: any) => {
+    // Build initial metadata
+    let meta: any = {};
+    if (data.description) {
+      try {
+        meta = JSON.parse(data.description);
+        if (typeof meta !== 'object' || meta === null) meta = { text: data.description };
+      } catch {
+        meta = { text: data.description };
+      }
+    }
+
+    if (data.registrationDesk !== undefined) meta.registrationDesk = Number(data.registrationDesk) || 5;
+    if (data.bufferNodes !== undefined) meta.bufferNodes = Number(data.bufferNodes) || 3;
+    if (data.manpower !== undefined) meta.manpower = data.manpower;
+    if (data.notes !== undefined) meta.notes = data.notes;
+
+    // Handle physical storage of requirement sheet if uploaded
+    let storageKey: string | null = null;
+    let actualFileSize = data.requirementSheet?.fileSize || 0;
+
+    if (data.requirementSheet?.fileBufferBase64) {
+      const storageDir = getRequirementSheetStorageDir();
+      const safeName = (data.requirementSheet.fileName || 'Examination_Requirement.xlsx').replace(/[^a-zA-Z0-9._-]/g, '_');
+      const diskFileName = `${data.examCode.trim()}_${Date.now()}_${safeName}`;
+      const filePath = path.join(storageDir, diskFileName);
+      const buffer = Buffer.from(data.requirementSheet.fileBufferBase64, 'base64');
+      fs.writeFileSync(filePath, buffer);
+      storageKey = filePath;
+      actualFileSize = buffer.length;
+
+      meta.requirementSheet = {
+        fileName: data.requirementSheet.fileName || 'Examination_Requirements.xlsx',
+        storageKey,
+        fileSize: actualFileSize,
+        mimeType: data.requirementSheet.mimeType || 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+        uploadedAt: new Date().toISOString(),
+        uploadedBy: adminUserId,
+        importStatus: 'Imported',
+        totalRows: data.requirementSheet.totalRows || 0,
+        totalCandidates: Number(data.requirementSheet.totalCandidates) || 0,
+        totalCities: Number(data.requirementSheet.totalCities) || 0,
+        datesCount: data.dates?.length || 0,
+        shiftsCount: data.dates?.reduce((acc: number, d: any) => acc + (d.shifts?.length || 0), 0) || 0,
+        rows: data.requirementSheet.rows || [],
+      };
+    }
+
+    const createdExam = await prisma.$transaction(async (tx: any) => {
       const exam = await tx.exam.create({
         data: {
           examTypeId: data.examTypeId,
           examCode: data.examCode.trim(),
           examName: data.examName.trim(),
           examYear: data.examYear || new Date().getFullYear(),
-          description: data.description,
+          description: JSON.stringify(meta),
           status: data.status || 'Scheduled',
         },
         include: {
@@ -2984,6 +3597,50 @@ export class AdminService {
 
       return exam;
     });
+
+    // Synchronize Dates & Shifts from sheet if provided
+    if (data.dates && Array.isArray(data.dates) && data.dates.length > 0) {
+      const dateGroupsForSync = data.dates.map((d: any) => ({
+        dateIso: new Date(d.examDate).toISOString().substring(0, 10),
+        shifts: (d.shifts || []).map((s: any) => ({
+          shiftName: s.shiftName || `Shift ${s.shiftNumber || 1}`,
+          shiftNumber: s.shiftNumber || 1,
+          startTime: s.startTime,
+          endTime: s.endTime,
+          reportingTime: s.reportingTime,
+        })),
+      }));
+      await ExamSummaryEngine.syncDatabaseSchedule(createdExam, dateGroupsForSync);
+    }
+
+    // Synchronize Global Calendar after successful persistence
+    await AdminService.syncCalendarForExam(createdExam.id);
+
+    // Re-calculate summary if dates exist
+    if (data.dates && data.dates.length > 0) {
+      const summary = await ExamSummaryEngine.calculateExamSummary(createdExam.id, { syncDatabaseDates: true });
+      meta.summary = summary;
+      meta.candidateRequiredCount = summary.candidateTarget;
+      meta.coverage = summary.coverageCount;
+      if (meta.requirementSheet) {
+        meta.requirementSheet.totalCandidates = summary.candidateTarget;
+        meta.requirementSheet.totalCities = summary.coverageCount;
+        meta.requirementSheet.datesCount = summary.examinationDateCount;
+        meta.requirementSheet.shiftsCount = summary.shiftCount;
+      }
+      await prisma.exam.update({
+        where: { id: createdExam.id },
+        data: { description: JSON.stringify(meta) },
+      });
+    }
+
+    return prisma.exam.findUnique({
+      where: { id: createdExam.id },
+      include: {
+        examType: { include: { project: { include: { client: true } } } },
+        dates: { include: { shifts: true }, orderBy: { examDate: 'asc' } },
+      },
+    });
   }
 
   static async updateExam(
@@ -2995,11 +3652,33 @@ export class AdminService {
       examYear?: number;
       description?: string;
       status?: string;
+      registrationDesk?: number | string;
+      bufferNodes?: number | string;
+      manpower?: any;
+      requirementSheet?: any;
+      dates?: Array<{
+        examDate: string;
+        displayDate?: string;
+        shifts?: Array<{
+          shiftName: string;
+          shiftNumber: number;
+          startTime?: string;
+          endTime?: string;
+          reportingTime?: string;
+        }>;
+      }>;
+      notes?: string;
     },
     adminUserId: string,
     adminEmail: string
   ) {
-    const existing = await prisma.exam.findUnique({ where: { id } });
+    const existing = await prisma.exam.findUnique({
+      where: { id },
+      include: {
+        examType: { include: { project: true } },
+        dates: { include: { shifts: true } },
+      },
+    });
     if (!existing) {
       throw new Error('Exam not found');
     }
@@ -3011,6 +3690,77 @@ export class AdminService {
       }
     }
 
+    let meta: any = {};
+    if (existing.description) {
+      try {
+        meta = JSON.parse(existing.description);
+        if (typeof meta !== 'object' || meta === null) meta = { text: existing.description };
+      } catch {
+        meta = { text: existing.description };
+      }
+    }
+
+    if (data.registrationDesk !== undefined) meta.registrationDesk = Number(data.registrationDesk) || 5;
+    if (data.bufferNodes !== undefined) meta.bufferNodes = Number(data.bufferNodes) || 3;
+    if (data.manpower !== undefined) meta.manpower = data.manpower;
+    if (data.notes !== undefined) meta.notes = data.notes;
+
+    // Handle physical storage of new requirement sheet if uploaded
+    if (data.requirementSheet?.fileBufferBase64) {
+      const storageDir = getRequirementSheetStorageDir();
+      const safeName = (data.requirementSheet.fileName || 'Examination_Requirement.xlsx').replace(/[^a-zA-Z0-9._-]/g, '_');
+      const diskFileName = `${(data.examCode || existing.examCode).trim()}_${Date.now()}_${safeName}`;
+      const filePath = path.join(storageDir, diskFileName);
+      const buffer = Buffer.from(data.requirementSheet.fileBufferBase64, 'base64');
+      fs.writeFileSync(filePath, buffer);
+
+      meta.requirementSheet = {
+        fileName: data.requirementSheet.fileName || 'Examination_Requirements.xlsx',
+        storageKey: filePath,
+        fileSize: buffer.length,
+        mimeType: data.requirementSheet.mimeType || 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+        uploadedAt: new Date().toISOString(),
+        uploadedBy: adminUserId,
+        importStatus: 'Imported',
+        totalRows: data.requirementSheet.totalRows || 0,
+        totalCandidates: Number(data.requirementSheet.totalCandidates) || 0,
+        totalCities: Number(data.requirementSheet.totalCities) || 0,
+        datesCount: data.dates?.length || 0,
+        shiftsCount: data.dates?.reduce((acc: number, d: any) => acc + (d.shifts?.length || 0), 0) || 0,
+        rows: data.requirementSheet.rows || [],
+      };
+    }
+
+    // Sync dates if new dates provided
+    if (data.dates && Array.isArray(data.dates) && data.dates.length > 0) {
+      const dateGroupsForSync = data.dates.map((d: any) => ({
+        dateIso: new Date(d.examDate).toISOString().substring(0, 10),
+        shifts: (d.shifts || []).map((s: any) => ({
+          shiftName: s.shiftName || `Shift ${s.shiftNumber || 1}`,
+          shiftNumber: s.shiftNumber || 1,
+          startTime: s.startTime,
+          endTime: s.endTime,
+          reportingTime: s.reportingTime,
+        })),
+      }));
+      await ExamSummaryEngine.syncDatabaseSchedule(existing, dateGroupsForSync);
+    }
+
+    await AdminService.syncCalendarForExam(id);
+
+    if (data.dates && data.dates.length > 0) {
+      const summary = await ExamSummaryEngine.calculateExamSummary(id, { syncDatabaseDates: true });
+      meta.summary = summary;
+      meta.candidateRequiredCount = summary.candidateTarget;
+      meta.coverage = summary.coverageCount;
+      if (meta.requirementSheet) {
+        meta.requirementSheet.totalCandidates = summary.candidateTarget;
+        meta.requirementSheet.totalCities = summary.coverageCount;
+        meta.requirementSheet.datesCount = summary.examinationDateCount;
+        meta.requirementSheet.shiftsCount = summary.shiftCount;
+      }
+    }
+
     return prisma.$transaction(async (tx: any) => {
       const updated = await tx.exam.update({
         where: { id },
@@ -3019,11 +3769,12 @@ export class AdminService {
           ...(data.examCode ? { examCode: data.examCode.trim() } : {}),
           ...(data.examName ? { examName: data.examName.trim() } : {}),
           ...(data.examYear !== undefined ? { examYear: data.examYear } : {}),
-          ...(data.description !== undefined ? { description: data.description } : {}),
+          description: JSON.stringify(meta),
           ...(data.status ? { status: data.status } : {}),
         },
         include: {
           examType: { include: { project: { include: { client: true } } } },
+          dates: { include: { shifts: true }, orderBy: { examDate: 'asc' } },
         },
       });
 
@@ -3228,6 +3979,354 @@ export class AdminService {
 
       return { success: true };
     });
+  }
+
+  // ── 12. Requirement Sheet Import, View & Download ──────────────────────────
+  static async importRequirementSheet(
+    examId: string,
+    data: {
+      fileName?: string;
+      fileSize?: number;
+      mimeType?: string;
+      fileBufferBase64?: string;
+      totalRows?: number;
+      totalCandidates?: number;
+      totalCities?: number;
+      dates?: Array<{
+        examDate: string;
+        displayDate?: string;
+        shifts?: Array<{
+          shiftName: string;
+          shiftNumber: number;
+          startTime?: string;
+          endTime?: string;
+          reportingTime?: string;
+        }>;
+      }>;
+      rows?: any[];
+    },
+    adminUserId: string,
+    adminEmail: string
+  ) {
+    const exam = await prisma.exam.findUnique({
+      where: { id: examId },
+      include: {
+        examType: {
+          include: {
+            project: true,
+          },
+        },
+        dates: {
+          include: {
+            shifts: true,
+          },
+        },
+      },
+    });
+
+    if (!exam) {
+      throw new Error('Examination not found');
+    }
+
+    // 0. Secure permanent storage of the original uploaded Excel workbook
+    const storageDir = getRequirementSheetStorageDir();
+
+    let storageKey: string | null = null;
+    let actualFileSize = data.fileSize || 0;
+
+    if (data.fileBufferBase64) {
+      const safeName = (data.fileName || 'Examination_Requirement.xlsx').replace(/[^a-zA-Z0-9._-]/g, '_');
+      const diskFileName = `${exam.id}_${Date.now()}_${safeName}`;
+      const filePath = path.join(storageDir, diskFileName);
+      const buffer = Buffer.from(data.fileBufferBase64, 'base64');
+      fs.writeFileSync(filePath, buffer);
+      storageKey = filePath;
+      actualFileSize = buffer.length;
+    }
+
+    // 1. Process and synchronize Dates and Shifts using the Schedule Engine
+    if (data.dates && Array.isArray(data.dates) && data.dates.length > 0) {
+      const dateGroupsForSync = data.dates.map((d: any) => ({
+        dateIso: new Date(d.examDate).toISOString().substring(0, 10),
+        shifts: (d.shifts || []).map((s: any) => ({
+          shiftName: s.shiftName || `Shift ${s.shiftNumber || 1}`,
+          shiftNumber: s.shiftNumber || 1,
+        })),
+      }));
+      await ExamSummaryEngine.syncDatabaseSchedule(exam, dateGroupsForSync);
+    }
+
+    // 2. Calculate universal summary from the engine (single source of truth)
+    let meta: any = {};
+    if (exam.description) {
+      try {
+        meta = JSON.parse(exam.description);
+        if (typeof meta !== 'object' || meta === null) meta = { text: exam.description };
+      } catch {
+        meta = { text: exam.description };
+      }
+    }
+
+    meta.requirementSheet = {
+      fileName: data.fileName || 'Examination_Requirements.xlsx',
+      storageKey: storageKey || meta.requirementSheet?.storageKey || null,
+      fileSize: actualFileSize,
+      mimeType: data.mimeType || 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+      uploadedAt: new Date().toISOString(),
+      uploadedBy: adminUserId,
+      importStatus: 'Imported',
+      totalRows: data.totalRows || 0,
+      totalCandidates: Number(data.totalCandidates) || 0,
+      totalCities: Number(data.totalCities) || 0,
+      datesCount: data.dates?.length || 0,
+      shiftsCount: data.dates?.reduce((acc: number, d: any) => acc + (d.shifts?.length || 0), 0) || 0,
+      rows: data.rows || [],
+    };
+
+    // Temporarily save metadata to allow calculation engine to read storageKey
+    await prisma.exam.update({
+      where: { id: exam.id },
+      data: { description: JSON.stringify(meta) },
+    });
+
+    const summary = await ExamSummaryEngine.calculateExamSummary(exam.id, { syncDatabaseDates: true });
+
+    meta.summary = summary;
+    meta.candidateRequiredCount = summary.candidateTarget;
+    meta.coverage = summary.coverageCount;
+    meta.requirementSheet.totalCandidates = summary.candidateTarget;
+    meta.requirementSheet.totalCities = summary.coverageCount;
+    meta.requirementSheet.datesCount = summary.examinationDateCount;
+    meta.requirementSheet.shiftsCount = summary.shiftCount;
+
+    return prisma.$transaction(async (tx: any) => {
+      const updatedExam = await tx.exam.update({
+        where: { id: exam.id },
+        data: {
+          description: JSON.stringify(meta),
+        },
+        include: {
+          examType: { include: { project: { include: { client: true } } } },
+          dates: { include: { shifts: true }, orderBy: { examDate: 'asc' } },
+        },
+      });
+
+      // 3. Update Parent Project targets if project exists
+      if (exam.examType?.project) {
+        await tx.project.update({
+          where: { id: exam.examType.project.id },
+          data: {
+            candidateTarget: Math.max(exam.examType.project.candidateTarget || 0, summary.candidateTarget),
+            citiesCount: Math.max(exam.examType.project.citiesCount || 0, summary.coverageCount),
+          },
+        });
+      }
+
+      // 4. Audit Log
+      await tx.auditLog.create({
+        data: {
+          userId: adminUserId,
+          userEmail: adminEmail,
+          action: 'EXAM_REQUIREMENT_SHEET_IMPORTED',
+          entity: 'Exam',
+          entityId: exam.id,
+          details: {
+            fileName: data.fileName,
+            fileSize: actualFileSize,
+            storageKey,
+            totalRows: data.totalRows,
+            totalCandidates: summary.candidateTarget,
+            totalCities: summary.coverageCount,
+            datesCount: summary.examinationDateCount,
+            shiftsCount: summary.shiftCount,
+            calculationModel: summary.calculationModel,
+          },
+        },
+      });
+
+      return {
+        success: true,
+        exam: updatedExam,
+        summary,
+        importedCount: summary.candidateTarget,
+        citiesCount: summary.coverageCount,
+        datesCount: summary.examinationDateCount,
+        shiftsCount: summary.shiftCount,
+      };
+    }).then(async (result: any) => {
+      // Synchronize Global Calendar entries automatically after successful import
+      await AdminService.syncCalendarForExam(exam.id);
+      return result;
+    });
+  }
+
+  static async getExamRequirementSheet(examId: string, _adminUserId?: string) {
+    const exam = await prisma.exam.findUnique({
+      where: { id: examId },
+      include: {
+        examType: {
+          include: {
+            project: {
+              include: {
+                client: true,
+              },
+            },
+          },
+        },
+        dates: {
+          include: {
+            shifts: true,
+          },
+        },
+      },
+    });
+
+    if (!exam) {
+      throw new Error('Examination not found');
+    }
+
+    let meta: any = {};
+    if (exam.description) {
+      try {
+        meta = JSON.parse(exam.description);
+      } catch {
+        meta = {};
+      }
+    }
+
+    const sheetMeta = meta.requirementSheet;
+    const storageKey = sheetMeta?.storageKey;
+
+    // Single authoritative source of truth for metrics
+    const summary = await ExamSummaryEngine.calculateExamSummary(examId);
+
+    if (!sheetMeta || !storageKey || !fs.existsSync(storageKey)) {
+      return {
+        hasFile: false,
+        message: 'No original Excel requirement sheet is available for this examination.',
+        summary,
+        exam: {
+          id: exam.id,
+          examCode: exam.examCode,
+          examName: exam.examName,
+          status: summary.lifecycleStage,
+          project: summary.projectName,
+          client: summary.clientName,
+          datesCount: summary.examinationDateCount,
+          shiftsCount: summary.shiftCount,
+          candidateTarget: summary.candidateTarget,
+          coverage: summary.coverageCount,
+        },
+      };
+    }
+
+    // Read actual original Excel workbook from storage
+    const buffer = fs.readFileSync(storageKey);
+    const wb = XLSX.read(buffer, { type: 'buffer', cellDates: true, raw: false });
+
+    const sheets = wb.SheetNames.map(sheetName => {
+      const ws = wb.Sheets[sheetName];
+      const rawGrid = XLSX.utils.sheet_to_json(ws, { header: 1, defval: '', raw: false });
+      const merges = ws['!merges'] || [];
+      return {
+        sheetName,
+        rawGrid,
+        merges,
+        totalRows: rawGrid.length,
+        totalCols: rawGrid.reduce((max: number, r: any) => Math.max(max, Array.isArray(r) ? r.length : 0), 0),
+      };
+    });
+
+    return {
+      hasFile: true,
+      summary,
+      exam: {
+        id: exam.id,
+        examCode: exam.examCode,
+        examName: exam.examName,
+        status: summary.lifecycleStage,
+        project: summary.projectName,
+        client: summary.clientName,
+        datesCount: summary.examinationDateCount,
+        shiftsCount: summary.shiftCount,
+        candidateTarget: summary.candidateTarget,
+        coverage: summary.coverageCount,
+      },
+      metadata: {
+        fileName: sheetMeta.fileName || 'Examination_Requirement.xlsx',
+        fileSize: sheetMeta.fileSize || buffer.length,
+        mimeType: sheetMeta.mimeType || 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+        uploadedAt: sheetMeta.uploadedAt,
+        uploadedBy: sheetMeta.uploadedBy,
+        totalCandidates: summary.candidateTarget,
+        totalCities: summary.coverageCount,
+        datesCount: summary.examinationDateCount,
+        shiftsCount: summary.shiftCount,
+      },
+      sheets,
+      activeSheet: sheets[0]?.sheetName || '',
+    };
+  }
+
+  static async getExamSummary(examId: string): Promise<ExamSummaryResult> {
+    return ExamSummaryEngine.calculateExamSummary(examId);
+  }
+
+  static async syncExamSummary(examId: string): Promise<ExamSummaryResult> {
+    const summary = await ExamSummaryEngine.calculateExamSummary(examId, { syncDatabaseDates: true });
+    const exam = await prisma.exam.findUnique({ where: { id: examId } });
+    if (exam) {
+      let meta: any = {};
+      try {
+        meta = JSON.parse(exam.description || '{}');
+      } catch {}
+      meta.summary = summary;
+      meta.candidateRequiredCount = summary.candidateTarget;
+      meta.coverage = summary.coverageCount;
+      if (meta.requirementSheet) {
+        meta.requirementSheet.totalCandidates = summary.candidateTarget;
+        meta.requirementSheet.totalCities = summary.coverageCount;
+        meta.requirementSheet.datesCount = summary.examinationDateCount;
+        meta.requirementSheet.shiftsCount = summary.shiftCount;
+      }
+      await prisma.exam.update({
+        where: { id: examId },
+        data: { description: JSON.stringify(meta) },
+      });
+    }
+    return summary;
+  }
+
+  static async downloadExamRequirementSheet(examId: string) {
+    const exam = await prisma.exam.findUnique({
+      where: { id: examId },
+    });
+
+    if (!exam) {
+      throw new Error('Examination not found');
+    }
+
+    let meta: any = {};
+    if (exam.description) {
+      try {
+        meta = JSON.parse(exam.description);
+      } catch {
+        meta = {};
+      }
+    }
+
+    const sheetMeta = meta.requirementSheet;
+    const storageKey = sheetMeta?.storageKey;
+
+    if (!sheetMeta || !storageKey || !fs.existsSync(storageKey)) {
+      throw new Error('No original Excel requirement sheet is available for this examination.');
+    }
+
+    return {
+      filePath: storageKey,
+      fileName: sheetMeta.fileName || 'Examination_Requirement.xlsx',
+      mimeType: sheetMeta.mimeType || 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+    };
   }
 }
 

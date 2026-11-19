@@ -9,6 +9,7 @@ import { authMiddleware } from '../../middleware/auth.middleware.js';
 const router = Router();
 
 router.post('/login', authRateLimiter, validateRequest({ body: loginSchema }), AuthController.login);
+router.post('/refresh', AuthController.refreshToken);
 router.post('/logout', authMiddleware, AuthController.logout);
 router.get('/me', authMiddleware, AuthController.me);
 

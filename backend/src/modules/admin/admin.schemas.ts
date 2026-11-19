@@ -153,6 +153,12 @@ export const createExamSchema = z.object({
   examYear: z.number().int().min(2020).max(2100).default(new Date().getFullYear()),
   description: z.string().optional(),
   status: z.enum(['Scheduled', 'InProgress', 'Completed', 'Cancelled']).default('Scheduled'),
+  registrationDesk: z.union([z.number(), z.string()]).optional(),
+  bufferNodes: z.union([z.number(), z.string()]).optional(),
+  manpower: z.any().optional(),
+  requirementSheet: z.any().optional(),
+  dates: z.array(z.any()).optional(),
+  notes: z.string().optional(),
 });
 
 export const updateExamSchema = createExamSchema.partial();
@@ -170,6 +176,28 @@ export const createExamShiftSchema = z.object({
   endTime: z.string().min(2, 'End time is required'),
   reportingTime: z.string().optional(),
   status: z.enum(['Scheduled', 'InProgress', 'Completed', 'Cancelled']).default('Scheduled'),
+});
+
+export const importRequirementSheetSchema = z.object({
+  fileName: z.string().optional(),
+  fileSize: z.number().int().nonnegative().optional(),
+  mimeType: z.string().optional(),
+  fileBufferBase64: z.string().optional(),
+  totalRows: z.number().int().nonnegative().optional(),
+  totalCandidates: z.number().int().nonnegative().optional(),
+  totalCities: z.number().int().nonnegative().optional(),
+  dates: z.array(z.object({
+    examDate: z.string(),
+    displayDate: z.string().optional(),
+    shifts: z.array(z.object({
+      shiftName: z.string(),
+      shiftNumber: z.number().int().positive(),
+      startTime: z.string().optional(),
+      endTime: z.string().optional(),
+      reportingTime: z.string().optional(),
+    })).optional(),
+  })).optional(),
+  rows: z.array(z.any()).optional(),
 });
 
 export const clientQuerySchema = paginationSchema.extend({
@@ -210,14 +238,16 @@ export const projectQuerySchema = paginationSchema.extend({
   clientId: z.string().optional(),
   projectId: z.string().optional(),
   examTypeId: z.string().optional(),
+  year: z.union([z.string(), z.number()]).optional(),
 });
 
 export const createProjectSchema = z.object({
-  projectCode: z.string().min(3),
-  name: z.string().min(3),
-  clientId: z.string().min(1),
-  examType: z.string().min(2),
+  projectCode: z.string().optional(),
+  name: z.string().min(2, 'Project Name is required'),
+  clientId: z.string().min(1, 'Client is required'),
+  examType: z.string().optional().default('Standard Examination'),
   description: z.string().optional(),
+  financialYear: z.string().optional(),
   stage: z.string().default('Setup'),
   status: z.string().default('Active'),
   startDate: z.string().optional(),
@@ -231,7 +261,9 @@ export const createProjectSchema = z.object({
   slaHealth: z.enum(['OnTrack', 'AtRisk', 'Delayed', 'Completed']).default('OnTrack'),
 });
 
-export const updateProjectSchema = createProjectSchema.partial();
+export const updateProjectSchema = createProjectSchema.partial().extend({
+  financialYear: z.string().optional(),
+});
 
 export const centreQuerySchema = paginationSchema.extend({
   regionId: z.string().optional(),
@@ -239,11 +271,13 @@ export const centreQuerySchema = paginationSchema.extend({
   cityId: z.string().optional(),
   status: z.string().optional(),
   eligibilityStatus: z.string().optional(),
+  clientId: z.string().optional(),
 });
 
 export const createCentreSchema = z.object({
   centreCode: z.string().min(3),
   centreName: z.string().min(3),
+  centreCategory: z.string().optional(),
   centreAddress: z.string().min(5),
   pincode: z.string().length(6, 'Pincode must be 6 digits'),
   regionId: z.string().optional(),

@@ -20,11 +20,26 @@ export async function authMiddleware(
   }
 
   const token = authHeader.split(' ')[1];
+  if (!token || token.trim() === '' || token === 'undefined' || token === 'null') {
+    sendError(res, 401, 'UNAUTHORIZED', 'Authentication token is missing or malformed');
+    return;
+  }
 
+  // 1. Verify JWT signature and expiration
+  let decoded: TokenPayload;
   try {
-    const decoded = verifyToken(token);
+    decoded = verifyToken(token);
+  } catch (err: any) {
+    if (err?.name === 'TokenExpiredError') {
+      sendError(res, 401, 'TOKEN_EXPIRED', 'Session token has expired');
+      return;
+    }
+    sendError(res, 401, 'INVALID_TOKEN', 'Session token is invalid or has expired');
+    return;
+  }
 
-    // Verify user is still active in database
+  // 2. Verify active account state in database (isolated from JWT catch)
+  try {
     const dbUser = await prisma.user.findUnique({
       where: { id: decoded.userId },
       select: { id: true, email: true, role: true, name: true, status: true, scope: true },
@@ -49,7 +64,8 @@ export async function authMiddleware(
     };
 
     next();
-  } catch (err: unknown) {
-    sendError(res, 401, 'INVALID_TOKEN', 'Session token is invalid or has expired');
+  } catch (dbErr: any) {
+    console.error('[authMiddleware] Database query error:', dbErr?.message);
+    sendError(res, 500, 'DATABASE_ERROR', 'Internal server error validating user authentication state');
   }
 }

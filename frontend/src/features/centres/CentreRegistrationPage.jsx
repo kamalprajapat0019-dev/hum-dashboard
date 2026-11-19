@@ -1,59 +1,24 @@
 import { useState, useEffect, useCallback } from 'react';
-import { useNavigate } from 'react-router-dom';
 import {
   Building2, UserCheck, FileText, Settings, Zap, ShieldCheck,
   CreditCard, CheckCircle2, ChevronRight, ChevronLeft, Save,
-  Send, AlertCircle, Upload, Eye, X, Check, Clock, AlertTriangle,
-  Loader2, Download, RefreshCw, FileCheck
+  Send, AlertCircle, X, Check, Loader2, FileCheck
 } from 'lucide-react';
 import { apiClient } from '@/services/apiClient';
 import { ENDPOINTS } from '@/services/endpoints';
-import { useAuth } from '@/context/AuthContext';
 import { StatusBadge } from '@/components/common';
-
-const INDIAN_STATES = [
-  'Andhra Pradesh', 'Arunachal Pradesh', 'Assam', 'Bihar', 'Chhattisgarh',
-  'Goa', 'Gujarat', 'Haryana', 'Himachal Pradesh', 'Jharkhand', 'Karnataka',
-  'Kerala', 'Madhya Pradesh', 'Maharashtra', 'Manipur', 'Meghalaya', 'Mizoram',
-  'Nagaland', 'Odisha', 'Punjab', 'Rajasthan', 'Sikkim', 'Tamil Nadu',
-  'Telangana', 'Tripura', 'Uttar Pradesh', 'Uttarakhand', 'West Bengal',
-  'Delhi', 'Jammu and Kashmir', 'Ladakh', 'Chandigarh', 'Puducherry'
-];
-
-const CENTRE_CATEGORIES = [
-  'School',
-  'College',
-  'University',
-  'Government Institution',
-  'Private Educational Institution',
-  'Polytechnic / Technical Institute',
-  'IT / Computer Training Institute',
-  'Dedicated Examination Centre',
-  'Other'
-];
-
-const BUILDING_TYPES = [
-  'Independent Building',
-  'Commercial Building',
-  'Educational Institution Building',
-  'Government Building',
-  'Residential Building',
-  'Industrial Building',
-  'Mixed-Use Building',
-  'Other'
-];
-
-const MAJOR_BANKS = [
-  'State Bank of India', 'HDFC Bank', 'ICICI Bank', 'Punjab National Bank',
-  'Bank of Baroda', 'Axis Bank', 'Canara Bank', 'Union Bank of India',
-  'Bank of India', 'IndusInd Bank', 'Kotak Mahindra Bank', 'Yes Bank',
-  'IDBI Bank', 'Central Bank of India', 'Indian Bank', 'Other'
-];
+import {
+  Step1BasicInfo,
+  Step2Personnel,
+  Step3Documents,
+  Step4Building,
+  Step5PowerNetwork,
+  Step6Safety,
+  Step7BankDetails,
+  Step8ReviewSubmit,
+} from './components/registration-steps';
 
 export default function CentreRegistrationPage() {
-  const navigate = useNavigate();
-  const { user } = useAuth();
-
   const [activeStep, setActiveStep] = useState(1);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
@@ -149,39 +114,40 @@ export default function CentreRegistrationPage() {
     dedicatedServerRoom: true,
   });
 
-  // Step 5: Power & Network
+  // Step 5: Power & LAN Infrastructure
   const [powerNetwork, setPowerNetwork] = useState({
     upsAvailable: true,
-    upsCapacityKva: 20,
-    gensetAvailable: true,
-    gensetCapacityKva: 40,
-    backupGensetAvailable: false,
-    backupGensetCapacityKva: 0,
-    coreSwitch1Gbps: true,
-    primaryInternet: true,
-    backupInternet: true,
-    ipScanningAvailable: true,
-    networkDiagramAvailable: true,
-    lanType: 'Single LAN',
+    upsCapacityKva: 15,
+    upsBackupDurationMins: 60,
+    generatorAvailable: true,
+    generatorCapacityKva: 25,
+    dgFuelArrangement: true,
+    autoSwitchover: true,
+    dedicatedInternetLine: true,
+    primaryIspName: 'Airtel Enterprise',
+    primaryBandwidthMbps: 100,
+    secondaryIspAvailable: true,
+    secondaryIspName: 'Tata Tele',
+    secondaryBandwidthMbps: 50,
+    lanStructured: true,
+    switchType: 'Gigabit Managed 24-Port',
   });
 
-  // Step 6: Safety & Security
+  // Step 6: Safety, Security & Hygiene
   const [safety, setSafety] = useState({
-    noOfFireExtinguishers: 6,
+    noOfFireExtinguishers: 4,
     fireSafetyClearanceDate: '',
     fireExtinguisherRefillDate: '',
-    firstAidKit: true,
-    fireExtinguisherEachFloor: true,
-    fireEmergencyAccessible: true,
-    assemblyArea: true,
-    safetySignage: true,
-    safeArea: true,
-    safeLateHours: true,
-    adequateHygiene: true,
-    insuranceCoverage: true,
+    firstAidAvailable: true,
+    smokeAlarmsAvailable: true,
+    emergencyExitsMarked: true,
+    securityGuardsAvailable: true,
+    noOfSecurityGuards: 2,
+    boundaryWall: true,
+    friskingArea: true,
   });
 
-  // Step 7: Bank Details
+  // Step 7: Bank & Commercial Details
   const [bank, setBank] = useState({
     accountName: '',
     bankName: 'State Bank of India',
@@ -197,7 +163,7 @@ export default function CentreRegistrationPage() {
 
   const showNotification = (message, type = 'success') => {
     setToast({ message, type });
-    setTimeout(() => setToast(null), 3500);
+    setTimeout(() => setToast(null), 4000);
   };
 
   // Load Existing Centre Application (if any)
@@ -529,7 +495,7 @@ export default function CentreRegistrationPage() {
         </div>
       )}
 
-      {/* ── Progress Wizard Steps Header (Phase 4 UX) ── */}
+      {/* ── Progress Wizard Steps Header ── */}
       <div
         className="card"
         style={{
@@ -541,7 +507,6 @@ export default function CentreRegistrationPage() {
       >
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', minWidth: 780 }}>
           {steps.map((st, idx) => {
-            const Icon = st.icon;
             const isCurrent = activeStep === st.number;
             const isCompleted = activeStep > st.number || isReadOnly;
 
@@ -600,1155 +565,90 @@ export default function CentreRegistrationPage() {
       </div>
 
       {/* ── Step Body Containers ── */}
-
-      {/* STEP 1: Basic Information */}
       {activeStep === 1 && (
-        <div className="card" style={{ padding: 24 }}>
-          <h3 style={{ margin: '0 0 16px', fontSize: '1.1rem', fontWeight: 700, color: '#1e40af' }}>
-            Step 1 — Centre Basic Identification & Location
-          </h3>
-
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(260px, 1fr))', gap: 16 }}>
-            <div className="form-group">
-              <label className="form-label">Centre Name (As per Document) *</label>
-              <input
-                type="text"
-                className="form-control"
-                value={basicInfo.centreName}
-                onChange={(e) => setBasicInfo({ ...basicInfo, centreName: e.target.value })}
-                placeholder="Enter registered centre name"
-                disabled={isReadOnly}
-                required
-              />
-            </div>
-
-            <div className="form-group">
-              <label className="form-label">Centre Category *</label>
-              <select
-                className="form-control"
-                value={basicInfo.centreCategory}
-                onChange={(e) => setBasicInfo({ ...basicInfo, centreCategory: e.target.value })}
-                disabled={isReadOnly}
-              >
-                {CENTRE_CATEGORIES.map((cat) => (
-                  <option key={cat} value={cat}>{cat}</option>
-                ))}
-              </select>
-            </div>
-
-            <div className="form-group">
-              <label className="form-label">Region *</label>
-              <select
-                className="form-control"
-                value={basicInfo.regionId}
-                onChange={(e) => setBasicInfo({ ...basicInfo, regionId: e.target.value })}
-                disabled={isReadOnly}
-              >
-                <option value="North">North</option>
-                <option value="South">South</option>
-                <option value="East">East</option>
-                <option value="West">West</option>
-                <option value="Central">Central</option>
-                <option value="North-East">North-East</option>
-              </select>
-            </div>
-
-            <div className="form-group" style={{ gridColumn: '1 / -1' }}>
-              <label className="form-label">Centre Address *</label>
-              <textarea
-                className="form-control"
-                rows={2}
-                value={basicInfo.centreAddress}
-                onChange={(e) => setBasicInfo({ ...basicInfo, centreAddress: e.target.value })}
-                placeholder="Complete postal address of the examination venue"
-                disabled={isReadOnly}
-                required
-              />
-            </div>
-
-            <div className="form-group">
-              <label className="form-label">State *</label>
-              <select
-                className="form-control"
-                value={basicInfo.stateName}
-                onChange={(e) => setBasicInfo({ ...basicInfo, stateName: e.target.value })}
-                disabled={isReadOnly}
-              >
-                {INDIAN_STATES.map((s) => (
-                  <option key={s} value={s}>{s}</option>
-                ))}
-              </select>
-            </div>
-
-            <div className="form-group">
-              <label className="form-label">City *</label>
-              <input
-                type="text"
-                className="form-control"
-                value={basicInfo.cityName}
-                onChange={(e) => setBasicInfo({ ...basicInfo, cityName: e.target.value })}
-                placeholder="e.g. Mumbai, New Delhi, Pune"
-                disabled={isReadOnly}
-                required
-              />
-            </div>
-
-            <div className="form-group">
-              <label className="form-label">Taluka (Optional)</label>
-              <input
-                type="text"
-                className="form-control"
-                value={basicInfo.taluka}
-                onChange={(e) => setBasicInfo({ ...basicInfo, taluka: e.target.value })}
-                placeholder="Tehsil / Taluka"
-                disabled={isReadOnly}
-              />
-            </div>
-
-            <div className="form-group">
-              <label className="form-label">PIN Code (6 digits) *</label>
-              <input
-                type="text"
-                className="form-control"
-                maxLength={6}
-                value={basicInfo.pincode}
-                onChange={(e) => setBasicInfo({ ...basicInfo, pincode: e.target.value.replace(/\D/g, '') })}
-                placeholder="e.g. 110085"
-                disabled={isReadOnly}
-                required
-              />
-            </div>
-
-            <div className="form-group">
-              <label className="form-label">Total Exam Nodes (Capacity) *</label>
-              <input
-                type="number"
-                className="form-control"
-                min={1}
-                value={basicInfo.totalNodes}
-                onChange={(e) => setBasicInfo({ ...basicInfo, totalNodes: Number(e.target.value) })}
-                disabled={isReadOnly}
-                required
-              />
-            </div>
-
-            <div className="form-group">
-              <label className="form-label">Edu Code (Optional)</label>
-              <input
-                type="text"
-                className="form-control"
-                value={basicInfo.eduCode}
-                onChange={(e) => setBasicInfo({ ...basicInfo, eduCode: e.target.value })}
-                placeholder="e.g. EDU-104"
-                disabled={isReadOnly}
-              />
-            </div>
-
-            <div className="form-group">
-              <label className="form-label">TC Code (Optional)</label>
-              <input
-                type="text"
-                className="form-control"
-                value={basicInfo.tcCode}
-                onChange={(e) => setBasicInfo({ ...basicInfo, tcCode: e.target.value })}
-                placeholder="e.g. TC-990"
-                disabled={isReadOnly}
-              />
-            </div>
-
-            <div className="form-group">
-              <label className="form-label">Organization Type *</label>
-              <select
-                className="form-control"
-                value={basicInfo.organizationType}
-                onChange={(e) => setBasicInfo({ ...basicInfo, organizationType: e.target.value })}
-                disabled={isReadOnly}
-              >
-                <option value="Trust">Trust</option>
-                <option value="Society">Society</option>
-                <option value="Partnership">Partnership</option>
-                <option value="Company">Company / Pvt Ltd</option>
-                <option value="Individual">Individual Proprietor</option>
-                <option value="Other">Other</option>
-              </select>
-            </div>
-          </div>
-
-          {/* Conditional Previous Examination */}
-          <div style={{ marginTop: 20, padding: 16, background: '#f8fafc', borderRadius: 8, border: '1px solid #e2e8f0' }}>
-            <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
-              <input
-                type="checkbox"
-                id="prevExam"
-                checked={basicInfo.previousExamConducted}
-                onChange={(e) => setBasicInfo({ ...basicInfo, previousExamConducted: e.target.checked })}
-                disabled={isReadOnly}
-              />
-              <label htmlFor="prevExam" style={{ fontWeight: 600, fontSize: '0.875rem', cursor: 'pointer' }}>
-                Has this centre conducted major computer-based examinations previously?
-              </label>
-            </div>
-
-            {basicInfo.previousExamConducted && (
-              <div style={{ marginTop: 12 }}>
-                <label className="form-label">Previous Exam Details *</label>
-                <textarea
-                  className="form-control"
-                  rows={2}
-                  value={basicInfo.previousEduExam}
-                  onChange={(e) => setBasicInfo({ ...basicInfo, previousEduExam: e.target.value })}
-                  placeholder="e.g. NEET UG 2024, JEE Main 2025, IBPS RRB"
-                  disabled={isReadOnly}
-                  required
-                />
-              </div>
-            )}
-          </div>
-
-          {/* Transit & Accessibility (Section 2.4 & 2.5) */}
-          <div style={{ marginTop: 20 }}>
-            <h4 style={{ margin: '0 0 12px', fontSize: '0.9375rem', fontWeight: 600 }}>Transit & Physical Accessibility</h4>
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: 14 }}>
-              <div>
-                <label className="form-label">Local Bus Stand Nearby?</label>
-                <select
-                  className="form-control"
-                  value={basicInfo.busStandNearby ? 'Yes' : 'No'}
-                  onChange={(e) => setBasicInfo({ ...basicInfo, busStandNearby: e.target.value === 'Yes' })}
-                  disabled={isReadOnly}
-                >
-                  <option value="No">No</option>
-                  <option value="Yes">Yes</option>
-                </select>
-              </div>
-
-              {basicInfo.busStandNearby && (
-                <div>
-                  <label className="form-label">Bus Stand Name</label>
-                  <input
-                    type="text"
-                    className="form-control"
-                    value={basicInfo.busStandName}
-                    onChange={(e) => setBasicInfo({ ...basicInfo, busStandName: e.target.value })}
-                    placeholder="e.g. Rohini Sector 8 Bus Stand"
-                    disabled={isReadOnly}
-                  />
-                </div>
-              )}
-
-              <div>
-                <label className="form-label">Metro Station Nearby?</label>
-                <select
-                  className="form-control"
-                  value={basicInfo.metroNearby ? 'Yes' : 'No'}
-                  onChange={(e) => setBasicInfo({ ...basicInfo, metroNearby: e.target.value === 'Yes' })}
-                  disabled={isReadOnly}
-                >
-                  <option value="No">No</option>
-                  <option value="Yes">Yes</option>
-                </select>
-              </div>
-
-              {basicInfo.metroNearby && (
-                <div>
-                  <label className="form-label">Metro Station Name</label>
-                  <input
-                    type="text"
-                    className="form-control"
-                    value={basicInfo.metroStationName}
-                    onChange={(e) => setBasicInfo({ ...basicInfo, metroStationName: e.target.value })}
-                    placeholder="e.g. Rohini West Metro Station"
-                    disabled={isReadOnly}
-                  />
-                </div>
-              )}
-
-              <div>
-                <label className="form-label">Distance from Highway / Main Road (KM)</label>
-                <input
-                  type="number"
-                  step="0.1"
-                  min="0"
-                  className="form-control"
-                  value={basicInfo.distanceFromMainRoad}
-                  onChange={(e) => setBasicInfo({ ...basicInfo, distanceFromMainRoad: Number(e.target.value) })}
-                  disabled={isReadOnly}
-                />
-              </div>
-
-              <div>
-                <label className="form-label">PH (PwD) Friendly Centre?</label>
-                <select
-                  className="form-control"
-                  value={basicInfo.phFriendly ? 'Yes' : 'No'}
-                  onChange={(e) => setBasicInfo({ ...basicInfo, phFriendly: e.target.value === 'Yes' })}
-                  disabled={isReadOnly}
-                >
-                  <option value="No">No</option>
-                  <option value="Yes">Yes</option>
-                </select>
-              </div>
-
-              {basicInfo.phFriendly && (
-                <div>
-                  <label className="form-label">Dedicated PwD Capacity Count</label>
-                  <input
-                    type="number"
-                    min="0"
-                    className="form-control"
-                    value={basicInfo.phCandidateCount}
-                    onChange={(e) => setBasicInfo({ ...basicInfo, phCandidateCount: Number(e.target.value) })}
-                    disabled={isReadOnly}
-                  />
-                </div>
-              )}
-            </div>
-          </div>
-        </div>
+        <Step1BasicInfo
+          basicInfo={basicInfo}
+          setBasicInfo={setBasicInfo}
+          isReadOnly={isReadOnly}
+        />
       )}
 
-      {/* STEP 2: Personnel Details */}
       {activeStep === 2 && (
-        <div className="card" style={{ padding: 24 }}>
-          <h3 style={{ margin: '0 0 16px', fontSize: '1.1rem', fontWeight: 700, color: '#1e40af' }}>
-            Step 2 — Owner & Key Operational Personnel
-          </h3>
-
-          {/* Section 1: Owner Details */}
-          <div style={{ marginBottom: 24, padding: 16, background: '#f8fafc', borderRadius: 8, border: '1px solid #e2e8f0' }}>
-            <h4 style={{ margin: '0 0 12px', fontSize: '0.9375rem', fontWeight: 700, color: '#0f172a' }}>
-              1. Owner / Authorized Signatory Details *
-            </h4>
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: 12 }}>
-              <div>
-                <label className="form-label">Full Name *</label>
-                <input
-                  type="text"
-                  className="form-control"
-                  value={personnel.owner.fullName}
-                  onChange={(e) => setPersonnel({ ...personnel, owner: { ...personnel.owner, fullName: e.target.value } })}
-                  placeholder="Full name as per Aadhaar / PAN"
-                  disabled={isReadOnly}
-                  required
-                />
-              </div>
-              <div>
-                <label className="form-label">Contact Mobile *</label>
-                <input
-                  type="text"
-                  maxLength={10}
-                  className="form-control"
-                  value={personnel.owner.contactNumber}
-                  onChange={(e) => setPersonnel({ ...personnel, owner: { ...personnel.owner, contactNumber: e.target.value.replace(/\D/g, '') } })}
-                  placeholder="10-digit mobile number"
-                  disabled={isReadOnly}
-                  required
-                />
-              </div>
-              <div>
-                <label className="form-label">Email</label>
-                <input
-                  type="email"
-                  className="form-control"
-                  value={personnel.owner.email}
-                  onChange={(e) => setPersonnel({ ...personnel, owner: { ...personnel.owner, email: e.target.value } })}
-                  placeholder="official@email.com"
-                  disabled={isReadOnly}
-                />
-              </div>
-              <div>
-                <label className="form-label">Aadhaar Number *</label>
-                <input
-                  type="text"
-                  maxLength={12}
-                  className="form-control"
-                  value={personnel.owner.aadhaarNumber}
-                  onChange={(e) => setPersonnel({ ...personnel, owner: { ...personnel.owner, aadhaarNumber: e.target.value.replace(/\D/g, '') } })}
-                  placeholder="12-digit Aadhaar"
-                  disabled={isReadOnly}
-                />
-              </div>
-              <div style={{ gridColumn: '1 / -1' }}>
-                <label className="form-label">Permanent Address</label>
-                <input
-                  type="text"
-                  className="form-control"
-                  value={personnel.owner.permanentAddress}
-                  onChange={(e) => setPersonnel({ ...personnel, owner: { ...personnel.owner, permanentAddress: e.target.value } })}
-                  placeholder="Residential address"
-                  disabled={isReadOnly}
-                />
-              </div>
-            </div>
-          </div>
-
-          {/* Section 2: Centre CS Details */}
-          <div style={{ marginBottom: 24, padding: 16, background: '#f8fafc', borderRadius: 8, border: '1px solid #e2e8f0' }}>
-            <h4 style={{ margin: '0 0 12px', fontSize: '0.9375rem', fontWeight: 700, color: '#0f172a' }}>
-              2. Centre Superintendent (CS / TCA) Details *
-            </h4>
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: 12 }}>
-              <div>
-                <label className="form-label">CS Full Name *</label>
-                <input
-                  type="text"
-                  className="form-control"
-                  value={personnel.cs.fullName}
-                  onChange={(e) => setPersonnel({ ...personnel, cs: { ...personnel.cs, fullName: e.target.value } })}
-                  placeholder="Centre Superintendent name"
-                  disabled={isReadOnly}
-                />
-              </div>
-              <div>
-                <label className="form-label">Contact Mobile *</label>
-                <input
-                  type="text"
-                  maxLength={10}
-                  className="form-control"
-                  value={personnel.cs.contactNumber}
-                  onChange={(e) => setPersonnel({ ...personnel, cs: { ...personnel.cs, contactNumber: e.target.value.replace(/\D/g, '') } })}
-                  placeholder="10-digit mobile"
-                  disabled={isReadOnly}
-                />
-              </div>
-              <div>
-                <label className="form-label">Email</label>
-                <input
-                  type="email"
-                  className="form-control"
-                  value={personnel.cs.email}
-                  onChange={(e) => setPersonnel({ ...personnel, cs: { ...personnel.cs, email: e.target.value } })}
-                  placeholder="cs@centre.com"
-                  disabled={isReadOnly}
-                />
-              </div>
-              <div>
-                <label className="form-label">Aadhaar Number</label>
-                <input
-                  type="text"
-                  maxLength={12}
-                  className="form-control"
-                  value={personnel.cs.aadhaarNumber}
-                  onChange={(e) => setPersonnel({ ...personnel, cs: { ...personnel.cs, aadhaarNumber: e.target.value.replace(/\D/g, '') } })}
-                  placeholder="12-digit Aadhaar"
-                  disabled={isReadOnly}
-                />
-              </div>
-            </div>
-          </div>
-
-          {/* Section 3: IT Person Details */}
-          <div style={{ marginBottom: 24, padding: 16, background: '#f8fafc', borderRadius: 8, border: '1px solid #e2e8f0' }}>
-            <h4 style={{ margin: '0 0 12px', fontSize: '0.9375rem', fontWeight: 700, color: '#0f172a' }}>
-              3. Centre IT Person / Network Administrator *
-            </h4>
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: 12 }}>
-              <div>
-                <label className="form-label">IT Lead Name *</label>
-                <input
-                  type="text"
-                  className="form-control"
-                  value={personnel.it.fullName}
-                  onChange={(e) => setPersonnel({ ...personnel, it: { ...personnel.it, fullName: e.target.value } })}
-                  placeholder="IT lead name"
-                  disabled={isReadOnly}
-                />
-              </div>
-              <div>
-                <label className="form-label">Contact Mobile *</label>
-                <input
-                  type="text"
-                  maxLength={10}
-                  className="form-control"
-                  value={personnel.it.contactNumber}
-                  onChange={(e) => setPersonnel({ ...personnel, it: { ...personnel.it, contactNumber: e.target.value.replace(/\D/g, '') } })}
-                  placeholder="10-digit mobile"
-                  disabled={isReadOnly}
-                />
-              </div>
-              <div>
-                <label className="form-label">Email</label>
-                <input
-                  type="email"
-                  className="form-control"
-                  value={personnel.it.email}
-                  onChange={(e) => setPersonnel({ ...personnel, it: { ...personnel.it, email: e.target.value } })}
-                  placeholder="it@centre.com"
-                  disabled={isReadOnly}
-                />
-              </div>
-            </div>
-          </div>
-
-          {/* Section 4: Electrician Details */}
-          <div style={{ padding: 16, background: '#f8fafc', borderRadius: 8, border: '1px solid #e2e8f0' }}>
-            <h4 style={{ margin: '0 0 12px', fontSize: '0.9375rem', fontWeight: 700, color: '#0f172a' }}>
-              4. Dedicated Electrician Details
-            </h4>
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: 12 }}>
-              <div>
-                <label className="form-label">Electrician Name</label>
-                <input
-                  type="text"
-                  className="form-control"
-                  value={personnel.electrician.fullName}
-                  onChange={(e) => setPersonnel({ ...personnel, electrician: { ...personnel.electrician, fullName: e.target.value } })}
-                  placeholder="Electrician name"
-                  disabled={isReadOnly}
-                />
-              </div>
-              <div>
-                <label className="form-label">Mobile Number</label>
-                <input
-                  type="text"
-                  maxLength={10}
-                  className="form-control"
-                  value={personnel.electrician.contactNumber}
-                  onChange={(e) => setPersonnel({ ...personnel, electrician: { ...personnel.electrician, contactNumber: e.target.value.replace(/\D/g, '') } })}
-                  placeholder="10-digit mobile"
-                  disabled={isReadOnly}
-                />
-              </div>
-            </div>
-          </div>
-        </div>
+        <Step2Personnel
+          personnel={personnel}
+          setPersonnel={setPersonnel}
+          isReadOnly={isReadOnly}
+        />
       )}
 
-      {/* STEP 3: Document Management */}
       {activeStep === 3 && (
-        <div className="card" style={{ padding: 24 }}>
-          <h3 style={{ margin: '0 0 8px', fontSize: '1.1rem', fontWeight: 700, color: '#1e40af' }}>
-            Step 3 — Mandatory & Supporting Document Checklist
-          </h3>
-          <p style={{ margin: '0 0 20px', fontSize: '0.8125rem', color: '#64748b' }}>
-            Upload high-resolution PDF or Image proofs (Max 10 MB per document). Mandatory items are marked with an asterisk (*).
-          </p>
-
-          <div className="table-responsive">
-            <table className="table">
-              <thead>
-                <tr>
-                  <th>Document Name</th>
-                  <th>Mandatory</th>
-                  <th>Status</th>
-                  <th>File Upload / Replace</th>
-                  <th style={{ textAlign: 'right' }}>Preview</th>
-                </tr>
-              </thead>
-              <tbody>
-                {[
-                  { key: 'current_electricity_bill', label: 'Current Electricity Bill', mandatory: true },
-                  { key: 'cancelled_cheque', label: 'Cancelled Cheque Copy', mandatory: true },
-                  { key: 'centre_pan', label: 'Centre / Entity PAN Card', mandatory: true },
-                  { key: 'gst_document', label: 'GST Registration Certificate', mandatory: true },
-                  { key: 'ef_data_sheet', label: 'EF Resource Data Sheet', mandatory: true },
-                  { key: 'owner_id_proof', label: 'Owner ID Proof (Aadhaar / Voter ID)', mandatory: true },
-                  { key: 'mou', label: 'MOU – ₹500 Stamp Paper', mandatory: true },
-                  { key: 'nda', label: 'NDA – ₹100 Stamp Paper', mandatory: true },
-                  { key: 'registration_certificate', label: 'Establishment / Registration Certificate', mandatory: true },
-                  { key: 'trust_society_certificate', label: 'Trust Deed / Society Certificate', mandatory: basicInfo.organizationType === 'Trust' || basicInfo.organizationType === 'Society' },
-                  { key: 'partnership_deed', label: 'Partnership Deed & KYC', mandatory: basicInfo.organizationType === 'Partnership' },
-                ].map((item) => {
-                  const uploaded = documents.find((d) => d.documentType.toLowerCase() === item.key.toLowerCase());
-                  const isUploading = uploadingDocType === item.key;
-
-                  return (
-                    <tr key={item.key}>
-                      <td>
-                        <strong>{item.label}</strong>
-                        {uploaded && (
-                          <div style={{ fontSize: '0.75rem', color: '#64748b' }}>
-                            File: {uploaded.fileName} (v{uploaded.version})
-                          </div>
-                        )}
-                      </td>
-                      <td>
-                        {item.mandatory ? (
-                          <span style={{ color: '#dc2626', fontWeight: 600 }}>Yes *</span>
-                        ) : (
-                          <span style={{ color: '#64748b' }}>Conditional</span>
-                        )}
-                      </td>
-                      <td>
-                        {uploaded ? (
-                          <span className={`badge ${uploaded.status === 'Verified' ? 'badge-success' : uploaded.status === 'Rejected' ? 'badge-danger' : 'badge-warning'}`}>
-                            {uploaded.status}
-                          </span>
-                        ) : (
-                          <span className="badge badge-subtle">Not Uploaded</span>
-                        )}
-                      </td>
-                      <td>
-                        {!isReadOnly && (
-                          <label
-                            className="btn btn-xs btn-secondary"
-                            style={{ display: 'inline-flex', alignItems: 'center', gap: 6, cursor: 'pointer' }}
-                          >
-                            <Upload size={12} className={isUploading ? 'animate-spin' : ''} />
-                            {isUploading ? 'Uploading...' : uploaded ? 'Replace File' : 'Upload File'}
-                            <input
-                              type="file"
-                              accept=".pdf,.jpg,.jpeg,.png"
-                              style={{ display: 'none' }}
-                              onChange={(e) => {
-                                if (e.target.files && e.target.files[0]) {
-                                  handleFileUpload(item.key, item.label, e.target.files[0]);
-                                }
-                              }}
-                              disabled={isUploading}
-                            />
-                          </label>
-                        )}
-                      </td>
-                      <td style={{ textAlign: 'right' }}>
-                        {uploaded?.fileUrl ? (
-                          <button
-                            type="button"
-                            className="btn btn-xs btn-secondary"
-                            onClick={() => setPreviewDocUrl(uploaded.fileUrl)}
-                          >
-                            <Eye size={12} /> View
-                          </button>
-                        ) : (
-                          <span style={{ color: '#cbd5e1' }}>—</span>
-                        )}
-                      </td>
-                    </tr>
-                  );
-                })}
-              </tbody>
-            </table>
-          </div>
-        </div>
+        <Step3Documents
+          documents={documents}
+          uploadingDocType={uploadingDocType}
+          handleFileUpload={handleFileUpload}
+          setPreviewDocUrl={setPreviewDocUrl}
+          isReadOnly={isReadOnly}
+        />
       )}
 
-      {/* STEP 4: Building & Infrastructure */}
       {activeStep === 4 && (
-        <div className="card" style={{ padding: 24 }}>
-          <h3 style={{ margin: '0 0 16px', fontSize: '1.1rem', fontWeight: 700, color: '#1e40af' }}>
-            Step 4 — Building Infrastructure & Facilities
-          </h3>
-
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: 16 }}>
-            <div>
-              <label className="form-label">No. of Floors</label>
-              <input
-                type="number"
-                min={1}
-                className="form-control"
-                value={building.noOfFloors}
-                onChange={(e) => setBuilding({ ...building, noOfFloors: Number(e.target.value) })}
-                disabled={isReadOnly}
-              />
-            </div>
-
-            <div>
-              <label className="form-label">Building Type</label>
-              <select
-                className="form-control"
-                value={building.buildingType}
-                onChange={(e) => setBuilding({ ...building, buildingType: e.target.value })}
-                disabled={isReadOnly}
-              >
-                {BUILDING_TYPES.map((bt) => (
-                  <option key={bt} value={bt}>{bt}</option>
-                ))}
-              </select>
-            </div>
-
-            <div>
-              <label className="form-label">Passenger Lifts Available</label>
-              <input
-                type="number"
-                min={0}
-                className="form-control"
-                value={building.noOfLifts}
-                onChange={(e) => setBuilding({ ...building, noOfLifts: Number(e.target.value) })}
-                disabled={isReadOnly}
-              />
-            </div>
-
-            <div>
-              <label className="form-label">Entry Gates</label>
-              <input
-                type="number"
-                min={1}
-                className="form-control"
-                value={building.noOfEntryGates}
-                onChange={(e) => setBuilding({ ...building, noOfEntryGates: Number(e.target.value) })}
-                disabled={isReadOnly}
-              />
-            </div>
-
-            <div>
-              <label className="form-label">Exit Gates</label>
-              <input
-                type="number"
-                min={1}
-                className="form-control"
-                value={building.noOfExitGates}
-                onChange={(e) => setBuilding({ ...building, noOfExitGates: Number(e.target.value) })}
-                disabled={isReadOnly}
-              />
-            </div>
-
-            <div>
-              <label className="form-label">CCTV Cameras (Active Units)</label>
-              <input
-                type="number"
-                min={0}
-                className="form-control"
-                value={building.noOfCctvCameras}
-                onChange={(e) => setBuilding({ ...building, noOfCctvCameras: Number(e.target.value) })}
-                disabled={isReadOnly}
-              />
-            </div>
-          </div>
-
-          <div style={{ marginTop: 24 }}>
-            <h4 style={{ margin: '0 0 14px', fontSize: '0.9375rem', fontWeight: 600 }}>Facility Checklist (Yes / No)</h4>
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: 12 }}>
-              {[
-                { key: 'separateEntryExit', label: 'Separate Entry & Exit Gates Available?' },
-                { key: 'parkingAvailable', label: 'Candidate & Staff Parking Facility Available?' },
-                { key: 'candidateParkingInside', label: 'Are Candidates Allowed to Park Inside Campus?' },
-                { key: 'receptionArea', label: 'Dedicated Reception & Waiting Area Present?' },
-                { key: 'separateWashrooms', label: 'Separate Male & Female Washrooms on Each Floor?' },
-                { key: 'drinkingWater', label: 'RO / Clean Drinking Water Area Available?' },
-                { key: 'acAvailable', label: 'Air Conditioning (AC) Available in Labs?' },
-                { key: 'lockerFacility', label: 'Baggage / Locker Facility for Candidate Items?' },
-                { key: 'cctvLobby', label: 'CCTV Surveillance Active in Entry & Lobby?' },
-                { key: 'serverRoomAvailable', label: 'Dedicated Server Room Available?' },
-                { key: 'dedicatedServerRoom', label: 'Dedicated Access-Controlled Server Room?' },
-              ].map((item) => (
-                <div
-                  key={item.key}
-                  style={{
-                    display: 'flex',
-                    alignItems: 'center',
-                    justifyContent: 'space-between',
-                    padding: '10px 14px',
-                    background: '#f8fafc',
-                    borderRadius: 6,
-                    border: '1px solid #e2e8f0',
-                  }}
-                >
-                  <span style={{ fontSize: '0.8125rem' }}>{item.label}</span>
-                  <select
-                    style={{ width: 80, height: 30, padding: '2px 8px', fontSize: '0.8125rem' }}
-                    className="form-control"
-                    value={building[item.key] ? 'Yes' : 'No'}
-                    onChange={(e) => setBuilding({ ...building, [item.key]: e.target.value === 'Yes' })}
-                    disabled={isReadOnly}
-                  >
-                    <option value="Yes">Yes</option>
-                    <option value="No">No</option>
-                  </select>
-                </div>
-              ))}
-            </div>
-          </div>
-        </div>
+        <Step4Building
+          building={building}
+          setBuilding={setBuilding}
+          isReadOnly={isReadOnly}
+        />
       )}
 
-      {/* STEP 5: Power & Network */}
       {activeStep === 5 && (
-        <div className="card" style={{ padding: 24 }}>
-          <h3 style={{ margin: '0 0 16px', fontSize: '1.1rem', fontWeight: 700, color: '#1e40af' }}>
-            Step 5 — Power Resilience & Network Infrastructure
-          </h3>
-
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(240px, 1fr))', gap: 16 }}>
-            <div className="card" style={{ padding: 16 }}>
-              <h4 style={{ margin: '0 0 12px', fontSize: '0.9375rem', fontWeight: 600 }}>Online UPS Backup</h4>
-              <div>
-                <label className="form-label">Online UPS Available?</label>
-                <select
-                  className="form-control"
-                  value={powerNetwork.upsAvailable ? 'Yes' : 'No'}
-                  onChange={(e) => setPowerNetwork({ ...powerNetwork, upsAvailable: e.target.value === 'Yes' })}
-                  disabled={isReadOnly}
-                >
-                  <option value="Yes">Yes</option>
-                  <option value="No">No</option>
-                </select>
-              </div>
-
-              {powerNetwork.upsAvailable && (
-                <div style={{ marginTop: 12 }}>
-                  <label className="form-label">UPS Capacity (KVA) *</label>
-                  <input
-                    type="number"
-                    min={1}
-                    className="form-control"
-                    value={powerNetwork.upsCapacityKva}
-                    onChange={(e) => setPowerNetwork({ ...powerNetwork, upsCapacityKva: Number(e.target.value) })}
-                    disabled={isReadOnly}
-                    required
-                  />
-                </div>
-              )}
-            </div>
-
-            <div className="card" style={{ padding: 16 }}>
-              <h4 style={{ margin: '0 0 12px', fontSize: '0.9375rem', fontWeight: 600 }}>Diesel Generator (GENSET)</h4>
-              <div>
-                <label className="form-label">GENSET Available?</label>
-                <select
-                  className="form-control"
-                  value={powerNetwork.gensetAvailable ? 'Yes' : 'No'}
-                  onChange={(e) => setPowerNetwork({ ...powerNetwork, gensetAvailable: e.target.value === 'Yes' })}
-                  disabled={isReadOnly}
-                >
-                  <option value="Yes">Yes</option>
-                  <option value="No">No</option>
-                </select>
-              </div>
-
-              {powerNetwork.gensetAvailable && (
-                <div style={{ marginTop: 12 }}>
-                  <label className="form-label">GENSET Capacity (KVA) *</label>
-                  <input
-                    type="number"
-                    min={1}
-                    className="form-control"
-                    value={powerNetwork.gensetCapacityKva}
-                    onChange={(e) => setPowerNetwork({ ...powerNetwork, gensetCapacityKva: Number(e.target.value) })}
-                    disabled={isReadOnly}
-                    required
-                  />
-                </div>
-              )}
-            </div>
-
-            <div className="card" style={{ padding: 16 }}>
-              <h4 style={{ margin: '0 0 12px', fontSize: '0.9375rem', fontWeight: 600 }}>Network & Internet Infrastructure</h4>
-              <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
-                <div>
-                  <label className="form-label">Core Switch</label>
-                  <select
-                    className="form-control"
-                    value={powerNetwork.coreSwitch1Gbps ? 'Yes' : 'No'}
-                    onChange={(e) => setPowerNetwork({ ...powerNetwork, coreSwitch1Gbps: e.target.value === 'Yes' })}
-                    disabled={isReadOnly}
-                  >
-                    <option value="Yes">1 Gbps Core Switch Available</option>
-                    <option value="No">Standard 100 Mbps Switch</option>
-                  </select>
-                </div>
-
-                <div>
-                  <label className="form-label">LAN Architecture</label>
-                  <select
-                    className="form-control"
-                    value={powerNetwork.lanType}
-                    onChange={(e) => setPowerNetwork({ ...powerNetwork, lanType: e.target.value })}
-                    disabled={isReadOnly}
-                  >
-                    <option value="Single LAN">Single Unified LAN</option>
-                    <option value="Multiple LAN">Multiple Segmented LANs</option>
-                  </select>
-                </div>
-              </div>
-            </div>
-          </div>
-        </div>
+        <Step5PowerNetwork
+          powerNetwork={powerNetwork}
+          setPowerNetwork={setPowerNetwork}
+          isReadOnly={isReadOnly}
+        />
       )}
 
-      {/* STEP 6: Safety & Security */}
       {activeStep === 6 && (
-        <div className="card" style={{ padding: 24 }}>
-          <h3 style={{ margin: '0 0 16px', fontSize: '1.1rem', fontWeight: 700, color: '#1e40af' }}>
-            Step 6 — Fire Safety, Emergency & Hygiene Standards
-          </h3>
-
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(240px, 1fr))', gap: 16 }}>
-            <div>
-              <label className="form-label">No. of Fire Extinguishers Installed</label>
-              <input
-                type="number"
-                min={0}
-                className="form-control"
-                value={safety.noOfFireExtinguishers}
-                onChange={(e) => setSafety({ ...safety, noOfFireExtinguishers: Number(e.target.value) })}
-                disabled={isReadOnly}
-              />
-            </div>
-
-            <div>
-              <label className="form-label">Fire Safety Clearance Date</label>
-              <input
-                type="date"
-                className="form-control"
-                value={safety.fireSafetyClearanceDate}
-                onChange={(e) => setSafety({ ...safety, fireSafetyClearanceDate: e.target.value })}
-                disabled={isReadOnly}
-              />
-            </div>
-
-            <div>
-              <label className="form-label">Extinguisher Refill Date</label>
-              <input
-                type="date"
-                className="form-control"
-                value={safety.fireExtinguisherRefillDate}
-                onChange={(e) => setSafety({ ...safety, fireExtinguisherRefillDate: e.target.value })}
-                disabled={isReadOnly}
-              />
-            </div>
-          </div>
-
-          <div style={{ marginTop: 24 }}>
-            <h4 style={{ margin: '0 0 14px', fontSize: '0.9375rem', fontWeight: 600 }}>Emergency & Risk Safeguards</h4>
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: 12 }}>
-              {[
-                { key: 'firstAidKit', label: 'First Aid Medical Kit Available on Campus?' },
-                { key: 'fireExtinguisherEachFloor', label: 'Fire Extinguishers Installed on Every Exam Floor?' },
-                { key: 'fireEmergencyAccessible', label: 'Clear & Unobstructed Fire Emergency Evacuation Paths?' },
-                { key: 'assemblyArea', label: 'Designated Open Assembly Area in Case of Fire/Emergency?' },
-                { key: 'safetySignage', label: 'Emergency Exit & Evacuation Signage Installed?' },
-                { key: 'adequateHygiene', label: 'Sanitation & Hygiene Standards Regularly Maintained?' },
-                { key: 'insuranceCoverage', label: 'Third-Party Asset Loss & Risk Accident Insurance Cover?' },
-              ].map((item) => (
-                <div
-                  key={item.key}
-                  style={{
-                    display: 'flex',
-                    alignItems: 'center',
-                    justifyContent: 'space-between',
-                    padding: '10px 14px',
-                    background: '#f8fafc',
-                    borderRadius: 6,
-                    border: '1px solid #e2e8f0',
-                  }}
-                >
-                  <span style={{ fontSize: '0.8125rem' }}>{item.label}</span>
-                  <select
-                    style={{ width: 80, height: 30, padding: '2px 8px', fontSize: '0.8125rem' }}
-                    className="form-control"
-                    value={safety[item.key] ? 'Yes' : 'No'}
-                    onChange={(e) => setSafety({ ...safety, [item.key]: e.target.value === 'Yes' })}
-                    disabled={isReadOnly}
-                  >
-                    <option value="Yes">Yes</option>
-                    <option value="No">No</option>
-                  </select>
-                </div>
-              ))}
-            </div>
-          </div>
-        </div>
+        <Step6Safety
+          safety={safety}
+          setSafety={setSafety}
+          isReadOnly={isReadOnly}
+        />
       )}
 
-      {/* STEP 7: Bank Account Details */}
       {activeStep === 7 && (
-        <div className="card" style={{ padding: 24 }}>
-          <h3 style={{ margin: '0 0 8px', fontSize: '1.1rem', fontWeight: 700, color: '#1e40af' }}>
-            Step 7 — Beneficiary Bank Account Details
-          </h3>
-          <p style={{ margin: '0 0 20px', fontSize: '0.8125rem', color: '#64748b' }}>
-            Enter the official bank account of the registered centre or operating legal entity for commercial settlement and exam payouts.
-          </p>
-
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(260px, 1fr))', gap: 16 }}>
-            <div className="form-group">
-              <label className="form-label">Account Holder Name *</label>
-              <input
-                type="text"
-                className="form-control"
-                value={bank.accountName}
-                onChange={(e) => setBank({ ...bank, accountName: e.target.value })}
-                placeholder="Name as recorded in the bank passbook"
-                disabled={isReadOnly}
-                required
-              />
-            </div>
-
-            <div className="form-group">
-              <label className="form-label">Bank Name *</label>
-              <select
-                className="form-control"
-                value={bank.bankName}
-                onChange={(e) => setBank({ ...bank, bankName: e.target.value })}
-                disabled={isReadOnly}
-              >
-                {MAJOR_BANKS.map((b) => (
-                  <option key={b} value={b}>{b}</option>
-                ))}
-              </select>
-            </div>
-
-            <div className="form-group">
-              <label className="form-label">Branch Name *</label>
-              <input
-                type="text"
-                className="form-control"
-                value={bank.branchName}
-                onChange={(e) => setBank({ ...bank, branchName: e.target.value })}
-                placeholder="Branch name (e.g. Rohini Sector 8)"
-                disabled={isReadOnly}
-                required
-              />
-            </div>
-
-            <div className="form-group">
-              <label className="form-label">Account Number (Digits only) *</label>
-              <input
-                type="text"
-                className="form-control"
-                value={bank.accountNumber}
-                onChange={(e) => setBank({ ...bank, accountNumber: e.target.value.replace(/\D/g, '') })}
-                placeholder="Account number"
-                disabled={isReadOnly}
-                required
-              />
-            </div>
-
-            <div className="form-group">
-              <label className="form-label">Confirm Account Number *</label>
-              <input
-                type="text"
-                className="form-control"
-                value={bank.confirmAccountNumber}
-                onChange={(e) => setBank({ ...bank, confirmAccountNumber: e.target.value.replace(/\D/g, '') })}
-                placeholder="Re-enter exact account number"
-                disabled={isReadOnly}
-                required
-              />
-            </div>
-
-            <div className="form-group">
-              <label className="form-label">IFSC Code (11 characters) *</label>
-              <input
-                type="text"
-                maxLength={11}
-                className="form-control"
-                style={{ textTransform: 'uppercase', fontFamily: 'monospace', fontWeight: 600 }}
-                value={bank.ifscCode}
-                onChange={(e) => setBank({ ...bank, ifscCode: e.target.value.trim().toUpperCase() })}
-                placeholder="e.g. SBIN0001234"
-                disabled={isReadOnly}
-                required
-              />
-            </div>
-
-            <div className="form-group">
-              <label className="form-label">Account Type *</label>
-              <select
-                className="form-control"
-                value={bank.accountType}
-                onChange={(e) => setBank({ ...bank, accountType: e.target.value })}
-                disabled={isReadOnly}
-              >
-                <option value="Current Account">Current Account</option>
-                <option value="Savings Account">Savings Account</option>
-                <option value="Other">Other</option>
-              </select>
-            </div>
-
-            <div className="form-group" style={{ gridColumn: '1 / -1' }}>
-              <label className="form-label">Bank Branch Address (Optional)</label>
-              <input
-                type="text"
-                className="form-control"
-                value={bank.branchAddress}
-                onChange={(e) => setBank({ ...bank, branchAddress: e.target.value })}
-                placeholder="Bank branch physical address"
-                disabled={isReadOnly}
-              />
-            </div>
-          </div>
-        </div>
+        <Step7BankDetails
+          bank={bank}
+          setBank={setBank}
+          isReadOnly={isReadOnly}
+        />
       )}
 
-      {/* STEP 8: Final Review & Submission */}
       {activeStep === 8 && (
-        <div className="card" style={{ padding: 24 }}>
-          <h3 style={{ margin: '0 0 16px', fontSize: '1.15rem', fontWeight: 700, color: '#1e40af' }}>
-            Final Application Dossier Review
-          </h3>
-
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(320px, 1fr))', gap: 16 }}>
-            {/* Basic Info Summary */}
-            <div className="card" style={{ padding: 16, background: '#f8fafc' }}>
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
-                <strong style={{ fontSize: '0.9375rem' }}>1. Basic Information</strong>
-                {!isReadOnly && <button type="button" className="btn btn-xs btn-ghost" onClick={() => setActiveStep(1)}>Edit</button>}
-              </div>
-              <div style={{ fontSize: '0.8125rem', color: '#475569', display: 'flex', flexDirection: 'column', gap: 4 }}>
-                <div>Centre: <strong>{basicInfo.centreName || '—'}</strong></div>
-                <div>Category: {basicInfo.centreCategory} ({basicInfo.organizationType})</div>
-                <div>Location: {basicInfo.cityName}, {basicInfo.stateName} (PIN: {basicInfo.pincode})</div>
-                <div>Declared Nodes: <strong>{basicInfo.totalNodes} nodes</strong></div>
-              </div>
-            </div>
-
-            {/* Personnel Summary */}
-            <div className="card" style={{ padding: 16, background: '#f8fafc' }}>
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
-                <strong style={{ fontSize: '0.9375rem' }}>2. Personnel Details</strong>
-                {!isReadOnly && <button type="button" className="btn btn-xs btn-ghost" onClick={() => setActiveStep(2)}>Edit</button>}
-              </div>
-              <div style={{ fontSize: '0.8125rem', color: '#475569', display: 'flex', flexDirection: 'column', gap: 4 }}>
-                <div>Owner: <strong>{personnel.owner.fullName || '—'}</strong> ({personnel.owner.contactNumber || '—'})</div>
-                <div>Centre CS: {personnel.cs.fullName || '—'}</div>
-                <div>IT Person: {personnel.it.fullName || '—'}</div>
-              </div>
-            </div>
-
-            {/* Documents Summary */}
-            <div className="card" style={{ padding: 16, background: '#f8fafc' }}>
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
-                <strong style={{ fontSize: '0.9375rem' }}>3. Uploaded Documents</strong>
-                {!isReadOnly && <button type="button" className="btn btn-xs btn-ghost" onClick={() => setActiveStep(3)}>Edit</button>}
-              </div>
-              <div style={{ fontSize: '0.8125rem', color: '#475569' }}>
-                Total Documents Uploaded: <strong>{documents.length} files</strong>
-              </div>
-            </div>
-
-            {/* Bank Summary */}
-            <div className="card" style={{ padding: 16, background: '#f8fafc' }}>
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
-                <strong style={{ fontSize: '0.9375rem' }}>7. Bank Details</strong>
-                {!isReadOnly && <button type="button" className="btn btn-xs btn-ghost" onClick={() => setActiveStep(7)}>Edit</button>}
-              </div>
-              <div style={{ fontSize: '0.8125rem', color: '#475569', display: 'flex', flexDirection: 'column', gap: 4 }}>
-                <div>Beneficiary: <strong>{bank.accountName || '—'}</strong></div>
-                <div>Bank: {bank.bankName} ({bank.ifscCode})</div>
-                <div>Account: <code>{bank.accountNumber?.length > 4 ? `XXXX XXXX ${bank.accountNumber.slice(-4)}` : bank.accountNumber}</code></div>
-              </div>
-            </div>
-          </div>
-
-          {/* Final Submission CTA */}
-          {!isReadOnly && (
-            <div style={{ marginTop: 24, padding: 20, background: '#eff6ff', borderRadius: 8, border: '1px solid #bfdbfe' }}>
-              <h4 style={{ margin: '0 0 6px', color: '#1e40af', fontSize: '1rem' }}>Ready to submit your application?</h4>
-              <p style={{ margin: '0 0 16px', fontSize: '0.8125rem', color: '#3b82f6' }}>
-                Please ensure all mandatory details and documents are verified. Once submitted, your dossier will be reviewed by OEMP administrators.
-              </p>
-              <button
-                type="button"
-                className="btn btn-primary"
-                onClick={handleSubmit}
-                disabled={submitting}
-                style={{ background: '#1e40af', borderColor: '#1e40af', display: 'flex', alignItems: 'center', gap: 8 }}
-              >
-                <Send size={15} /> {submitting ? 'Submitting Application...' : 'Submit Application Dossier'}
-              </button>
-            </div>
-          )}
-        </div>
+        <Step8ReviewSubmit
+          basicInfo={basicInfo}
+          personnel={personnel}
+          documents={documents}
+          building={building}
+          powerNetwork={powerNetwork}
+          safety={safety}
+          bank={bank}
+          setActiveStep={setActiveStep}
+          isReadOnly={isReadOnly}
+          handleSubmit={handleSubmit}
+          submitting={submitting}
+        />
       )}
 
-      {/* ── Wizard Navigation Controls (Prev / Next) ── */}
+      {/* ── Wizard Footer Navigation Bar ── */}
       <div
+        className="card"
         style={{
           marginTop: 24,
+          padding: '16px 20px',
           display: 'flex',
-          justifyContent: 'space-between',
           alignItems: 'center',
+          justifyContent: 'space-between',
+          background: 'var(--color-bg-card, #ffffff)',
         }}
       >
         <button
@@ -1821,4 +721,3 @@ export default function CentreRegistrationPage() {
     </div>
   );
 }
-

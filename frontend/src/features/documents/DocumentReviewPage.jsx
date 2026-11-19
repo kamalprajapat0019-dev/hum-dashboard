@@ -5,7 +5,7 @@ import {
 } from 'lucide-react';
 import { DocStore, DOC_TYPES, CentreStore, appendAuditLog } from '@/services/dataService';
 import { useAuth } from '@/context/AuthContext';
-import { StatusBadge, ProgressRing } from '@/components/common';
+import { StatusBadge, ProgressRing, ActionGroup, ViewAction, Button } from '@/components/common';
 
 export default function DocumentReviewPage() {
   const { user } = useAuth();
@@ -288,33 +288,34 @@ export default function DocumentReviewPage() {
                       </span>
                     </td>
                     <td style={{ textAlign: 'right' }}>
-                      <div style={{ display: 'inline-flex', gap: 6 }}>
+                      <ActionGroup>
                         {doc.file_name && (
-                          <button
-                            className="btn btn-secondary btn-sm"
-                            title="Preview file"
+                          <ViewAction
+                            tooltip="Preview file"
                             onClick={() => setPreviewDoc(doc)}
-                          >
-                            <Eye size={13} />
-                          </button>
+                          />
                         )}
-                        <button
-                          className="btn btn-primary btn-sm"
+                        <Button
+                          variant="primary"
+                          size="sm"
+                          icon={<Check size={13} />}
                           title="Approve document"
                           onClick={() => handleApprove(doc)}
                           disabled={doc.status === 'Approved'}
                         >
-                          <Check size={13} /> Approve
-                        </button>
-                        <button
-                          className="btn btn-ghost btn-sm"
+                          Approve
+                        </Button>
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          icon={<X size={13} />}
                           style={{ color: 'var(--color-danger)' }}
                           title="Reject / Rework"
                           onClick={() => setReworkDoc(doc)}
                         >
-                          <X size={13} /> Rework
-                        </button>
-                      </div>
+                          Rework
+                        </Button>
+                      </ActionGroup>
                     </td>
                   </tr>
                 ))

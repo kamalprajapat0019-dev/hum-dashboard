@@ -8,7 +8,7 @@ import {
   BookingStore, ProjectStore, CentreStore, EligibilityStore, appendAuditLog
 } from '@/services/dataService';
 import { useAuth } from '@/context/AuthContext';
-import { StatusBadge } from '@/components/common';
+import { StatusBadge, ActionGroup, Button } from '@/components/common';
 
 export default function BookingLockingPage() {
   const { user } = useAuth();
@@ -429,36 +429,42 @@ export default function BookingLockingPage() {
                       <StatusBadge status={b.status} />
                     </td>
                     <td style={{ textAlign: 'right' }}>
-                      <div style={{ display: 'inline-flex', gap: 6 }}>
+                      <ActionGroup>
                         {b.is_locked ? (
-                          <button
-                            className="btn btn-secondary btn-sm"
+                          <Button
+                            variant="secondary"
+                            size="sm"
+                            icon={<Unlock size={13} />}
                             title="Unlock booking"
                             onClick={() => handleUnlockBooking(b)}
                           >
-                            <Unlock size={13} /> Unlock
-                          </button>
+                            Unlock
+                          </Button>
                         ) : (
-                          <button
-                            className="btn btn-primary btn-sm"
+                          <Button
+                            variant="primary"
+                            size="sm"
+                            icon={<Lock size={13} />}
                             title="Lock node allocation"
                             onClick={() => handleLockBooking(b)}
                           >
-                            <Lock size={13} /> Lock
-                          </button>
+                            Lock
+                          </Button>
                         )}
 
-                        <button
-                          className="btn btn-secondary btn-sm"
+                        <Button
+                          variant="secondary"
+                          size="sm"
+                          icon={<Repeat size={13} />}
                           title="Replace centre with alternate venue"
                           onClick={() => {
                             setSelectedBookingForAction(b);
                             setShowReplaceModal(true);
                           }}
                         >
-                          <Repeat size={13} /> Replace
-                        </button>
-                      </div>
+                          Replace
+                        </Button>
+                      </ActionGroup>
                     </td>
                   </tr>
                 ))

@@ -1,6 +1,6 @@
 import { prisma } from '../../config/database.js';
 import { verifyPassword } from '../../utils/hasher.js';
-import { generateToken } from '../../utils/jwt.js';
+import { generateToken, generateRefreshToken, verifyRefreshToken, TokenPayload } from '../../utils/jwt.js';
 import { LoginInput } from './auth.schemas.js';
 
 export class AuthService {
@@ -57,12 +57,15 @@ export class AuthService {
       }),
     ]);
 
-    const token = generateToken({
+    const tokenPayload: TokenPayload = {
       userId: user.id,
       email: user.email,
       role: user.role,
       name: user.name,
-    });
+    };
+
+    const token = generateToken(tokenPayload);
+    const refreshToken = generateRefreshToken(tokenPayload);
 
     const safeUser = {
       id: user.id,
@@ -75,7 +78,62 @@ export class AuthService {
       lastLogin: user.lastLogin,
     };
 
-    return { success: true, token, user: safeUser };
+    return { success: true, token, refreshToken, user: safeUser };
+  }
+
+  static async refreshToken(refreshTokenString: string) {
+    if (!refreshTokenString || typeof refreshTokenString !== 'string') {
+      return { success: false, code: 'INVALID_REFRESH_TOKEN', message: 'Refresh token is required' };
+    }
+
+    let decoded: TokenPayload;
+    try {
+      decoded = verifyRefreshToken(refreshTokenString);
+    } catch (err: any) {
+      if (err?.name === 'TokenExpiredError') {
+        return { success: false, code: 'REFRESH_TOKEN_EXPIRED', message: 'Refresh token has expired' };
+      }
+      return { success: false, code: 'INVALID_REFRESH_TOKEN', message: 'Refresh token is invalid or malformed' };
+    }
+
+    const user = await prisma.user.findUnique({
+      where: { id: decoded.userId },
+      select: {
+        id: true,
+        email: true,
+        name: true,
+        role: true,
+        status: true,
+      },
+    });
+
+    if (!user) {
+      return { success: false, code: 'UNAUTHORIZED', message: 'User account not found' };
+    }
+
+    if (user.status !== 'Active') {
+      return {
+        success: false,
+        code: 'ACCOUNT_INACTIVE',
+        message: `Account is ${user.status.toLowerCase()}. Please contact administrator.`,
+      };
+    }
+
+    const newPayload: TokenPayload = {
+      userId: user.id,
+      email: user.email,
+      role: user.role,
+      name: user.name,
+    };
+
+    const newAccessToken = generateToken(newPayload);
+    const newRefreshToken = generateRefreshToken(newPayload);
+
+    return {
+      success: true,
+      token: newAccessToken,
+      refreshToken: newRefreshToken,
+    };
   }
 
   static async getMe(userId: string) {

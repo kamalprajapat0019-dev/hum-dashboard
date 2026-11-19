@@ -28,6 +28,7 @@ import {
   updateExamSchema,
   createExamDateSchema,
   createExamShiftSchema,
+  importRequirementSheetSchema,
   centreQuerySchema,
   createCentreSchema,
   updateCentreSchema,
@@ -70,6 +71,8 @@ router.get('/allowed-domains', AdminController.getAllowedDomains);
 router.post('/allowed-domains', AdminController.addAllowedDomain);
 
 // Project Management
+router.get('/projects/summary', AdminController.getProjectSummary);
+router.get('/projects/next-code', AdminController.getNextProjectCode);
 router.get('/projects', validateRequest({ query: projectQuerySchema }), AdminController.listProjects);
 router.post('/projects', validateRequest({ body: createProjectSchema }), AdminController.createProject);
 router.get('/projects/:id', AdminController.getProjectById);
@@ -94,6 +97,11 @@ router.post('/exams', validateRequest({ body: createExamSchema }), AdminControll
 router.get('/exams/:id', AdminController.getExamById);
 router.put('/exams/:id', validateRequest({ body: updateExamSchema }), AdminController.updateExam);
 router.delete('/exams/:id', AdminController.deleteExam);
+router.post('/exams/:id/requirement-sheet', validateRequest({ body: importRequirementSheetSchema }), AdminController.importRequirementSheet);
+router.get('/exams/:id/requirement-sheet', AdminController.getExamRequirementSheet);
+router.get('/exams/:id/requirement-sheet/download', AdminController.downloadExamRequirementSheet);
+router.get('/exams/:id/summary', AdminController.getExamSummary);
+router.post('/exams/:id/summary/sync', AdminController.syncExamSummary);
 
 // Exam Dates Management
 router.get('/exams/:examId/dates', AdminController.listExamDates);
