@@ -2,7 +2,8 @@
  * Auth Context — Role-based access control & session provider
  */
 import { createContext, useContext, useState, useEffect, useCallback } from 'react';
-import { ROLES, ROLE_LABELS, ROLE_COLORS } from '../constants/roles';
+import { ROLES, ROLE_LABELS, ROLE_COLORS, normalizeRole } from '../constants/roles';
+import { ROLE_PERMISSIONS } from '../constants/permissions';
 import { authService, DEMO_USERS } from '../services/authService';
 
 export { ROLES, ROLE_LABELS, ROLE_COLORS, DEMO_USERS };
@@ -34,10 +35,13 @@ export function AuthProvider({ children }) {
     setUser(null);
   }, []);
 
-  const hasAccess = useCallback((_resource) => {
+  const hasAccess = useCallback((permissionOrResource) => {
     if (!user) return false;
-    if (user.role === ROLES.ADMIN) return true;
-    return true; // Scope checks applied at component level
+    const roleKey = normalizeRole(user.role);
+    if (roleKey === ROLES.ADMIN) return true;
+    if (!permissionOrResource) return true;
+    const allowedPermissions = ROLE_PERMISSIONS[roleKey] || [];
+    return allowedPermissions.includes(permissionOrResource);
   }, [user]);
 
   return (

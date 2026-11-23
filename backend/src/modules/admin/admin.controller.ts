@@ -778,6 +778,17 @@ export class AdminController {
   }
 
   // ── Exam Instances Management ────────────────────────────────────────────
+  static async getExamsSummary(req: AuthenticatedRequest, res: Response): Promise<void> {
+    try {
+      const { clientId, projectId, status } = req.query as { clientId?: string; projectId?: string; status?: string };
+      const summary = await AdminService.getExamsSummary({ clientId, projectId, status });
+      sendSuccess(res, summary);
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : 'Failed to retrieve exams summary';
+      sendError(res, 500, 'EXAMS_SUMMARY_ERROR', msg);
+    }
+  }
+
   static async listExams(req: AuthenticatedRequest, res: Response): Promise<void> {
     try {
       const { page, limit, search, examTypeId, projectId, clientId, status } = req.query as any;

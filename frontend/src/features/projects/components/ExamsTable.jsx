@@ -13,6 +13,7 @@ export function ExamsTable({
   handleOpenManpower,
   handleOpenViewExam,
   handleOpenEditExam,
+  handleManageShifts,
 }) {
   return (
     <div className="card">
@@ -222,9 +223,18 @@ export function ExamsTable({
                       </span>
                     </td>
 
-                    {/* 10. Actions (Manpower, View, Edit) - strictly no Manage Shifts */}
+                    {/* 10. Actions (Manage Shifts, Manpower, View, Edit) */}
                     <td style={{ textAlign: 'right' }}>
                       <ActionGroup align="right">
+                        <Button
+                          variant="secondary"
+                          size="sm"
+                          icon={<Calendar size={12} />}
+                          onClick={() => handleManageShifts && handleManageShifts(ex)}
+                          title="Manage Shifts"
+                        >
+                          Manage Shifts
+                        </Button>
                         <Button
                           variant="secondary"
                           size="sm"

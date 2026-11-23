@@ -14,7 +14,6 @@ import CentreProfileModal from './components/CentreProfileModal';
 
 const STATUS_OPTIONS = [
   'All',
-  'Draft',
   'Registered',
   'Ready to Book',
   'Invited',

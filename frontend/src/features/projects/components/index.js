@@ -1,4 +1,5 @@
 export { ProjectKpiCards } from './ProjectKpiCards';
+export { ExamKpiCards } from './ExamKpiCards';
 export { ProjectsTable } from './ProjectsTable';
 export { ExamsTable } from './ExamsTable';
 export { ProjectFormModal } from './ProjectFormModal';

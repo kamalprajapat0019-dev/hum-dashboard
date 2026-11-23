@@ -92,6 +92,7 @@ router.patch('/exam-types/:id/status', validateRequest({ body: updateExamTypeSta
 router.delete('/exam-types/:id', AdminController.deleteExamType);
 
 // Exam Instances Management
+router.get('/exams/summary', AdminController.getExamsSummary);
 router.get('/exams', validateRequest({ query: examQuerySchema }), AdminController.listExams);
 router.post('/exams', validateRequest({ body: createExamSchema }), AdminController.createExam);
 router.get('/exams/:id', AdminController.getExamById);

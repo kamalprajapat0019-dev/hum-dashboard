@@ -9,6 +9,7 @@ import ExamCalendarModal from '@/components/common/ExamCalendarModal';
 import ExamRequirementViewerPage from './ExamRequirementViewerPage';
 import {
   ProjectKpiCards,
+  ExamKpiCards,
   ProjectsTable,
   ExamsTable,
   ProjectFormModal,
@@ -87,13 +88,30 @@ export default function ProjectsPage() {
   const [viewingManpowerExam, setViewingManpowerExam] = useState(null);
   const [viewingExamRequirement, setViewingExamRequirement] = useState(null);
 
+  // ── Examination Summary Cards State ───────────────────────────────────────
+  const [examSummary, setExamSummary] = useState({
+    totalExams: 0,
+    activeScheduledExams: 0,
+    totalCandidateTarget: 0,
+    totalCoverage: 0,
+  });
+  const [examSummaryLoading, setExamSummaryLoading] = useState(false);
+  const [examSummaryError, setExamSummaryError] = useState(null);
+
   // ── Forms Initial State ──────────────────────────────────────────────────
   const initialProjectForm = {
     projectCode: '',
     name: '',
     clientId: '',
     financialYear: '2026-2027',
+    description: '',
+    examType: 'CBT Examination',
+    stage: 'Setup',
     status: 'Active',
+    candidateTarget: '',
+    centreTarget: '',
+    citiesCount: '',
+    examDates: [],
   };
   const [projectForm, setProjectForm] = useState(initialProjectForm);
 
@@ -175,9 +193,61 @@ export default function ProjectsPage() {
     }
   }, [statusFilter, clientFilter]);
 
+  const deriveExamSummaryFromExams = useCallback((examList = exams) => {
+    const list = examList || [];
+    let activeScheduled = 0;
+    let candidates = 0;
+    let coverage = 0;
+    const citiesSet = new Set();
+
+    list.forEach(ex => {
+      if (['Active', 'Scheduled'].includes(ex.status)) activeScheduled++;
+      const meta = parseExamMeta(ex);
+      const cTarget = Number(meta.candidateRequiredCount) || Number(meta.summary?.candidateTarget) || Number(meta.requirementSheet?.totalCandidates) || 0;
+      const cov = Number(meta.coverage) || Number(meta.summary?.coverageCount) || Number(meta.requirementSheet?.totalCities) || 0;
+      candidates += cTarget;
+      coverage += cov;
+      if (Array.isArray(meta.requirementSheet?.cityWiseTotals)) {
+        meta.requirementSheet.cityWiseTotals.forEach(c => {
+          if (c.city && typeof c.city === 'string') citiesSet.add(c.city.trim().toLowerCase());
+        });
+      }
+    });
+
+    setExamSummary({
+      totalExams: list.length,
+      activeScheduledExams: activeScheduled,
+      totalCandidateTarget: candidates,
+      totalCoverage: citiesSet.size > 0 ? citiesSet.size : coverage,
+    });
+  }, [exams]);
+
+  const loadExamSummary = useCallback(async () => {
+    setExamSummaryLoading(true);
+    setExamSummaryError(null);
+    try {
+      const res = await apiClient.get(ENDPOINTS.ADMIN.EXAMS_SUMMARY, {
+        params: {
+          clientId: clientFilter || undefined,
+          projectId: exProjectFilter || undefined,
+          status: exStatusFilter || undefined,
+        },
+      });
+      if (res?.success && res.data) {
+        setExamSummary(res.data);
+      } else {
+        deriveExamSummaryFromExams();
+      }
+    } catch {
+      deriveExamSummaryFromExams();
+    } finally {
+      setExamSummaryLoading(false);
+    }
+  }, [clientFilter, exProjectFilter, exStatusFilter, deriveExamSummaryFromExams]);
+
   const loadData = useCallback(async () => {
-    await Promise.all([loadProjects(), loadReferenceData()]);
-  }, [loadProjects, loadReferenceData]);
+    await Promise.all([loadProjects(), loadReferenceData(), loadExamSummary()]);
+  }, [loadProjects, loadReferenceData, loadExamSummary]);
 
   // Load static reference datasets on mount
   useEffect(() => {
@@ -188,6 +258,13 @@ export default function ProjectsPage() {
   useEffect(() => {
     loadProjects();
   }, [loadProjects]);
+
+  // Reload exam summary when switching to exams tab or updating exam filters
+  useEffect(() => {
+    if (activeTab === 'exams') {
+      loadExamSummary();
+    }
+  }, [activeTab, loadExamSummary]);
 
   // Load Exam Dates & Shifts for selected exam instance
   const loadExamDatesAndShifts = async (examId) => {
@@ -222,6 +299,30 @@ export default function ProjectsPage() {
   };
 
   // ── Project Handlers ─────────────────────────────────────────────────────
+  const handleAddDateRow = () => {
+    setProjectForm(prev => ({
+      ...prev,
+      examDates: [
+        ...(prev.examDates || []),
+        { examDate: '', shift: 'Shift 1', startTime: '09:00 AM', endTime: '12:00 PM' }
+      ]
+    }));
+  };
+
+  const handleRemoveDateRow = (index) => {
+    setProjectForm(prev => ({
+      ...prev,
+      examDates: (prev.examDates || []).filter((_, i) => i !== index)
+    }));
+  };
+
+  const handleDateRowChange = (index, field, value) => {
+    setProjectForm(prev => ({
+      ...prev,
+      examDates: (prev.examDates || []).map((row, i) => i === index ? { ...row, [field]: value } : row)
+    }));
+  };
+
   const handleOpenAddProject = async () => {
     setEditingProject(null);
     let nextCode = `PRJ-${String(projects.length + 1).padStart(4, '0')}`;
@@ -234,23 +335,56 @@ export default function ProjectsPage() {
       // Fallback sequential code
     }
     setProjectForm({
+      ...initialProjectForm,
       projectCode: nextCode,
-      name: '',
       clientId: clientFilter || clients[0]?.id || '',
-      financialYear: '2026-2027',
-      status: 'Active',
+      examDates: [],
     });
     setShowProjectModal(true);
   };
 
-  const handleOpenEditProject = (p) => {
+  const handleOpenEditProject = async (p) => {
     setEditingProject(p);
+    let meta = {};
+    if (p.description) {
+      try {
+        meta = JSON.parse(p.description);
+        if (typeof meta !== 'object' || meta === null) meta = { text: p.description };
+      } catch {
+        meta = { text: p.description };
+      }
+    }
+
+    let existingDates = [];
+    try {
+      const detailRes = await apiClient.get(ENDPOINTS.ADMIN.PROJECT_DETAIL(p.id));
+      if (detailRes?.success && detailRes.data?.examDates) {
+        existingDates = detailRes.data.examDates.map(d => ({
+          id: d.id,
+          examDate: d.examDate ? new Date(d.examDate).toISOString().split('T')[0] : '',
+          shift: d.shift || 'Shift 1',
+          startTime: d.startTime || '',
+          endTime: d.endTime || '',
+        }));
+      }
+    } catch {
+      // fallback
+    }
+
     setProjectForm({
+      id: p.id,
       projectCode: p.projectCode || '',
       name: p.name || '',
       clientId: p.clientId || clients[0]?.id || '',
-      financialYear: getFinancialYear(p) || '2026-2027',
+      financialYear: meta.financialYear || p.financialYear || getFinancialYear(p) || '2026-2027',
+      description: meta.text || p.description || '',
+      examType: p.examType || 'CBT Examination',
+      stage: p.stage || 'Setup',
       status: p.status || 'Active',
+      candidateTarget: p.candidateTarget !== undefined && p.candidateTarget !== null ? p.candidateTarget : '',
+      centreTarget: p.centreTarget !== undefined && p.centreTarget !== null ? p.centreTarget : '',
+      citiesCount: p.citiesCount !== undefined && p.citiesCount !== null ? p.citiesCount : '',
+      examDates: existingDates,
     });
     setShowProjectModal(true);
   };
@@ -264,14 +398,21 @@ export default function ProjectsPage() {
 
     setSubmitting(true);
     try {
+      const payload = {
+        name: projectForm.name.trim(),
+        clientId: projectForm.clientId,
+        financialYear: projectForm.financialYear.trim(),
+        description: projectForm.description?.trim() || '',
+        examType: projectForm.examType || 'CBT Examination',
+        stage: projectForm.stage || 'Setup',
+        status: projectForm.status || 'Active',
+        candidateTarget: Number(projectForm.candidateTarget) || 0,
+        centreTarget: Number(projectForm.centreTarget) || 0,
+        citiesCount: Number(projectForm.citiesCount) || 0,
+        examDates: (projectForm.examDates || []).filter(d => d.examDate),
+      };
+
       if (editingProject) {
-        // Only update project-level details; preserve examination dates, candidate allocations & cities
-        const payload = {
-          name: projectForm.name.trim(),
-          clientId: projectForm.clientId,
-          financialYear: projectForm.financialYear.trim(),
-          status: projectForm.status || 'Active',
-        };
         const res = await apiClient.put(ENDPOINTS.ADMIN.PROJECT_DETAIL(editingProject.id), payload);
         if (res && res.success) {
           showToast(`Project "${projectForm.name}" updated successfully!`, 'success');
@@ -279,13 +420,7 @@ export default function ProjectsPage() {
           await loadData();
         }
       } else {
-        const payload = {
-          projectCode: projectForm.projectCode?.trim() || undefined,
-          name: projectForm.name.trim(),
-          clientId: projectForm.clientId,
-          financialYear: projectForm.financialYear.trim(),
-          status: projectForm.status || 'Active',
-        };
+        payload.projectCode = projectForm.projectCode;
         const res = await apiClient.post(ENDPOINTS.ADMIN.PROJECTS, payload);
         if (res && res.success) {
           showToast(`Project "${projectForm.name}" created successfully!`, 'success');
@@ -501,6 +636,7 @@ export default function ProjectsPage() {
 
   const availableFinancialYears = Array.from(
     new Set([
+      '2027-2028',
       '2026-2027',
       '2025-2026',
       '2024-2025',
@@ -657,7 +793,7 @@ export default function ProjectsPage() {
           onClick={() => setActiveTab('exams')}
         >
           <BookOpen size={15} style={{ marginRight: 6, display: 'inline-block', verticalAlign: '-2px' }} />
-          2. Examinations ({exams.length})
+          2. Examinations
         </button>
       </div>
 
@@ -700,18 +836,29 @@ export default function ProjectsPage() {
 
       {/* ── TAB 2: EXAMINATIONS ──────────────────────────────────── */}
       {activeTab === 'exams' && (
-        <ExamsTable
-          loading={loading}
-          filteredExams={filteredExams}
-          projects={projects}
-          exProjectFilter={exProjectFilter}
-          setExProjectFilter={setExProjectFilter}
-          exStatusFilter={exStatusFilter}
-          setExStatusFilter={setExStatusFilter}
-          handleOpenManpower={handleOpenManpower}
-          handleOpenViewExam={handleOpenViewExam}
-          handleOpenEditExam={handleOpenEditExam}
-        />
+        <>
+          <ExamKpiCards
+            summary={examSummary}
+            loading={examSummaryLoading}
+            error={examSummaryError}
+            onRetry={loadExamSummary}
+          />
+
+          <ExamsTable
+            loading={loading}
+            filteredExams={filteredExams}
+            projects={projects}
+            exProjectFilter={exProjectFilter}
+            setExProjectFilter={setExProjectFilter}
+            exStatusFilter={exStatusFilter}
+            setExStatusFilter={setExStatusFilter}
+            handleOpenManpower={handleOpenManpower}
+            handleOpenViewExam={handleOpenViewExam}
+            handleOpenEditExam={handleOpenEditExam}
+            handleManageShifts={handleOpenDatesAndShifts}
+            handleDeleteExam={handleDeleteExam}
+          />
+        </>
       )}
 
       {/* ── Modals & Drawers ───────────────────────────────────────────────── */}
@@ -724,6 +871,9 @@ export default function ProjectsPage() {
         clients={clients}
         onSubmit={handleSaveProject}
         submitting={submitting}
+        onAddDateRow={handleAddDateRow}
+        onRemoveDateRow={handleRemoveDateRow}
+        onDateRowChange={handleDateRowChange}
       />
 
       <ProjectViewModal

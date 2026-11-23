@@ -84,6 +84,7 @@ export const ENDPOINTS = {
     EXAM_TYPE_DETAIL: (id) => `/admin/exam-types/${id}`,
     EXAM_TYPE_STATUS: (id) => `/admin/exam-types/${id}/status`,
     EXAMS: '/admin/exams',
+    EXAMS_SUMMARY: '/admin/exams/summary',
     EXAM_DETAIL: (id) => `/admin/exams/${id}`,
     EXAM_REQUIREMENT_SHEET: (id) => `/admin/exams/${id}/requirement-sheet`,
     EXAM_REQUIREMENT_SHEET_DOWNLOAD: (id) => `/admin/exams/${id}/requirement-sheet/download`,

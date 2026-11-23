@@ -5,16 +5,17 @@ import { prisma } from '../src/config/database.js';
 async function runBenchmark() {
   console.log('=== PERFORMANCE BENCHMARK (BASELINE AUDIT) ===\n');
 
-  let server: Server;
-  let baseUrl: string;
-
-  await new Promise<void>((resolve) => {
-    server = app.listen(0, () => {
-      const addr = server.address();
+  const { server, baseUrl } = await new Promise<{ server: Server; baseUrl: string }>((resolve, reject) => {
+    const s: Server = app.listen(0, () => {
+      const addr = s.address();
       if (addr && typeof addr === 'object') {
-        baseUrl = `http://localhost:${addr.port}/api/v1`;
+        resolve({
+          server: s,
+          baseUrl: `http://localhost:${addr.port}/api/v1`,
+        });
+      } else {
+        reject(new Error('Failed to obtain server address: server.address() is invalid'));
       }
-      resolve();
     });
   });
 
