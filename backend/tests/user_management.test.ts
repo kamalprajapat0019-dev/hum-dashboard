@@ -95,14 +95,14 @@ describe('OEMP User Management Module & RBAC Security Audit', () => {
   });
 
   afterAll(async () => {
-    // Clean up created test users
+    // Clean up created test users safely
     await prisma.user.deleteMany({
       where: {
         email: {
           contains: `audit.${timestamp}`,
         },
       },
-    });
+    }).catch(() => {});
 
     await new Promise<void>((resolve) => {
       server.close(() => resolve());

@@ -33,5 +33,7 @@ frontend/scratch/
 storage/
 backend/storage/
 backend/backend/
+uploads/
+backend/uploads/
 
 

@@ -173,7 +173,7 @@ export default function CentreDashboard() {
 
           <button
             className="btn btn-sm btn-primary"
-            onClick={() => navigate(ROUTES.CENTRE.REGISTRATION)}
+            onClick={() => navigate(ROUTES.CENTRE.PROFILE)}
             style={{
               display: 'flex',
               alignItems: 'center',
@@ -183,7 +183,7 @@ export default function CentreDashboard() {
               color: '#fff',
             }}
           >
-            {isDraft ? (centreProfile ? 'Continue Registration' : 'Start Centre Registration') : 'View Application Dossier'}
+            {isDraft ? (centreProfile ? 'Continue Profile Completion' : 'Start Centre Profile') : 'View Centre Profile'}
             <ArrowRight size={14} />
           </button>
         </div>
@@ -231,9 +231,9 @@ export default function CentreDashboard() {
           <span className="card-title">Centre Profile Record — Real-time Database</span>
           <button
             className="btn btn-xs btn-secondary"
-            onClick={() => navigate(ROUTES.CENTRE.REGISTRATION)}
+            onClick={() => navigate(ROUTES.CENTRE.PROFILE)}
           >
-            Open 7-Step Form
+            Open Profile
           </button>
         </div>
         <div className="card-body">
@@ -274,14 +274,14 @@ export default function CentreDashboard() {
               <Building2 size={32} style={{ margin: '0 auto 8px', opacity: 0.5, display: 'block' }} />
               <div style={{ fontWeight: 600, color: '#334155' }}>No Centre Registered Yet</div>
               <div style={{ fontSize: '0.8125rem', marginTop: 4 }}>
-                Click below to start your seven-step centre registration form.
+                Click below to complete your 6-submodule centre profile dossier.
               </div>
               <button
                 className="btn btn-sm btn-primary"
-                onClick={() => navigate(ROUTES.CENTRE.REGISTRATION)}
+                onClick={() => navigate(ROUTES.CENTRE.PROFILE)}
                 style={{ marginTop: 14 }}
               >
-                Begin Centre Registration
+                Begin Centre Profile
               </button>
             </div>
           )}

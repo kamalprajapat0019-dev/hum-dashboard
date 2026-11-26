@@ -21,7 +21,7 @@ import CentreDashboard from '../roles/centre-user/CentreDashboard';
 import ClientsPage from '../features/clients/ClientsPage';
 import ProjectsPage from '../features/projects/ProjectsPage';
 import CentresPage from '../features/centres/CentresPage';
-import CentreRegistrationPage from '../features/centres/CentreRegistrationPage';
+import MyCentreProfilePage from '../features/centres/MyCentreProfilePage';
 import CentreDocuments from '../features/centres/CentreDocuments';
 import CentreConsentPage from '../features/centres/CentreConsentPage';
 import UsersPage from '../features/users/UsersPage';
@@ -196,13 +196,11 @@ export function AppRouter() {
         </ProtectedRoute>
       } />
       <Route path={ROUTES.CENTRE.REGISTRATION} element={
-        <ProtectedRoute allowedRoles={[ROLES.CENTRE, ROLES.ADMIN]}>
-          <DashboardLayout><CentreRegistrationPage /></DashboardLayout>
-        </ProtectedRoute>
+        <Navigate to={ROUTES.CENTRE.PROFILE} replace />
       } />
       <Route path={ROUTES.CENTRE.PROFILE} element={
         <ProtectedRoute allowedRoles={[ROLES.CENTRE, ROLES.ADMIN]}>
-          <DashboardLayout><CentreRegistrationPage /></DashboardLayout>
+          <DashboardLayout><MyCentreProfilePage /></DashboardLayout>
         </ProtectedRoute>
       } />
       <Route path={ROUTES.CENTRE.BOOKING} element={<ProtectedRoute allowedRoles={[ROLES.CENTRE, ROLES.ADMIN]}><DashboardLayout><BookingLockingPage /></DashboardLayout></ProtectedRoute>} />
@@ -214,9 +212,11 @@ export function AppRouter() {
       <Route path={ROUTES.CENTRE.ALLOCATION} element={<ProtectedRoute allowedRoles={[ROLES.CENTRE, ROLES.ADMIN]}><DashboardLayout><AllocationManagementPage /></DashboardLayout></ProtectedRoute>} />
       <Route path={ROUTES.CENTRE.READINESS} element={<ProtectedRoute allowedRoles={[ROLES.CENTRE, ROLES.ADMIN]}><DashboardLayout><ReadinessExamPage /></DashboardLayout></ProtectedRoute>} />
       <Route path={ROUTES.CENTRE.EXAMDAY} element={<ProtectedRoute allowedRoles={[ROLES.CENTRE, ROLES.ADMIN]}><DashboardLayout><ReadinessExamPage /></DashboardLayout></ProtectedRoute>} />
+      <Route path={ROUTES.CENTRE.NOTIFICATIONS} element={<ProtectedRoute allowedRoles={[ROLES.CENTRE, ROLES.ADMIN]}><DashboardLayout><NotificationCenterPage /></DashboardLayout></ProtectedRoute>} />
       <Route path={ROUTES.CENTRE.SUPPORT} element={<ProtectedRoute allowedRoles={[ROLES.CENTRE, ROLES.ADMIN]}><DashboardLayout><IncidentManagementPage /></DashboardLayout></ProtectedRoute>} />
       <Route path={ROUTES.CENTRE.INVOICE} element={<ProtectedRoute allowedRoles={[ROLES.CENTRE, ROLES.ADMIN]}><DashboardLayout><InvoiceManagementPage /></DashboardLayout></ProtectedRoute>} />
       <Route path={ROUTES.CENTRE.HISTORY} element={<ProtectedRoute allowedRoles={[ROLES.CENTRE, ROLES.ADMIN]}><DashboardLayout><PaymentReconciliationPage /></DashboardLayout></ProtectedRoute>} />
+      <Route path={ROUTES.CENTRE.POLICIES} element={<ProtectedRoute allowedRoles={[ROLES.CENTRE, ROLES.ADMIN]}><DashboardLayout><CentreDocuments /></DashboardLayout></ProtectedRoute>} />
 
       {/* 404 / Fallback */}
       <Route path="*" element={<Navigate to={ROUTES.HOME} replace />} />

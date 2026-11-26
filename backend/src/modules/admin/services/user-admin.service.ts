@@ -679,6 +679,7 @@ export class UserAdminService {
       email: string;
       name: string;
       phoneNumber?: string;
+      whatsappNumber?: string;
       centreId?: string;
       clientId?: string;
       scope?: unknown;
@@ -698,7 +699,7 @@ export class UserAdminService {
     }
 
     const token = crypto.randomBytes(32).toString('hex');
-    const expiresAt = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000); // 7 days
+    const expiresAt = new Date(Date.now() + 72 * 60 * 60 * 1000); // 72-hour window (FRD Sec. 4)
 
     const invitation = await prisma.$transaction(async (tx: any) => {
       // Invalidate any existing pending invitation for this email
@@ -713,6 +714,7 @@ export class UserAdminService {
           name: data.name.trim(),
           role: Role.CENTRE,
           phone: data.phoneNumber ? data.phoneNumber.trim() : null,
+          whatsappNumber: data.whatsappNumber || (data.phoneNumber ? data.phoneNumber.trim() : null),
           centreId: data.centreId || null,
           clientId: data.clientId || null,
           scope: data.scope ? (data.scope as Prisma.InputJsonValue) : Prisma.JsonNull,

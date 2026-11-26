@@ -102,8 +102,8 @@ export class AuthController {
 
   static async verifyInvitation(req: Request, res: Response): Promise<void> {
     try {
-      const token = req.params.token as string;
-      const result = await AdminService.verifyInvitationToken(token);
+      const token = (req.params.token || req.body?.token || req.query?.token) as string;
+      const result = await AuthService.validateSignUpInvite(token);
       if (!result.valid) {
         sendError(res, 400, 'INVALID_INVITATION_TOKEN', result.message || 'Invalid or expired activation link');
         return;
@@ -123,6 +123,63 @@ export class AuthController {
     } catch (err: unknown) {
       const msg = err instanceof Error ? err.message : 'Account activation failed';
       sendError(res, 400, 'ACTIVATION_FAILED', msg);
+    }
+  }
+
+  // ── FRD Sec. 4: Sign-Up Link, Registration & OTP Verification ─────────────
+
+  static async validateInvite(req: Request, res: Response): Promise<void> {
+    try {
+      const token = (req.params.token || req.body?.token || req.query?.token) as string;
+      if (!token) {
+        sendError(res, 400, 'MISSING_TOKEN', 'Invitation token is required');
+        return;
+      }
+      const result = await AuthService.validateSignUpInvite(token);
+      if (!result.valid) {
+        sendError(res, 400, 'INVALID_INVITE_TOKEN', result.message);
+        return;
+      }
+      sendSuccess(res, result);
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : 'Invite validation failed';
+      sendError(res, 400, 'INVITE_VALIDATION_ERROR', msg);
+    }
+  }
+
+  static async registerFromInvite(req: Request, res: Response): Promise<void> {
+    try {
+      const result = await AuthService.registerFromInvite(req.body);
+      sendSuccess(res, result, 201, { message: result.message });
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : 'Registration from invite failed';
+      sendError(res, 400, 'REGISTRATION_FAILED', msg);
+    }
+  }
+
+  static async verifyInviteOtp(req: Request, res: Response): Promise<void> {
+    try {
+      const { token, otpType, otpCode } = req.body;
+      const result = await AuthService.verifyInviteOtp(token, otpType, otpCode);
+      sendSuccess(res, result);
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : 'OTP verification failed';
+      sendError(res, 400, 'OTP_VERIFICATION_FAILED', msg);
+    }
+  }
+
+  static async resendInviteOtp(req: Request, res: Response): Promise<void> {
+    try {
+      const { token, otpType } = req.body;
+      const result = await AuthService.resendInviteOtp(token, otpType);
+      if (!result.success && (result as any).isExpired) {
+        sendError(res, 400, 'INVITE_EXPIRED', result.message);
+        return;
+      }
+      sendSuccess(res, result);
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : 'Failed to resend OTP';
+      sendError(res, 400, 'RESEND_OTP_FAILED', msg);
     }
   }
 }

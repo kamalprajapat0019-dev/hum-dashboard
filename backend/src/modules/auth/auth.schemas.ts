@@ -5,4 +5,47 @@ export const loginSchema = z.object({
   password: z.string().min(1, 'Password is required'),
 });
 
+export const validateInviteSchema = z.object({
+  token: z.string().min(1, 'Invitation token is required'),
+});
+
+export const registerFromInviteSchema = z
+  .object({
+    token: z.string().min(1, 'Invitation token is required'),
+    centreName: z.string().min(2, 'Centre Name must be at least 2 characters'),
+    name: z.string().optional(),
+    mobile: z.string().min(10, 'Mobile number must be at least 10 digits'),
+    email: z.string().email('Valid email is required'),
+    password: z
+      .string()
+      .min(8, 'Password must be at least 8 characters long')
+      .regex(/[A-Z]/, 'Password must contain at least one uppercase letter')
+      .regex(/[a-z]/, 'Password must contain at least one lowercase letter')
+      .regex(/[0-9]/, 'Password must contain at least one number')
+      .regex(/[^A-Za-z0-9]/, 'Password must contain at least one special character'),
+    confirmPassword: z.string().min(8, 'Confirm password is required'),
+    termsAccepted: z.literal(true, {
+      errorMap: () => ({ message: 'You must accept the terms and conditions' }),
+    }),
+  })
+  .refine((data) => data.password === data.confirmPassword, {
+    message: 'Password and Confirm Password must match exactly',
+    path: ['confirmPassword'],
+  });
+
+export const verifyOtpSchema = z.object({
+  token: z.string().min(1, 'Token is required'),
+  otpType: z.enum(['EMAIL', 'MOBILE']),
+  otpCode: z.string().min(4, 'OTP code is required'),
+});
+
+export const resendInviteOtpSchema = z.object({
+  token: z.string().min(1, 'Token is required'),
+  otpType: z.enum(['EMAIL', 'MOBILE']),
+});
+
 export type LoginInput = z.infer<typeof loginSchema>;
+export type ValidateInviteInput = z.infer<typeof validateInviteSchema>;
+export type RegisterFromInviteInput = z.infer<typeof registerFromInviteSchema>;
+export type VerifyOtpInput = z.infer<typeof verifyOtpSchema>;
+export type ResendInviteOtpInput = z.infer<typeof resendInviteOtpSchema>;

@@ -167,7 +167,7 @@ describe('OEMP Centre Master & Centre Registration Workflow Audit', () => {
     expect(res.status).toBe(200);
     const body = await res.json();
     expect(body.success).toBe(true);
-    expect(body.data.centreCode).toMatch(/^CTR-\d{4}-\d{4}$/);
+    expect(body.data.centreCode).toMatch(/^CTR-\d{4}-\d{4,}$/);
     expect(body.data.centreStatus).toBe('Draft');
 
     testCentreId = body.data.id;

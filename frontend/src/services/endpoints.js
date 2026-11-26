@@ -111,8 +111,14 @@ export const ENDPOINTS = {
     DRAFT: '/centre/draft',
     SUBMIT: '/centre/submit',
     UPLOAD_DOC: '/centre/documents/upload',
+    DELETE_DOC: (docId) => `/centre/documents/${docId}`,
+    UPLOAD_MEDIA: '/centre/media/upload',
+    MEDIA_DOWNLOAD: (assetId) => `/centre/media/${assetId}`,
+    DOC_DOWNLOAD: (docId) => `/centre/documents/${docId}/download`,
     STATUS: '/centre/status',
     INVITE_USER: '/centre/invite-user',
+    SUBMODULE_REVIEWS: '/centre/submodules/reviews',
+    SUBMODULE_REVIEW: '/centre/submodules/review',
   },
 };
 

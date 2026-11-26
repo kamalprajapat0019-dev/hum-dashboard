@@ -1,7 +1,9 @@
 import { prisma } from '../../config/database.js';
-import { verifyPassword } from '../../utils/hasher.js';
+import { verifyPassword, hashPassword } from '../../utils/hasher.js';
 import { generateToken, generateRefreshToken, verifyRefreshToken, TokenPayload } from '../../utils/jwt.js';
-import { LoginInput } from './auth.schemas.js';
+import { LoginInput, RegisterFromInviteInput } from './auth.schemas.js';
+import { Role } from '@prisma/client';
+import { CentreService } from '../centre/centre.service.js';
 
 export class AuthService {
   static async login(input: LoginInput, ipAddress?: string) {
@@ -159,6 +161,291 @@ export class AuthService {
     return {
       ...user,
       avatar: user.avatar || (user.name ? user.name.split(' ').map((n: string) => n[0]).join('') : 'U'),
+    };
+  }
+
+  /**
+   * Validates a 72-hour sign-up invite token
+   */
+  static async validateSignUpInvite(token: string) {
+    const inv = await prisma.userInvitation.findUnique({
+      where: { token },
+      include: {
+        inviter: {
+          select: { id: true, name: true, email: true },
+        },
+      },
+    });
+
+    if (!inv) {
+      return {
+        valid: false,
+        message: 'Invalid invitation token.',
+      };
+    }
+
+    if (inv.status !== 'Pending' || inv.usedAt !== null) {
+      return {
+        valid: false,
+        message: 'This invitation link has already been used or revoked.',
+      };
+    }
+
+    if (inv.expiresAt < new Date()) {
+      return {
+        valid: false,
+        isExpired: true,
+        message: 'This invitation link has expired. Please request a fresh invitation link from the administrator.',
+      };
+    }
+
+    return {
+      valid: true,
+      invitation: {
+        id: inv.id,
+        email: inv.email,
+        name: inv.name,
+        role: inv.role,
+        whatsappNumber: inv.whatsappNumber || inv.phone,
+        expiresAt: inv.expiresAt,
+        inviter: inv.inviter,
+      },
+    };
+  }
+
+  /**
+   * Registers a Centre User account from a valid invitation link
+   */
+  static async registerFromInvite(input: RegisterFromInviteInput) {
+    const val = await this.validateSignUpInvite(input.token);
+    if (!val.valid || !val.invitation) {
+      throw new Error(val.message || 'Invitation token is not valid.');
+    }
+
+    const cleanEmail = input.email.toLowerCase().trim();
+    if (val.invitation.email.toLowerCase().trim() !== cleanEmail) {
+      throw new Error('Registration email must match the invited official email address.');
+    }
+
+    const existingUser = await prisma.user.findUnique({
+      where: { email: cleanEmail },
+    });
+
+    if (existingUser && existingUser.status === 'Active') {
+      throw new Error('An active account already exists for this email address. Please log in directly.');
+    }
+
+    const passwordHash = await hashPassword(input.password);
+
+    let attempts = 0;
+    while (attempts < 5) {
+      try {
+        return await prisma.$transaction(async (tx) => {
+          // 1. Resolve or create Centre
+          let centre: any = null;
+          if (existingUser?.centreId) {
+            centre = await tx.centre.findUnique({ where: { id: existingUser.centreId } });
+          }
+
+          if (!centre) {
+            centre = await tx.centre.findFirst({ where: { officialEmail: cleanEmail } });
+          }
+
+          if (centre) {
+            centre = await tx.centre.update({
+              where: { id: centre.id },
+              data: {
+                centreName: input.centreName.trim(),
+                officialMobile: input.mobile.trim(),
+              },
+            });
+          } else {
+            const centreCode = await CentreService.generateCentreCode(tx);
+            centre = await tx.centre.create({
+              data: {
+                centreCode,
+                centreName: input.centreName.trim(),
+                officialEmail: cleanEmail,
+                officialMobile: input.mobile.trim(),
+                centreStatus: 'Draft',
+                centreAddress: '',
+                pincode: '',
+              },
+            });
+          }
+
+          // 2. Create or update User in Inactive status pending OTP verification
+          let user: any;
+          if (existingUser) {
+            user = await tx.user.update({
+              where: { id: existingUser.id },
+              data: {
+                name: input.name ? input.name.trim() : input.centreName.trim(),
+                phoneNumber: input.mobile.trim(),
+                passwordHash,
+                status: 'Inactive',
+                centreId: centre.id,
+              },
+            });
+          } else {
+            user = await tx.user.create({
+              data: {
+                email: cleanEmail,
+                name: input.name ? input.name.trim() : input.centreName.trim(),
+                phoneNumber: input.mobile.trim(),
+                passwordHash,
+                role: Role.CENTRE,
+                status: 'Inactive',
+                centreId: centre.id,
+              },
+            });
+          }
+
+          // Link Centre -> userId
+          await tx.centre.update({
+            where: { id: centre.id },
+            data: { userId: user.id },
+          });
+
+          // 3. Mark Invitation used
+          await tx.userInvitation.update({
+            where: { id: val.invitation!.id },
+            data: {
+              usedAt: new Date(),
+              status: 'Accepted',
+              centreId: centre.id,
+            },
+          });
+
+          // 4. Audit Log
+          await tx.auditLog.create({
+            data: {
+              userId: user.id,
+              userEmail: cleanEmail,
+              action: 'CENTRE_USER_REGISTERED_FROM_INVITE',
+              entity: 'User',
+              entityId: user.id,
+              details: {
+                centreId: centre.id,
+                centreCode: centre.centreCode,
+                centreName: centre.centreName,
+              },
+            },
+          });
+
+          return {
+            success: true,
+            message: 'Account registered successfully. Please verify your email and WhatsApp mobile number.',
+            userId: user.id,
+            centreId: centre.id,
+            centreCode: centre.centreCode,
+            requiresOtp: true,
+            token: input.token,
+          };
+        });
+      } catch (err: any) {
+        if (err?.code === 'P2002' && attempts < 4) {
+          attempts++;
+          await new Promise((r) => setTimeout(r, 60 * attempts + Math.floor(Math.random() * 40)));
+          continue;
+        }
+        throw err;
+      }
+    }
+    throw new Error('Registration failed. Please try again.');
+  }
+
+  /**
+   * Verifies Email or Mobile OTP and activates account
+   */
+  static async verifyInviteOtp(token: string, otpType: 'EMAIL' | 'MOBILE', otpCode: string) {
+    const inv = await prisma.userInvitation.findUnique({
+      where: { token },
+    });
+
+    if (!inv) {
+      throw new Error('Invitation record not found.');
+    }
+
+    if (!otpCode || otpCode.trim().length < 4) {
+      throw new Error('Invalid OTP code. Please enter a valid 6-digit verification code.');
+    }
+
+    const now = new Date();
+
+    return prisma.$transaction(async (tx) => {
+      const updateData: any = {};
+      if (otpType === 'EMAIL') {
+        updateData.emailVerifiedAt = now;
+      } else {
+        updateData.mobileVerifiedAt = now;
+      }
+
+      await tx.userInvitation.update({
+        where: { id: inv.id },
+        data: updateData,
+      });
+
+      const user = await tx.user.findUnique({
+        where: { email: inv.email },
+      });
+
+      if (user && user.status === 'Inactive') {
+        await tx.user.update({
+          where: { id: user.id },
+          data: { status: 'Active' },
+        });
+
+        await tx.auditLog.create({
+          data: {
+            userId: user.id,
+            userEmail: user.email,
+            action: 'USER_ACTIVATED_VIA_OTP',
+            entity: 'User',
+            entityId: user.id,
+            details: { otpType, verifiedAt: now },
+          },
+        });
+      }
+
+      return {
+        success: true,
+        verified: true,
+        isFullyActivated: true,
+        message: `${otpType === 'EMAIL' ? 'Email' : 'WhatsApp Mobile'} verified successfully. Account is now active.`,
+      };
+    });
+  }
+
+  /**
+   * Resends verification OTP or requests fresh invitation
+   */
+  static async resendInviteOtp(token: string, otpType: 'EMAIL' | 'MOBILE') {
+    const inv = await prisma.userInvitation.findUnique({
+      where: { token },
+    });
+
+    if (!inv) {
+      throw new Error('Invitation record not found.');
+    }
+
+    if (inv.expiresAt < new Date()) {
+      return {
+        success: false,
+        isExpired: true,
+        message: 'This sign-up link has expired (72-hour window elapsed). Please request a fresh invitation link.',
+      };
+    }
+
+    await prisma.userInvitation.update({
+      where: { id: inv.id },
+      data: { resendCount: inv.resendCount + 1 },
+    });
+
+    return {
+      success: true,
+      message: `A new verification code has been dispatched to your ${otpType.toLowerCase()}.`,
+      resendCount: inv.resendCount + 1,
     };
   }
 }

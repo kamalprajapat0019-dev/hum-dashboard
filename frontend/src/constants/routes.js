@@ -75,8 +75,8 @@ export const ROUTES = {
 
   CENTRE: {
     DASHBOARD: '/centre',
-    REGISTRATION: '/centre/registration',
     PROFILE: '/centre/profile',
+    REGISTRATION: '/centre/registration',
     BOOKING: '/centre/booking',
     CONSENT: '/centre/consent',
     DOCUMENTS: '/centre/documents',
@@ -88,6 +88,8 @@ export const ROUTES = {
     EXAMDAY: '/centre/examday',
     SUPPORT: '/centre/support',
     INVOICE: '/centre/invoice',
+    NOTIFICATIONS: '/centre/notifications',
     HISTORY: '/centre/history',
+    POLICIES: '/centre/policies',
   },
 };
