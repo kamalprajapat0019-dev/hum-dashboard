@@ -585,134 +585,164 @@ export function Submodule1BasicInfo({
         </div>
       </div>
 
-      {/* ── Section 5: Transportation & Accessibility (FRD Sec. 6.1) ── */}
+      {/* ── Section 5: Transportation & Accessibility (FRD Table 6.1.3) ── */}
       <div className="card" style={{ padding: 24 }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 18 }}>
           <Navigation size={20} color="var(--color-primary, #2563eb)" />
-          <h3 style={{ margin: 0, fontSize: '1.05rem', fontWeight: 700, color: 'var(--text-primary, #1e293b)' }}>
-            5. Transportation & Accessibility (FRD Sec. 6.1)
-          </h3>
+          <div>
+            <h3 style={{ margin: 0, fontSize: '1.05rem', fontWeight: 700, color: 'var(--text-primary, #1e293b)' }}>
+              5. Transportation & Accessibility (FRD Table 6.1.3)
+            </h3>
+            <span style={{ fontSize: '0.8125rem', color: 'var(--text-secondary, #64748b)' }}>
+              Transit proximity to bus stands, railway stations, main roads, and directional signage.
+            </span>
+          </div>
         </div>
 
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(260px, 1fr))', gap: 16 }}>
-          {/* Bus Stand */}
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: 16 }}>
+          {/* 1. Distance from Nearby Local Bus Stand? (KM) - Mandatory */}
           <div className="form-group">
-            <label className="form-label">Bus Stand Nearby?</label>
-            <div style={{ display: 'flex', gap: 20, marginTop: 4, marginBottom: 8 }}>
-              <label style={{ display: 'flex', alignItems: 'center', gap: 8, cursor: 'pointer' }}>
-                <input
-                  type="radio"
-                  name="busStandNearby"
-                  checked={Boolean(basicInfo.busStandNearby)}
-                  onChange={() => handleChange('busStandNearby', true)}
-                  disabled={isReadOnly}
-                />
-                Yes
-              </label>
-              <label style={{ display: 'flex', alignItems: 'center', gap: 8, cursor: 'pointer' }}>
-                <input
-                  type="radio"
-                  name="busStandNearby"
-                  checked={!basicInfo.busStandNearby}
-                  onChange={() => handleChange('busStandNearby', false)}
-                  disabled={isReadOnly}
-                />
-                No
-              </label>
-            </div>
-            {basicInfo.busStandNearby && (
+            <label className="form-label" htmlFor="busStandDistanceKm">
+              Distance from Nearby Local Bus Stand? (KM) <span style={{ color: 'var(--color-danger, #dc2626)' }}>*</span>
+            </label>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
               <input
-                type="text"
+                id="busStandDistanceKm"
+                type="number"
+                step="0.1"
+                min={0}
                 className="form-control"
-                value={basicInfo.busStandName || ''}
-                onChange={(e) => handleChange('busStandName', e.target.value)}
-                placeholder="Name of nearest Bus Stand"
+                value={basicInfo.busStandDistanceKm ?? ''}
+                onChange={(e) => {
+                  const val = e.target.value;
+                  handleChange('busStandDistanceKm', val === '' ? '' : Number(val));
+                }}
+                placeholder="e.g. 1.5"
                 disabled={isReadOnly}
+                required
               />
-            )}
+              <span style={{ fontWeight: 700, fontSize: '0.875rem', color: 'var(--text-secondary, #64748b)', padding: '0 4px' }}>
+                KM
+              </span>
+            </div>
           </div>
 
-          {/* Railway Station */}
+          {/* 2. Bus Stand Name - Conditional */}
           <div className="form-group">
-            <label className="form-label">Railway Station Nearby?</label>
-            <div style={{ display: 'flex', gap: 20, marginTop: 4, marginBottom: 8 }}>
-              <label style={{ display: 'flex', alignItems: 'center', gap: 8, cursor: 'pointer' }}>
-                <input
-                  type="radio"
-                  name="railwayStationNearby"
-                  checked={Boolean(basicInfo.railwayStationNearby)}
-                  onChange={() => handleChange('railwayStationNearby', true)}
-                  disabled={isReadOnly}
-                />
-                Yes
-              </label>
-              <label style={{ display: 'flex', alignItems: 'center', gap: 8, cursor: 'pointer' }}>
-                <input
-                  type="radio"
-                  name="railwayStationNearby"
-                  checked={!basicInfo.railwayStationNearby}
-                  onChange={() => handleChange('railwayStationNearby', false)}
-                  disabled={isReadOnly}
-                />
-                No
-              </label>
-            </div>
-            {basicInfo.railwayStationNearby && (
-              <input
-                type="text"
-                className="form-control"
-                value={basicInfo.railwayStationName || ''}
-                onChange={(e) => handleChange('railwayStationName', e.target.value)}
-                placeholder="Name of nearest Railway Station"
-                disabled={isReadOnly}
-              />
-            )}
-          </div>
-
-          {/* Distance from Main Road */}
-          <div className="form-group">
-            <label className="form-label" htmlFor="mainRoadDistanceKm">
-              Distance from Main Road (km)
+            <label className="form-label" htmlFor="busStandName">
+              Bus Stand Name {basicInfo.busStandDistanceKm !== '' && basicInfo.busStandDistanceKm !== undefined && (
+                <span style={{ color: 'var(--color-danger, #dc2626)' }}>*</span>
+              )}
             </label>
             <input
-              id="mainRoadDistanceKm"
-              type="number"
-              step="0.1"
-              min={0}
+              id="busStandName"
+              type="text"
               className="form-control"
-              value={basicInfo.mainRoadDistanceKm ?? basicInfo.distanceFromMainRoad ?? 0.5}
-              onChange={(e) => {
-                const val = Number(e.target.value);
-                handleChange('mainRoadDistanceKm', val);
-                handleChange('distanceFromMainRoad', val);
-              }}
-              placeholder="e.g. 0.5"
+              value={basicInfo.busStandName || ''}
+              onChange={(e) => handleChange('busStandName', e.target.value)}
+              placeholder="e.g. Anand Vihar ISBT / Local Depot"
               disabled={isReadOnly}
             />
           </div>
 
-          {/* Sign Boards */}
+          {/* 3. Distance from Nearby Railway Station? (KM) - Mandatory */}
           <div className="form-group">
-            <label className="form-label">Sign Boards Available?</label>
-            <div style={{ display: 'flex', gap: 20, marginTop: 4 }}>
+            <label className="form-label" htmlFor="railwayStationDistanceKm">
+              Distance from Nearby Railway Station? (KM) <span style={{ color: 'var(--color-danger, #dc2626)' }}>*</span>
+            </label>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+              <input
+                id="railwayStationDistanceKm"
+                type="number"
+                step="0.1"
+                min={0}
+                className="form-control"
+                value={basicInfo.railwayStationDistanceKm ?? ''}
+                onChange={(e) => {
+                  const val = e.target.value;
+                  handleChange('railwayStationDistanceKm', val === '' ? '' : Number(val));
+                }}
+                placeholder="e.g. 4.2"
+                disabled={isReadOnly}
+                required
+              />
+              <span style={{ fontWeight: 700, fontSize: '0.875rem', color: 'var(--text-secondary, #64748b)', padding: '0 4px' }}>
+                KM
+              </span>
+            </div>
+          </div>
+
+          {/* 4. Railway Station Name - Conditional */}
+          <div className="form-group">
+            <label className="form-label" htmlFor="railwayStationName">
+              Railway Station Name {basicInfo.railwayStationDistanceKm !== '' && basicInfo.railwayStationDistanceKm !== undefined && (
+                <span style={{ color: 'var(--color-danger, #dc2626)' }}>*</span>
+              )}
+            </label>
+            <input
+              id="railwayStationName"
+              type="text"
+              className="form-control"
+              value={basicInfo.railwayStationName || ''}
+              onChange={(e) => handleChange('railwayStationName', e.target.value)}
+              placeholder="e.g. New Delhi Railway Station"
+              disabled={isReadOnly}
+            />
+          </div>
+
+          {/* 5. Centre Distance from Main Road (KM) - Mandatory */}
+          <div className="form-group">
+            <label className="form-label" htmlFor="mainRoadDistanceKm">
+              Centre Distance from Main Road (KM) <span style={{ color: 'var(--color-danger, #dc2626)' }}>*</span>
+            </label>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+              <input
+                id="mainRoadDistanceKm"
+                type="number"
+                step="0.1"
+                min={0}
+                className="form-control"
+                value={basicInfo.mainRoadDistanceKm ?? basicInfo.distanceFromMainRoad ?? ''}
+                onChange={(e) => {
+                  const val = e.target.value;
+                  const num = val === '' ? '' : Number(val);
+                  handleChange('mainRoadDistanceKm', num);
+                  handleChange('distanceFromMainRoad', num);
+                }}
+                placeholder="e.g. 0.5"
+                disabled={isReadOnly}
+                required
+              />
+              <span style={{ fontWeight: 700, fontSize: '0.875rem', color: 'var(--text-secondary, #64748b)', padding: '0 4px' }}>
+                KM
+              </span>
+            </div>
+          </div>
+
+          {/* 6. Sign Boards Available to Approach Centre Easily? - Mandatory */}
+          <div className="form-group">
+            <label className="form-label">
+              Sign Boards Available to Approach Centre Easily? <span style={{ color: 'var(--color-danger, #dc2626)' }}>*</span>
+            </label>
+            <div style={{ display: 'flex', gap: 24, marginTop: 8 }}>
               <label style={{ display: 'flex', alignItems: 'center', gap: 8, cursor: 'pointer' }}>
                 <input
                   type="radio"
                   name="signBoardsAvailable"
-                  checked={Boolean(basicInfo.signBoardsAvailable ?? basicInfo.signBoards)}
+                  checked={Boolean(basicInfo.signBoardsAvailable ?? basicInfo.signBoards ?? true)}
                   onChange={() => {
                     handleChange('signBoardsAvailable', true);
                     handleChange('signBoards', true);
                   }}
                   disabled={isReadOnly}
                 />
-                Yes, Visible Direction Boards
+                Yes
               </label>
               <label style={{ display: 'flex', alignItems: 'center', gap: 8, cursor: 'pointer' }}>
                 <input
                   type="radio"
                   name="signBoardsAvailable"
-                  checked={!(basicInfo.signBoardsAvailable ?? basicInfo.signBoards)}
+                  checked={!(basicInfo.signBoardsAvailable ?? basicInfo.signBoards ?? true)}
                   onChange={() => {
                     handleChange('signBoardsAvailable', false);
                     handleChange('signBoards', false);

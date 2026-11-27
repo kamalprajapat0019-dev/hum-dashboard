@@ -234,8 +234,10 @@ model Centre {
   landlineStd               String?
   googleMapLink             String?                  @db.Text
   busStandNearby            Boolean                  @default(false)
+  busStandDistanceKm        Float?
   busStandName              String?
   railwayStationNearby      Boolean                  @default(false)
+  railwayStationDistanceKm  Float?
   railwayStationName        String?
   mainRoadDistanceKm        Float?
   signBoardsAvailable       Boolean                  @default(false)

@@ -167,10 +167,10 @@ export function BasicTab({
               <div><span style={{ color: '#64748b' }}>Centre WhatsApp Mobile:</span> {centre.centreWhatsappMobile || centre.whatsappMobile || '—'}</div>
               <div><span style={{ color: '#64748b' }}>Centre Alternate Mobile:</span> {centre.centreAlternateMobile || centre.alternateMobile || '—'}</div>
               <div><span style={{ color: '#64748b' }}>Centre Phone Number with STD:</span> {centre.centrePhoneNumberWithStdCode || centre.phoneStd || '—'}</div>
-              <div><span style={{ color: '#64748b' }}>Nearby Bus Stand:</span> {inf.busStandNearby ? `Yes (${inf.busStandName || 'Nearby'})` : 'No'}</div>
-              <div><span style={{ color: '#64748b' }}>Nearby Metro Station:</span> {inf.metroNearby ? `Yes (${inf.metroStationName || 'Nearby'})` : 'No'}</div>
-              <div><span style={{ color: '#64748b' }}>Distance from Highway:</span> {inf.distanceFromMainRoad !== null ? `${inf.distanceFromMainRoad} km` : '—'}</div>
-              <div><span style={{ color: '#64748b' }}>PH Friendly Centre:</span> {inf.phFriendly ? `Yes (${inf.phCandidateCount || 0} candidates)` : 'No'}</div>
+              <div><span style={{ color: '#64748b' }}>Nearby Bus Stand:</span> {centre.busStandDistanceKm !== null && centre.busStandDistanceKm !== undefined ? `${centre.busStandDistanceKm} KM (${centre.busStandName || 'Bus Stand'})` : (inf.busStandNearby ? `Yes (${inf.busStandName || 'Nearby'})` : '—')}</div>
+              <div><span style={{ color: '#64748b' }}>Nearby Railway Station:</span> {centre.railwayStationDistanceKm !== null && centre.railwayStationDistanceKm !== undefined ? `${centre.railwayStationDistanceKm} KM (${centre.railwayStationName || 'Railway Station'})` : (centre.railwayStationName || '—')}</div>
+              <div><span style={{ color: '#64748b' }}>Distance from Main Road:</span> {centre.mainRoadDistanceKm !== null && centre.mainRoadDistanceKm !== undefined ? `${centre.mainRoadDistanceKm} KM` : (inf.distanceFromMainRoad !== null ? `${inf.distanceFromMainRoad} KM` : '—')}</div>
+              <div><span style={{ color: '#64748b' }}>Approach Sign Boards:</span> {centre.signBoardsAvailable ? 'Yes' : 'No'}</div>
             </div>
           </div>
         </div>
