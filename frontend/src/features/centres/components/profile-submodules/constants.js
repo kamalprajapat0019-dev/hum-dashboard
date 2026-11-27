@@ -28,10 +28,9 @@ export const CENTRE_CATEGORIES = [
  * Proprietorship; Partnership Firm; Trust/Society
  */
 export const ORGANIZATION_TYPES = [
-  'Trust/Society',
   'Proprietorship',
-  'Partnership Firm'
-
+  'Partnership Firm',
+  'Trust/Society'
 ];
 
 /**
@@ -65,9 +64,9 @@ export const REGION_LABELS = {
  * Domestic; Commercial; Industrial; Other
  */
 export const ELECTRICITY_CONNECTION_TYPES = [
+  'Domestic',
   'Commercial',
   'Industrial',
-  'Domestic',
   'Other'
 ];
 
@@ -88,9 +87,7 @@ export const GENERATOR_FUEL_TYPES = [
  */
 export const LAN_TYPES = [
   'Single LAN',
-  'LAN',
-  'Single Unified LAN',
-  'VLAN Segmented (Cat6)'
+  'LAN'
 ];
 
 export const BUILDING_TYPES = [
@@ -114,10 +111,8 @@ export const MAJOR_BANKS = [
  * Savings; Current
  */
 export const BANK_ACCOUNT_TYPES = [
-  'Current',
   'Savings',
-  'Current Account',
-  'Savings Account'
+  'Current'
 ];
 
 export const LAB_TYPES = [

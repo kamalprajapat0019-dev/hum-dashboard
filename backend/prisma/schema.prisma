@@ -639,6 +639,7 @@ model CentreContact {
   centre                 Centre   @relation(fields: [centreId], references: [id], onDelete: Cascade)
   personType             String   // Owner, TCA, IT Person, Electrician, Centre Head / Venue CS, OWNER, TCA_CS, IT_PERSON, ELECTRICIAN
   fullName               String
+  designation            String?
   contactNumber          String
   alternateContactNumber String?
   whatsappNumber         String?
@@ -649,6 +650,10 @@ model CentreContact {
   motherName             String?
   permanentAddress       String?  @db.Text
   currentAddress         String?  @db.Text
+  photoUrl               String?  @db.Text
+  idProofUrl             String?  @db.Text
+  policeVerificationUrl  String?  @db.Text
+  tcaLetterUrl           String?  @db.Text
   qualification          String?
   experienceYears        Int?
   isCertified            Boolean?

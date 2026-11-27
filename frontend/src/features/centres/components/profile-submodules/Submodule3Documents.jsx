@@ -26,26 +26,21 @@ export function Submodule3Documents({
       { key: 'gst_certificate', label: 'GST Certificate or Non-GST Declaration', mandatory: true, hint: 'Form GST REG-06 or official Non-GST declaration letter' },
       { key: 'registration_certificate', label: 'Centre Registration Certificate / Establishment Documents / Shop Act / MSME Certificate', mandatory: true, hint: 'Incorporation, Trust, Society, or Academic registration proof' },
       { key: 'current_electricity_bill', label: 'Current Electricity Bill (Last 2 Months)', mandatory: true, hint: 'Utility power bill showing venue address and sanctioned load' },
-      { key: 'mou', label: `MOU - 500 Stamp Paper (${currentYear}-${currentYear + 1})`, mandatory: true, hint: 'Notarized Master Service Agreement on ₹500 non-judicial stamp paper' },
-      { key: 'nda', label: 'NDA - 100 Stamp Paper', mandatory: true, hint: 'Examination confidentiality undertaking on ₹100 stamp paper' },
+      { key: 'mou', label: `MOU - 500 Stamp (${currentYear}-${currentYear + 1})`, mandatory: true, hint: 'Notarized Master Service Agreement on ₹500 non-judicial stamp paper' },
+      { key: 'nda', label: 'NDA-100 Stamp', mandatory: true, hint: 'Examination confidentiality undertaking on ₹100 stamp paper' },
       { key: 'notarized_affidavit', label: 'Notarized Affidavit', mandatory: true, hint: 'Stamp paper affidavit regarding examination integrity & infrastructure declaration' },
       { key: 'willingness_letter', label: 'Willingness Letter on Centre Letterhead', mandatory: true, hint: 'Signed & stamped willingness undertaking on official letterhead' },
-      { key: 'cancelled_cheque', label: 'Cancelled Cheque / Bank Passbook Copy', mandatory: true, hint: 'Original cancelled cheque showing Account Name and IFSC' },
-      { key: 'rent_agreement', label: 'Rent Agreement in English (if rented/leased)', mandatory: false, hint: 'Registered lease deed / rent agreement if venue premises are rented' },
+      { key: 'cancelled_cheque', label: 'Cancelled Cheque', mandatory: true, hint: 'Original cancelled cheque showing Account Name, Account Number and IFSC' },
+      { key: 'bank_passbook', label: 'Bank Passbook', mandatory: true, hint: 'Attested bank passbook showing active transaction history' },
+      { key: 'rent_agreement', label: 'Rent Agreement in English', mandatory: false, hint: 'Registered lease deed / rent agreement in English (if premises are rented/leased)' },
     ];
 
     const conditionalDocs = [];
-    if (organizationType === 'Trust' || organizationType === 'Trust/Society') {
+    if (organizationType === 'Trust' || organizationType === 'Society' || organizationType === 'Trust/Society') {
       conditionalDocs.push(
-        { key: 'trust_deed', label: 'Registered Trust Deed / Society Registration Certificate', mandatory: true, hint: 'Complete Trust Deed certified by Sub-Registrar' },
-        { key: 'trustee_list', label: 'Certified List of Trustees / Governing Body Member List', mandatory: true, hint: 'Current Board of Trustees with contact information' },
+        { key: 'trust_deed', label: 'Registered Trust Deed / Society Registration Certificate', mandatory: true, hint: 'Complete Trust Deed / Society Certificate certified by Sub-Registrar' },
+        { key: 'trustee_list', label: 'Certified List of Trustees / Governing Body Member List', mandatory: true, hint: 'Current Board of Trustees / Governing Body with contact details' },
         { key: 'tax_exemption_12a_80g', label: '12A / 80G Tax Exemption Certificate', mandatory: false, hint: 'Income Tax 12A/80G order (if applicable)' }
-      );
-    } else if (organizationType === 'Society') {
-      conditionalDocs.push(
-        { key: 'society_certificate', label: 'Society Registration Certificate', mandatory: true, hint: 'Certificate issued under Societies Registration Act' },
-        { key: 'moa_rules', label: 'Memorandum of Association (MOA) & Rules', mandatory: true, hint: 'Approved MOA and Bylaws of the Society' },
-        { key: 'governing_body', label: 'Certified Governing Body Member List', mandatory: true, hint: 'Current managing council list' }
       );
     } else if (organizationType === 'Partnership' || organizationType === 'Partnership Firm') {
       conditionalDocs.push(
@@ -59,12 +54,7 @@ export function Submodule3Documents({
       );
     }
 
-    const optionalDocs = [
-      { key: 'fire_noc', label: 'Fire Safety Certificate / NOC', mandatory: false, hint: 'Valid Fire Service NOC for the academic/commercial building' },
-      { key: 'ef_data_sheet', label: 'EF Resource & Node Data Sheet', mandatory: false, hint: 'Computer node inventory sheet signed by IT Head' },
-    ];
-
-    return [...baseDocs, ...conditionalDocs, ...optionalDocs];
+    return [...baseDocs, ...conditionalDocs];
   };
 
   const checklist = getDocChecklist();

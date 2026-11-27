@@ -209,11 +209,36 @@ export class CentreService {
       }),
     ]);
 
-    // Mask contacts Aadhaar
-    const maskedContacts = contacts.map((c) => ({
-      ...c,
-      aadhaarNumber: this.maskAadhaar(c.aadhaarNumber),
-    }));
+    // Mask contacts Aadhaar and resolve contact documents/photos
+    const maskedContacts = contacts.map((c) => {
+      const roleKey =
+        c.personType === 'Owner' || c.personType === 'OWNER'
+          ? 'owner'
+          : c.personType === 'Centre CS' || c.personType === 'TCA' || c.personType === 'TCA_CS'
+          ? 'cs'
+          : c.personType === 'IT Person' || c.personType === 'IT_PERSON'
+          ? 'it'
+          : c.personType === 'Electrician' || c.personType === 'ELECTRICIAN'
+          ? 'electrician'
+          : null;
+
+      const contactAssets = roleKey
+        ? mediaAssets.filter((a) => a.entityType === 'CONTACT' && a.entityId === roleKey)
+        : [];
+      const photoAsset = contactAssets.find((a) => a.fieldKey === 'photo');
+      const idProofAsset = contactAssets.find((a) => a.fieldKey === 'idProof');
+      const policeAsset = contactAssets.find((a) => a.fieldKey === 'policeVerification');
+      const tcaLetterAsset = contactAssets.find((a) => a.fieldKey === 'tcaLetter');
+
+      return {
+        ...c,
+        photoUrl: (c as any).photoUrl || (photoAsset ? `/api/v1/centre/media/${photoAsset.id}/download` : null),
+        idProofUrl: (c as any).idProofUrl || (idProofAsset ? `/api/v1/centre/media/${idProofAsset.id}/download` : null),
+        policeVerificationUrl: (c as any).policeVerificationUrl || (policeAsset ? `/api/v1/centre/media/${policeAsset.id}/download` : null),
+        tcaLetterUrl: (c as any).tcaLetterUrl || (tcaLetterAsset ? `/api/v1/centre/media/${tcaLetterAsset.id}/download` : null),
+        aadhaarNumber: this.maskAadhaar(c.aadhaarNumber),
+      };
+    });
 
     // Mask bank account number
     let maskedBank = null;
@@ -435,6 +460,7 @@ export class CentreService {
                 where: { id: existingContact.id },
                 data: {
                   fullName: c.fullName || existingContact.fullName,
+                  designation: c.designation !== undefined ? c.designation : (existingContact as any).designation,
                   contactNumber: c.contactNumber || existingContact.contactNumber,
                   email: c.email ?? existingContact.email,
                   aadhaarNumber:
@@ -446,11 +472,15 @@ export class CentreService {
                   motherName: c.motherName ?? existingContact.motherName,
                   permanentAddress: c.permanentAddress ?? existingContact.permanentAddress,
                   currentAddress: c.currentAddress ?? existingContact.currentAddress,
+                  photoUrl: c.photoUrl !== undefined ? c.photoUrl : (existingContact as any).photoUrl,
+                  idProofUrl: c.idProofUrl !== undefined ? c.idProofUrl : (existingContact as any).idProofUrl,
+                  policeVerificationUrl: c.policeVerificationUrl !== undefined ? c.policeVerificationUrl : (existingContact as any).policeVerificationUrl,
+                  tcaLetterUrl: c.tcaLetterUrl !== undefined ? c.tcaLetterUrl : (existingContact as any).tcaLetterUrl,
                   alternateContactNumber: c.alternateNumber || c.alternateContactNumber || existingContact.alternateContactNumber,
                   qualification: c.qualification ?? existingContact.qualification,
                   experienceYears: c.experienceYears !== undefined ? Number(c.experienceYears) : existingContact.experienceYears,
                   isPrimary: c.personType === 'Owner' || c.personType === 'OWNER',
-                },
+                } as any,
               });
             } else {
               await tx.centreContact.create({
@@ -458,6 +488,7 @@ export class CentreService {
                   centreId,
                   personType: c.personType,
                   fullName: c.fullName || '—',
+                  designation: c.designation || null,
                   contactNumber: c.contactNumber || '—',
                   alternateContactNumber: c.alternateNumber || c.alternateContactNumber || null,
                   email: c.email || null,
@@ -467,10 +498,14 @@ export class CentreService {
                   motherName: c.motherName || null,
                   permanentAddress: c.permanentAddress || null,
                   currentAddress: c.currentAddress || null,
+                  photoUrl: c.photoUrl || null,
+                  idProofUrl: c.idProofUrl || null,
+                  policeVerificationUrl: c.policeVerificationUrl || null,
+                  tcaLetterUrl: c.tcaLetterUrl || null,
                   qualification: c.qualification || null,
                   experienceYears: c.experienceYears !== undefined ? Number(c.experienceYears) : null,
                   isPrimary: c.personType === 'Owner' || c.personType === 'OWNER',
-                },
+                } as any,
               });
             }
           }

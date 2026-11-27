@@ -83,10 +83,10 @@ export default function MyCentreProfilePage() {
 
   // ── Submodule 2: Key Personnel ─────────────────────────────────────────────
   const [personnel, setPersonnel] = useState({
-    owner: { fullName: '', contactNumber: '', email: '', aadhaarNumber: '', fatherName: '', permanentAddress: '', photoUrl: '' },
-    cs: { fullName: '', contactNumber: '', email: '', aadhaarNumber: '', fatherName: '', permanentAddress: '', photoUrl: '' },
-    it: { fullName: '', contactNumber: '', email: '', aadhaarNumber: '', fatherName: '', permanentAddress: '', photoUrl: '' },
-    electrician: { fullName: '', contactNumber: '', aadhaarNumber: '', photoUrl: '' },
+    owner: { fullName: '', designation: '', contactNumber: '', email: '', aadhaarNumber: '', fatherName: '', motherName: '', permanentAddress: '', currentAddress: '', photoUrl: '', idProofUrl: '', policeVerificationUrl: '' },
+    cs: { fullName: '', contactNumber: '', email: '', aadhaarNumber: '', fatherName: '', motherName: '', permanentAddress: '', currentAddress: '', photoUrl: '', idProofUrl: '', policeVerificationUrl: '', tcaLetterUrl: '' },
+    it: { fullName: '', contactNumber: '', email: '', aadhaarNumber: '', fatherName: '', motherName: '', permanentAddress: '', currentAddress: '', photoUrl: '', idProofUrl: '', policeVerificationUrl: '' },
+    electrician: { fullName: '', contactNumber: '', aadhaarNumber: '', photoUrl: '', idProofUrl: '', policeVerificationUrl: '' },
   });
 
   // ── Submodule 3: Documents ─────────────────────────────────────────────────
@@ -421,6 +421,12 @@ export default function MyCentreProfilePage() {
             ...prev,
             cancelledChequeUrl: docData.fileUrl,
             proofFileName: docData.fileName,
+          }));
+        } else if (docData.documentType === 'bank_passbook') {
+          setBank((prev) => ({
+            ...prev,
+            bankPassbookUrl: docData.fileUrl,
+            passbookFileName: docData.fileName,
           }));
         }
       }

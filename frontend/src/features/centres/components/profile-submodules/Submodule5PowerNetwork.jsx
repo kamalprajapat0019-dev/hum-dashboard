@@ -785,10 +785,128 @@ export function Submodule5PowerNetwork({
               type="number"
               min={1}
               className="form-control"
-              value={powerNetwork.networkAdminsCount ?? 2}
-              onChange={(e) => handleChange('networkAdminsCount', Number(e.target.value))}
+              value={powerNetwork.networkAdminsCount ?? ((powerNetwork.networkAdmins || []).length || 2)}
+              onChange={(e) => {
+                const num = Math.max(1, Number(e.target.value));
+                handleChange('networkAdminsCount', num);
+              }}
               disabled={isReadOnly}
             />
+          </div>
+
+          {/* Repeatable Network Administrator Details (FRD Sec. 10.2) */}
+          <div style={{ gridColumn: '1 / -1', marginTop: 10 }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}>
+              <strong style={{ fontSize: '0.9375rem', color: 'var(--text-primary)' }}>
+                On-Site Network Administrators (FRD Sec. 10.2)
+              </strong>
+              {!isReadOnly && (
+                <button
+                  type="button"
+                  className="btn btn-xs btn-secondary"
+                  onClick={() => {
+                    const admins = [...(powerNetwork.networkAdmins || [{ name: '', contact: '', email: '' }])];
+                    admins.push({ name: '', contact: '', email: '' });
+                    handleChange('networkAdmins', admins);
+                    handleChange('networkAdminsCount', admins.length);
+                  }}
+                >
+                  + Add Administrator
+                </button>
+              )}
+            </div>
+
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+              {(powerNetwork.networkAdmins && powerNetwork.networkAdmins.length > 0
+                ? powerNetwork.networkAdmins
+                : [{ name: '', contact: '', email: '' }]
+              ).map((admin, idx) => (
+                <div
+                  key={idx}
+                  style={{
+                    display: 'grid',
+                    gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr)) 40px',
+                    gap: 12,
+                    alignItems: 'flex-end',
+                    padding: 12,
+                    borderRadius: 'var(--radius-md, 6px)',
+                    background: 'var(--bg-subtle, #f8fafc)',
+                    border: '1px solid var(--border-color, #e2e8f0)',
+                  }}
+                >
+                  <div className="form-group" style={{ margin: 0 }}>
+                    <label className="form-label" style={{ fontSize: '0.75rem' }}>
+                      Admin #{idx + 1} Full Name
+                    </label>
+                    <input
+                      type="text"
+                      className="form-control"
+                      value={admin.name || ''}
+                      onChange={(e) => {
+                        const admins = [...(powerNetwork.networkAdmins || [{ name: '', contact: '', email: '' }])];
+                        admins[idx] = { ...admins[idx], name: e.target.value };
+                        handleChange('networkAdmins', admins);
+                      }}
+                      placeholder="e.g. Rahul Sharma"
+                      disabled={isReadOnly}
+                    />
+                  </div>
+
+                  <div className="form-group" style={{ margin: 0 }}>
+                    <label className="form-label" style={{ fontSize: '0.75rem' }}>
+                      Contact Mobile (10 Digits)
+                    </label>
+                    <input
+                      type="text"
+                      maxLength={10}
+                      className="form-control"
+                      value={admin.contact || ''}
+                      onChange={(e) => {
+                        const admins = [...(powerNetwork.networkAdmins || [{ name: '', contact: '', email: '' }])];
+                        admins[idx] = { ...admins[idx], contact: e.target.value.replace(/\D/g, '') };
+                        handleChange('networkAdmins', admins);
+                      }}
+                      placeholder="10-digit mobile"
+                      disabled={isReadOnly}
+                    />
+                  </div>
+
+                  <div className="form-group" style={{ margin: 0 }}>
+                    <label className="form-label" style={{ fontSize: '0.75rem' }}>
+                      Email Address
+                    </label>
+                    <input
+                      type="email"
+                      className="form-control"
+                      value={admin.email || ''}
+                      onChange={(e) => {
+                        const admins = [...(powerNetwork.networkAdmins || [{ name: '', contact: '', email: '' }])];
+                        admins[idx] = { ...admins[idx], email: e.target.value };
+                        handleChange('networkAdmins', admins);
+                      }}
+                      placeholder="admin@institution.edu.in"
+                      disabled={isReadOnly}
+                    />
+                  </div>
+
+                  {!isReadOnly && (powerNetwork.networkAdmins || []).length > 1 ? (
+                    <button
+                      type="button"
+                      className="btn btn-xs btn-subtle"
+                      style={{ height: 36, display: 'flex', alignItems: 'center', justifyContent: 'center' }}
+                      onClick={() => {
+                        const admins = (powerNetwork.networkAdmins || []).filter((_, i) => i !== idx);
+                        handleChange('networkAdmins', admins);
+                        handleChange('networkAdminsCount', admins.length);
+                      }}
+                      title="Remove Administrator"
+                    >
+                      ×
+                    </button>
+                  ) : <div />}
+                </div>
+              ))}
+            </div>
           </div>
 
           {/* Network Diagram Upload */}

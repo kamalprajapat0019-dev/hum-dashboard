@@ -293,21 +293,6 @@ export function Submodule1BasicInfo({
             />
           </div>
 
-          <div className="form-group">
-            <label className="form-label" htmlFor="googleMapLink">
-              Google Map Link
-            </label>
-            <input
-              id="googleMapLink"
-              type="url"
-              className="form-control"
-              value={basicInfo.googleMapLink || ''}
-              onChange={(e) => handleChange('googleMapLink', e.target.value)}
-              placeholder="https://maps.google.com/?q=..."
-              disabled={isReadOnly}
-            />
-          </div>
-
           {/* Contact Fields per FRD Sec. 6.1 */}
           <div className="form-group">
             <label className="form-label" htmlFor="centreOfficialEmail">
@@ -331,7 +316,7 @@ export function Submodule1BasicInfo({
 
           <div className="form-group">
             <label className="form-label" htmlFor="alternativeEmail">
-              Centre Alternate Email ID
+              Centre Alternative Email
             </label>
             <input
               id="alternativeEmail"
@@ -535,7 +520,7 @@ export function Submodule1BasicInfo({
             <>
               <div className="form-group">
                 <label className="form-label" htmlFor="previousExamName">
-                  Name of Exam
+                  Previous Conducted Exam Name
                 </label>
                 <input
                   id="previousExamName"
@@ -550,7 +535,7 @@ export function Submodule1BasicInfo({
 
               <div className="form-group">
                 <label className="form-label" htmlFor="previousExamDate">
-                  Date of Exam
+                  Previous Conducted Exam Date
                 </label>
                 <input
                   id="previousExamDate"
@@ -562,21 +547,6 @@ export function Submodule1BasicInfo({
                       : ''
                   }
                   onChange={(e) => handleChange('previousExamDate', e.target.value)}
-                  disabled={isReadOnly}
-                />
-              </div>
-
-              <div className="form-group" style={{ gridColumn: '1 / -1' }}>
-                <label className="form-label" htmlFor="previousEduExam">
-                  Previous Exam Conducted Details
-                </label>
-                <textarea
-                  id="previousEduExam"
-                  rows={2}
-                  className="form-control"
-                  value={basicInfo.previousEduExam || ''}
-                  onChange={(e) => handleChange('previousEduExam', e.target.value)}
-                  placeholder="Clients, vendor details, peak concurrent nodes conducted..."
                   disabled={isReadOnly}
                 />
               </div>
@@ -756,20 +726,22 @@ export function Submodule1BasicInfo({
         </div>
       </div>
 
-      {/* ── Section 6: Accommodation & Food Facilities (FRD Sec. 6.1) ── */}
+      {/* ── Section 6: Accommodation & Food Facilities (FRD Sec. 6.1.4) ── */}
       <div className="card" style={{ padding: 24 }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 18 }}>
           <Utensils size={20} color="var(--color-primary, #2563eb)" />
           <h3 style={{ margin: 0, fontSize: '1.05rem', fontWeight: 700, color: 'var(--text-primary, #1e293b)' }}>
-            6. Accommodation & Food Facilities (FRD Sec. 6.1)
+            6. Accommodation & Food Facilities (FRD Sec. 6.1.4)
           </h3>
         </div>
 
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(260px, 1fr))', gap: 16 }}>
-          {/* Hotels Nearby */}
-          <div className="form-group">
-            <label className="form-label">Hotels Nearby?</label>
-            <div style={{ display: 'flex', gap: 20, marginTop: 4, marginBottom: 8 }}>
+          {/* Are Hotels Available Near the College/Centre? - Mandatory */}
+          <div className="form-group" style={{ gridColumn: '1 / -1' }}>
+            <label className="form-label">
+              Are Hotels Available Near the College/Centre? <span style={{ color: 'var(--color-danger, #dc2626)' }}>*</span>
+            </label>
+            <div style={{ display: 'flex', gap: 24, marginTop: 4, marginBottom: 8 }}>
               <label style={{ display: 'flex', alignItems: 'center', gap: 8, cursor: 'pointer' }}>
                 <input
                   type="radio"
@@ -785,30 +757,47 @@ export function Submodule1BasicInfo({
                   type="radio"
                   name="hotelsNearby"
                   checked={!basicInfo.hotelsNearby}
-                  onChange={() => handleChange('hotelsNearby', false)}
+                  onChange={() => {
+                    handleChange('hotelsNearby', false);
+                    handleChange('nearestHotelDistanceKm', null);
+                  }}
                   disabled={isReadOnly}
                 />
                 No
               </label>
             </div>
             {basicInfo.hotelsNearby && (
-              <input
-                type="number"
-                step="0.1"
-                min={0}
-                className="form-control"
-                value={basicInfo.nearestHotelDistanceKm ?? ''}
-                onChange={(e) => handleChange('nearestHotelDistanceKm', Number(e.target.value))}
-                placeholder="Distance in km (e.g. 1.5)"
-                disabled={isReadOnly}
-              />
+              <div style={{ maxWidth: 360, marginTop: 8 }}>
+                <label className="form-label" htmlFor="nearestHotelDistanceKm">
+                  Nearest Hotel Distance from Centre (KM) <span style={{ color: 'var(--color-danger, #dc2626)' }}>*</span>
+                </label>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                  <input
+                    id="nearestHotelDistanceKm"
+                    type="number"
+                    step="0.1"
+                    min={0}
+                    className="form-control"
+                    value={basicInfo.nearestHotelDistanceKm ?? ''}
+                    onChange={(e) => handleChange('nearestHotelDistanceKm', e.target.value === '' ? '' : Number(e.target.value))}
+                    placeholder="e.g. 1.5"
+                    disabled={isReadOnly}
+                    required
+                  />
+                  <span style={{ fontWeight: 700, fontSize: '0.875rem', color: 'var(--text-secondary, #64748b)', padding: '0 4px' }}>
+                    KM
+                  </span>
+                </div>
+              </div>
             )}
           </div>
 
-          {/* Canteen within Campus */}
-          <div className="form-group">
-            <label className="form-label">Canteen Within Campus?</label>
-            <div style={{ display: 'flex', gap: 20, marginTop: 4 }}>
+          {/* Is Canteen Available Within the Campus? - Mandatory */}
+          <div className="form-group" style={{ gridColumn: '1 / -1' }}>
+            <label className="form-label">
+              Is Canteen Available Within the Campus? <span style={{ color: 'var(--color-danger, #dc2626)' }}>*</span>
+            </label>
+            <div style={{ display: 'flex', gap: 24, marginTop: 4 }}>
               <label style={{ display: 'flex', alignItems: 'center', gap: 8, cursor: 'pointer' }}>
                 <input
                   type="radio"
@@ -838,123 +827,139 @@ export function Submodule1BasicInfo({
             </div>
           </div>
 
-          {/* Canteen Food for Staff */}
-          <div className="form-group">
-            <label className="form-label">Canteen Food for Staff / Coordinators / Observers?</label>
-            <div style={{ display: 'flex', gap: 20, marginTop: 4 }}>
-              <label style={{ display: 'flex', alignItems: 'center', gap: 8, cursor: 'pointer' }}>
-                <input
-                  type="radio"
-                  name="canteenFoodForStaff"
-                  checked={Boolean(basicInfo.canteenFoodForStaff)}
-                  onChange={() => handleChange('canteenFoodForStaff', true)}
-                  disabled={isReadOnly}
-                />
-                Yes
-              </label>
-              <label style={{ display: 'flex', alignItems: 'center', gap: 8, cursor: 'pointer' }}>
-                <input
-                  type="radio"
-                  name="canteenFoodForStaff"
-                  checked={!basicInfo.canteenFoodForStaff}
-                  onChange={() => handleChange('canteenFoodForStaff', false)}
-                  disabled={isReadOnly}
-                />
-                No
-              </label>
-            </div>
-          </div>
+          {/* When Canteen Available == YES: Show 3 fields ONLY */}
+          {Boolean(basicInfo.canteenAvailable ?? basicInfo.canteenArrangement) ? (
+            <>
+              {/* Canteen Food for Staff / Coordinators / Observers */}
+              <div className="form-group">
+                <label className="form-label">Canteen Food for Staff / Coordinators / Observers?</label>
+                <div style={{ display: 'flex', gap: 20, marginTop: 4 }}>
+                  <label style={{ display: 'flex', alignItems: 'center', gap: 8, cursor: 'pointer' }}>
+                    <input
+                      type="radio"
+                      name="canteenFoodForStaff"
+                      checked={Boolean(basicInfo.canteenFoodForStaff)}
+                      onChange={() => handleChange('canteenFoodForStaff', true)}
+                      disabled={isReadOnly}
+                    />
+                    Yes
+                  </label>
+                  <label style={{ display: 'flex', alignItems: 'center', gap: 8, cursor: 'pointer' }}>
+                    <input
+                      type="radio"
+                      name="canteenFoodForStaff"
+                      checked={!basicInfo.canteenFoodForStaff}
+                      onChange={() => handleChange('canteenFoodForStaff', false)}
+                      disabled={isReadOnly}
+                    />
+                    No
+                  </label>
+                </div>
+              </div>
 
-          {/* Food for Testing Days */}
-          <div className="form-group">
-            <label className="form-label">Food for Testing Days?</label>
-            <div style={{ display: 'flex', gap: 20, marginTop: 4 }}>
-              <label style={{ display: 'flex', alignItems: 'center', gap: 8, cursor: 'pointer' }}>
-                <input
-                  type="radio"
-                  name="foodForTestingDays"
-                  checked={Boolean(basicInfo.foodForTestingDays)}
-                  onChange={() => handleChange('foodForTestingDays', true)}
-                  disabled={isReadOnly}
-                />
-                Yes
-              </label>
-              <label style={{ display: 'flex', alignItems: 'center', gap: 8, cursor: 'pointer' }}>
-                <input
-                  type="radio"
-                  name="foodForTestingDays"
-                  checked={!basicInfo.foodForTestingDays}
-                  onChange={() => handleChange('foodForTestingDays', false)}
-                  disabled={isReadOnly}
-                />
-                No
-              </label>
-            </div>
-          </div>
+              {/* Food for Testing Days */}
+              <div className="form-group">
+                <label className="form-label">Food for Testing Days?</label>
+                <div style={{ display: 'flex', gap: 20, marginTop: 4 }}>
+                  <label style={{ display: 'flex', alignItems: 'center', gap: 8, cursor: 'pointer' }}>
+                    <input
+                      type="radio"
+                      name="foodForTestingDays"
+                      checked={Boolean(basicInfo.foodForTestingDays)}
+                      onChange={() => handleChange('foodForTestingDays', true)}
+                      disabled={isReadOnly}
+                    />
+                    Yes
+                  </label>
+                  <label style={{ display: 'flex', alignItems: 'center', gap: 8, cursor: 'pointer' }}>
+                    <input
+                      type="radio"
+                      name="foodForTestingDays"
+                      checked={!basicInfo.foodForTestingDays}
+                      onChange={() => handleChange('foodForTestingDays', false)}
+                      disabled={isReadOnly}
+                    />
+                    No
+                  </label>
+                </div>
+              </div>
 
-          {/* Food for Mock Days */}
-          <div className="form-group">
-            <label className="form-label">Food for Mock Days?</label>
-            <div style={{ display: 'flex', gap: 20, marginTop: 4 }}>
-              <label style={{ display: 'flex', alignItems: 'center', gap: 8, cursor: 'pointer' }}>
-                <input
-                  type="radio"
-                  name="foodForMockDays"
-                  checked={Boolean(basicInfo.foodForMockDays)}
-                  onChange={() => handleChange('foodForMockDays', true)}
-                  disabled={isReadOnly}
-                />
-                Yes
+              {/* Food for Mock Days */}
+              <div className="form-group">
+                <label className="form-label">Food for Mock Days?</label>
+                <div style={{ display: 'flex', gap: 20, marginTop: 4 }}>
+                  <label style={{ display: 'flex', alignItems: 'center', gap: 8, cursor: 'pointer' }}>
+                    <input
+                      type="radio"
+                      name="foodForMockDays"
+                      checked={Boolean(basicInfo.foodForMockDays)}
+                      onChange={() => handleChange('foodForMockDays', true)}
+                      disabled={isReadOnly}
+                    />
+                    Yes
+                  </label>
+                  <label style={{ display: 'flex', alignItems: 'center', gap: 8, cursor: 'pointer' }}>
+                    <input
+                      type="radio"
+                      name="foodForMockDays"
+                      checked={!basicInfo.foodForMockDays}
+                      onChange={() => handleChange('foodForMockDays', false)}
+                      disabled={isReadOnly}
+                    />
+                    No
+                  </label>
+                </div>
+              </div>
+            </>
+          ) : (
+            /* When Canteen Available == NO: Show Outside Food Question */
+            <div className="form-group" style={{ gridColumn: '1 / -1' }}>
+              <label className="form-label">
+                If Canteen Is Not Available, Can Outside Food Arrangements Be Made?
               </label>
-              <label style={{ display: 'flex', alignItems: 'center', gap: 8, cursor: 'pointer' }}>
-                <input
-                  type="radio"
-                  name="foodForMockDays"
-                  checked={!basicInfo.foodForMockDays}
-                  onChange={() => handleChange('foodForMockDays', false)}
-                  disabled={isReadOnly}
-                />
-                No
-              </label>
+              <div style={{ display: 'flex', gap: 24, marginTop: 4, marginBottom: 8 }}>
+                <label style={{ display: 'flex', alignItems: 'center', gap: 8, cursor: 'pointer' }}>
+                  <input
+                    type="radio"
+                    name="outsideFoodPossible"
+                    checked={Boolean(basicInfo.outsideFoodPossible)}
+                    onChange={() => handleChange('outsideFoodPossible', true)}
+                    disabled={isReadOnly}
+                  />
+                  Yes
+                </label>
+                <label style={{ display: 'flex', alignItems: 'center', gap: 8, cursor: 'pointer' }}>
+                  <input
+                    type="radio"
+                    name="outsideFoodPossible"
+                    checked={!basicInfo.outsideFoodPossible}
+                    onChange={() => {
+                      handleChange('outsideFoodPossible', false);
+                      handleChange('outsideFoodDetails', '');
+                    }}
+                    disabled={isReadOnly}
+                  />
+                  No
+                </label>
+              </div>
+              {basicInfo.outsideFoodPossible && (
+                <div style={{ marginTop: 8 }}>
+                  <label className="form-label" htmlFor="outsideFoodDetails">
+                    Outside Food Vendor / Arrangement Details
+                  </label>
+                  <textarea
+                    id="outsideFoodDetails"
+                    rows={2}
+                    className="form-control"
+                    value={basicInfo.outsideFoodDetails || ''}
+                    onChange={(e) => handleChange('outsideFoodDetails', e.target.value)}
+                    placeholder="Details of food arrangements, vendor names, delivery logistics..."
+                    disabled={isReadOnly}
+                  />
+                </div>
+              )}
             </div>
-          </div>
-
-          {/* Outside Food Possible */}
-          <div className="form-group" style={{ gridColumn: '1 / -1' }}>
-            <label className="form-label">Outside Food Possible?</label>
-            <div style={{ display: 'flex', gap: 20, marginTop: 4, marginBottom: 8 }}>
-              <label style={{ display: 'flex', alignItems: 'center', gap: 8, cursor: 'pointer' }}>
-                <input
-                  type="radio"
-                  name="outsideFoodPossible"
-                  checked={Boolean(basicInfo.outsideFoodPossible)}
-                  onChange={() => handleChange('outsideFoodPossible', true)}
-                  disabled={isReadOnly}
-                />
-                Yes, Outside Packed Catering Allowed
-              </label>
-              <label style={{ display: 'flex', alignItems: 'center', gap: 8, cursor: 'pointer' }}>
-                <input
-                  type="radio"
-                  name="outsideFoodPossible"
-                  checked={!basicInfo.outsideFoodPossible}
-                  onChange={() => handleChange('outsideFoodPossible', false)}
-                  disabled={isReadOnly}
-                />
-                No
-              </label>
-            </div>
-            {basicInfo.outsideFoodPossible && (
-              <textarea
-                rows={2}
-                className="form-control"
-                value={basicInfo.outsideFoodDetails || ''}
-                onChange={(e) => handleChange('outsideFoodDetails', e.target.value)}
-                placeholder="Details of food arrangements, preferred vendors, dining halls..."
-                disabled={isReadOnly}
-              />
-            )}
-          </div>
+          )}
         </div>
       </div>
     </div>

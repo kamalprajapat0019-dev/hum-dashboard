@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { AlertCircle, CheckCircle2, CreditCard, Upload, Eye, ShieldCheck, Lock, Check, FileCheck } from 'lucide-react';
-import { MAJOR_BANKS } from './constants';
+import { MAJOR_BANKS, BANK_ACCOUNT_TYPES } from './constants';
 import { validateDocumentFile, validateAndCompressPhoto, formatBytes } from '@/utils/fileValidation';
 
 export function Submodule6BankDetails({
@@ -18,6 +18,7 @@ export function Submodule6BankDetails({
 
   const [localError, setLocalError] = useState(null);
   const [showPlainAccount, setShowPlainAccount] = useState(!bank.accountNumber || !isReadOnly);
+  const [uploadingType, setUploadingType] = useState(null);
 
   const handleChange = (field, value) => {
     setBank((prev) => ({
@@ -26,9 +27,10 @@ export function Submodule6BankDetails({
     }));
   };
 
-  const handleProofUpload = async (file) => {
+  const handleProofUpload = async (docType, docName, file) => {
     if (!file) return;
     setLocalError(null);
+    setUploadingType(docType);
 
     const isPdf = file.type === 'application/pdf';
     let result;
@@ -41,27 +43,38 @@ export function Submodule6BankDetails({
 
     if (!result.success) {
       setLocalError(result.error);
+      setUploadingType(null);
       return;
     }
 
     if (onUploadProof) {
       try {
         await onUploadProof({
-          documentType: 'cancelled_cheque',
-          documentName: 'Cancelled Cheque / Bank Passbook Copy',
+          documentType: docType,
+          documentName: docName,
           fileName: result.fileName,
           fileUrl: result.fileUrl,
           fileSize: result.finalSizeBytes,
           mimeType: result.mimeType,
         });
 
-        setBank((prev) => ({
-          ...prev,
-          cancelledChequeUrl: result.fileUrl,
-          proofFileName: result.fileName,
-        }));
+        if (docType === 'cancelled_cheque') {
+          setBank((prev) => ({
+            ...prev,
+            cancelledChequeUrl: result.fileUrl,
+            proofFileName: result.fileName,
+          }));
+        } else if (docType === 'bank_passbook') {
+          setBank((prev) => ({
+            ...prev,
+            bankPassbookUrl: result.fileUrl,
+            passbookFileName: result.fileName,
+          }));
+        }
       } catch (err) {
-        setLocalError(err.message || 'Failed to upload bank proof document.');
+        setLocalError(err.message || `Failed to upload ${docName}.`);
+      } finally {
+        setUploadingType(null);
       }
     }
   };
@@ -169,7 +182,7 @@ export function Submodule6BankDetails({
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(260px, 1fr))', gap: 16 }}>
           <div className="form-group">
             <label className="form-label" htmlFor="accountName">
-              Centre Beneficiary Account Holder Name <span style={{ color: 'var(--color-danger)' }}>*</span>
+              Account Holder Name <span style={{ color: 'var(--color-danger)' }}>*</span>
             </label>
             <input
               id="accountName"
@@ -230,8 +243,9 @@ export function Submodule6BankDetails({
               onChange={(e) => handleChange('accountType', e.target.value)}
               disabled={isReadOnly}
             >
-              <option value="Current">Current</option>
-              <option value="Savings">Savings</option>
+              {BANK_ACCOUNT_TYPES.map((type) => (
+                <option key={type} value={type}>{type}</option>
+              ))}
             </select>
           </div>
 
@@ -322,76 +336,148 @@ export function Submodule6BankDetails({
           </div>
         </div>
 
-        {/* ── Cancelled Cheque / Passbook Upload ── */}
-        <div
-          style={{
-            marginTop: 20,
-            padding: 16,
-            borderRadius: 'var(--radius-md, 8px)',
-            background: 'var(--bg-subtle, #f8fafc)',
-            border: '1px solid var(--border-color, #e2e8f0)',
-            display: 'flex',
-            justifyContent: 'space-between',
-            alignItems: 'center',
-            flexWrap: 'wrap',
-            gap: 14,
-          }}
-        >
-          <div>
-            <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-              <FileCheck size={18} color="var(--color-primary)" />
-              <strong style={{ fontSize: '0.875rem', color: 'var(--text-primary)' }}>
-                Bank Account Proof (Cancelled Cheque or Passbook Copy) *
-              </strong>
+        {/* ── Cancelled Cheque & Bank Passbook Uploads (FRD Sec. 11) ── */}
+        <div style={{ marginTop: 20, display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(320px, 1fr))', gap: 16 }}>
+          {/* Slot 1: Cancelled Cheque */}
+          <div
+            style={{
+              padding: 16,
+              borderRadius: 'var(--radius-md, 8px)',
+              background: 'var(--bg-subtle, #f8fafc)',
+              border: '1px solid var(--border-color, #e2e8f0)',
+              display: 'flex',
+              flexDirection: 'column',
+              justifyContent: 'space-between',
+              gap: 12,
+            }}
+          >
+            <div>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                <FileCheck size={18} color="var(--color-primary)" />
+                <strong style={{ fontSize: '0.875rem', color: 'var(--text-primary)' }}>
+                  Cancelled Cheque <span style={{ color: 'var(--color-danger)' }}>*</span>
+                </strong>
+              </div>
+              <p style={{ margin: '4px 0 0', fontSize: '0.75rem', color: 'var(--text-secondary)' }}>
+                Original cancelled cheque leaf with account name & IFSC. PDF (≤ 10MB) or JPG (≤ 2MB).
+              </p>
+              {bank.proofFileName && (
+                <span style={{ fontSize: '0.72rem', color: 'var(--color-primary)', marginTop: 4, display: 'inline-block' }}>
+                  Uploaded: {bank.proofFileName}
+                </span>
+              )}
             </div>
-            <p style={{ margin: '4px 0 0', fontSize: '0.75rem', color: 'var(--text-secondary)' }}>
-              Mandatory proof for verifying account holder name and IFSC. Accepts PDF (≤ 10MB) or JPG (≤ 2MB).
-            </p>
-            {bank.proofFileName && (
-              <span style={{ fontSize: '0.72rem', color: 'var(--color-primary)', marginTop: 4, display: 'inline-block' }}>
-                Uploaded: {bank.proofFileName}
-              </span>
-            )}
+
+            <div style={{ display: 'flex', alignItems: 'center', gap: 10, alignSelf: 'flex-start' }}>
+              {bank.cancelledChequeUrl && (
+                <a
+                  href={bank.cancelledChequeUrl}
+                  target="_blank"
+                  rel="noreferrer"
+                  className="btn btn-xs btn-secondary"
+                  style={{ display: 'inline-flex', alignItems: 'center', gap: 4 }}
+                >
+                  <Eye size={12} /> View
+                </a>
+              )}
+
+              {!isReadOnly && (
+                <label
+                  className="btn btn-xs btn-primary"
+                  style={{
+                    display: 'inline-flex',
+                    alignItems: 'center',
+                    gap: 6,
+                    cursor: uploadingType === 'cancelled_cheque' ? 'not-allowed' : 'pointer',
+                  }}
+                >
+                  <Upload size={12} className={uploadingType === 'cancelled_cheque' ? 'animate-spin' : ''} />
+                  {uploadingType === 'cancelled_cheque' ? 'Uploading...' : bank.cancelledChequeUrl ? 'Replace Cheque' : 'Upload Cheque'}
+                  <input
+                    type="file"
+                    accept=".pdf,application/pdf,.jpg,.jpeg,image/jpeg"
+                    style={{ display: 'none' }}
+                    onChange={(e) => {
+                      if (e.target.files?.[0]) {
+                        handleProofUpload('cancelled_cheque', 'Cancelled Cheque', e.target.files[0]);
+                      }
+                    }}
+                    disabled={uploadingType === 'cancelled_cheque'}
+                  />
+                </label>
+              )}
+            </div>
           </div>
 
-          <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-            {bank.cancelledChequeUrl && (
-              <a
-                href={bank.cancelledChequeUrl}
-                target="_blank"
-                rel="noreferrer"
-                className="btn btn-xs btn-secondary"
-                style={{ display: 'inline-flex', alignItems: 'center', gap: 4 }}
-              >
-                <Eye size={12} /> View Proof
-              </a>
-            )}
+          {/* Slot 2: Bank Passbook */}
+          <div
+            style={{
+              padding: 16,
+              borderRadius: 'var(--radius-md, 8px)',
+              background: 'var(--bg-subtle, #f8fafc)',
+              border: '1px solid var(--border-color, #e2e8f0)',
+              display: 'flex',
+              flexDirection: 'column',
+              justifyContent: 'space-between',
+              gap: 12,
+            }}
+          >
+            <div>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                <FileCheck size={18} color="var(--color-primary)" />
+                <strong style={{ fontSize: '0.875rem', color: 'var(--text-primary)' }}>
+                  Bank Passbook <span style={{ color: 'var(--color-danger)' }}>*</span>
+                </strong>
+              </div>
+              <p style={{ margin: '4px 0 0', fontSize: '0.75rem', color: 'var(--text-secondary)' }}>
+                Attested bank passbook first page showing account particulars. PDF (≤ 10MB) or JPG (≤ 2MB).
+              </p>
+              {bank.passbookFileName && (
+                <span style={{ fontSize: '0.72rem', color: 'var(--color-primary)', marginTop: 4, display: 'inline-block' }}>
+                  Uploaded: {bank.passbookFileName}
+                </span>
+              )}
+            </div>
 
-            {!isReadOnly && (
-              <label
-                className="btn btn-xs btn-primary"
-                style={{
-                  display: 'inline-flex',
-                  alignItems: 'center',
-                  gap: 6,
-                  cursor: uploadingProof ? 'not-allowed' : 'pointer',
-                }}
-              >
-                <Upload size={12} className={uploadingProof ? 'animate-spin' : ''} />
-                {uploadingProof ? 'Uploading...' : bank.cancelledChequeUrl ? 'Replace Proof' : 'Upload Proof'}
-                <input
-                  type="file"
-                  accept=".pdf,application/pdf,.jpg,.jpeg,image/jpeg"
-                  style={{ display: 'none' }}
-                  onChange={(e) => {
-                    if (e.target.files?.[0]) {
-                      handleProofUpload(e.target.files[0]);
-                    }
+            <div style={{ display: 'flex', alignItems: 'center', gap: 10, alignSelf: 'flex-start' }}>
+              {bank.bankPassbookUrl && (
+                <a
+                  href={bank.bankPassbookUrl}
+                  target="_blank"
+                  rel="noreferrer"
+                  className="btn btn-xs btn-secondary"
+                  style={{ display: 'inline-flex', alignItems: 'center', gap: 4 }}
+                >
+                  <Eye size={12} /> View
+                </a>
+              )}
+
+              {!isReadOnly && (
+                <label
+                  className="btn btn-xs btn-primary"
+                  style={{
+                    display: 'inline-flex',
+                    alignItems: 'center',
+                    gap: 6,
+                    cursor: uploadingType === 'bank_passbook' ? 'not-allowed' : 'pointer',
                   }}
-                  disabled={uploadingProof}
-                />
-              </label>
-            )}
+                >
+                  <Upload size={12} className={uploadingType === 'bank_passbook' ? 'animate-spin' : ''} />
+                  {uploadingType === 'bank_passbook' ? 'Uploading...' : bank.bankPassbookUrl ? 'Replace Passbook' : 'Upload Passbook'}
+                  <input
+                    type="file"
+                    accept=".pdf,application/pdf,.jpg,.jpeg,image/jpeg"
+                    style={{ display: 'none' }}
+                    onChange={(e) => {
+                      if (e.target.files?.[0]) {
+                        handleProofUpload('bank_passbook', 'Bank Passbook', e.target.files[0]);
+                      }
+                    }}
+                    disabled={uploadingType === 'bank_passbook'}
+                  />
+                </label>
+              )}
+            </div>
           </div>
         </div>
       </div>

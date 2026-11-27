@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import {
   AlertCircle, CheckCircle2, UserCheck, Upload, Trash2, Eye, Shield,
-  Camera, FileText, Wrench, ShieldCheck, Cpu
+  Camera, FileText, Wrench, ShieldCheck, Cpu, Image as ImageIcon
 } from 'lucide-react';
 import { validateAndCompressPhoto, validateDocumentFile, formatBytes } from '@/utils/fileValidation';
 
@@ -11,7 +11,6 @@ export function Submodule2Personnel({
   isReadOnly = false,
   reviewStatus = 'NOT_STARTED',
   reworkReason = '',
-  mediaAssets = [],
   onUploadMedia,
   validationErrors = {},
 }) {
@@ -31,15 +30,15 @@ export function Submodule2Personnel({
     }));
   };
 
-  const handlePhotoSelect = async (roleKey, personType, file) => {
+  const handlePhotoSelect = async (roleKey, fieldKey, label, file) => {
     if (!file) return;
     setUploadError(null);
-    setUploadingRole(`${roleKey}-photo`);
+    setUploadingRole(`${roleKey}-${fieldKey}`);
 
     try {
       const result = await validateAndCompressPhoto(file);
       if (!result.success) {
-        setUploadError(`[${personType}] ${result.error}`);
+        setUploadError(`[${label}] ${result.error}`);
         return;
       }
 
@@ -47,7 +46,7 @@ export function Submodule2Personnel({
         await onUploadMedia({
           entityType: 'CONTACT',
           entityId: roleKey,
-          fieldKey: 'photo',
+          fieldKey,
           assetCategory: 'PHOTO',
           fileName: result.fileName,
           fileUrl: result.fileUrl,
@@ -68,7 +67,7 @@ export function Submodule2Personnel({
         },
       }));
     } catch (err) {
-      setUploadError(err.message || 'Failed to process photo.');
+      setUploadError(err.message || `Failed to process ${label}.`);
     } finally {
       setUploadingRole(null);
     }
@@ -193,61 +192,43 @@ export function Submodule2Personnel({
 
       {/* ── 1. OWNER DETAILS (FRD Sec. 7.1) ── */}
       <div className="card" style={{ padding: 24 }}>
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 16 }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 18 }}>
+          <UserCheck size={20} color="var(--color-primary, #2563eb)" />
           <div>
-            <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-              <UserCheck size={18} color="var(--color-primary, #2563eb)" />
-              <h3 style={{ margin: 0, fontSize: '1.05rem', fontWeight: 700, color: 'var(--text-primary, #1e293b)' }}>
-                1. Centre Owner Details (FRD Sec. 7)
-              </h3>
-              <span className="badge badge-primary" style={{ fontSize: '0.7rem' }}>Mandatory</span>
-            </div>
-            <p style={{ margin: '4px 0 0', fontSize: '0.8125rem', color: 'var(--text-secondary, #64748b)' }}>
+            <h3 style={{ margin: 0, fontSize: '1.05rem', fontWeight: 700, color: 'var(--text-primary, #1e293b)' }}>
+              1. Owner Details (FRD Sec. 7.1)
+            </h3>
+            <span style={{ fontSize: '0.8125rem', color: 'var(--text-secondary, #64748b)' }}>
               Primary institutional head / trustee legally accountable for the examination venue contract.
-            </p>
-          </div>
-
-          {/* Photo Upload */}
-          <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-            {owner.photoUrl ? (
-              <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                <img
-                  src={owner.photoUrl}
-                  alt="Owner Photo"
-                  style={{ width: 52, height: 52, borderRadius: 8, objectFit: 'cover', border: '1px solid var(--border-color)' }}
-                />
-                {!isReadOnly && (
-                  <label className="btn btn-xs btn-secondary" style={{ cursor: 'pointer' }}>
-                    <Camera size={12} style={{ marginRight: 4 }} /> Change
-                    <input
-                      type="file"
-                      accept=".jpg,.jpeg"
-                      style={{ display: 'none' }}
-                      onChange={(e) => handlePhotoSelect('owner', 'Owner', e.target.files?.[0])}
-                    />
-                  </label>
-                )}
-              </div>
-            ) : (
-              !isReadOnly && (
-                <label className="btn btn-xs btn-secondary" style={{ cursor: 'pointer', display: 'inline-flex', alignItems: 'center', gap: 6 }}>
-                  <Upload size={12} /> Upload Photo (JPG ≤ 2MB)
-                  <input
-                    type="file"
-                    accept=".jpg,.jpeg"
-                    style={{ display: 'none' }}
-                    onChange={(e) => handlePhotoSelect('owner', 'Owner', e.target.files?.[0])}
-                  />
-                </label>
-              )
-            )}
+            </span>
           </div>
         </div>
 
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(240px, 1fr))', gap: 16 }}>
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(260px, 1fr))', gap: 16 }}>
+          {/* 1. Owner Name - Mandatory */}
+          <div className="form-group">
+            <label className="form-label" htmlFor="owner-name">
+              Owner Name <span style={{ color: 'var(--color-danger, #dc2626)' }}>*</span>
+            </label>
+            <input
+              id="owner-name"
+              type="text"
+              className="form-control"
+              value={owner.fullName || owner.name || ''}
+              onChange={(e) => {
+                handleFieldChange('owner', 'fullName', e.target.value);
+                handleFieldChange('owner', 'name', e.target.value);
+              }}
+              placeholder="Full name as per Aadhaar"
+              disabled={isReadOnly}
+              required
+            />
+          </div>
+
+          {/* 2. Owner Designation - Mandatory */}
           <div className="form-group">
             <label className="form-label" htmlFor="owner-designation">
-              Owner Designation <span style={{ color: 'var(--color-danger)' }}>*</span>
+              Owner Designation <span style={{ color: 'var(--color-danger, #dc2626)' }}>*</span>
             </label>
             <input
               id="owner-designation"
@@ -261,25 +242,10 @@ export function Submodule2Personnel({
             />
           </div>
 
-          <div className="form-group">
-            <label className="form-label" htmlFor="owner-fullName">
-              Full Name <span style={{ color: 'var(--color-danger)' }}>*</span>
-            </label>
-            <input
-              id="owner-fullName"
-              type="text"
-              className="form-control"
-              value={owner.fullName || ''}
-              onChange={(e) => handleFieldChange('owner', 'fullName', e.target.value)}
-              placeholder="Full name as per Aadhaar"
-              disabled={isReadOnly}
-              required
-            />
-          </div>
-
+          {/* 3. Owner Contact Number - Mandatory */}
           <div className="form-group">
             <label className="form-label" htmlFor="owner-contactNumber">
-              Contact Number (10 Digits) <span style={{ color: 'var(--color-danger)' }}>*</span>
+              Owner Contact Number <span style={{ color: 'var(--color-danger, #dc2626)' }}>*</span>
             </label>
             <input
               id="owner-contactNumber"
@@ -288,31 +254,16 @@ export function Submodule2Personnel({
               className="form-control"
               value={owner.contactNumber || ''}
               onChange={(e) => handleFieldChange('owner', 'contactNumber', e.target.value.replace(/\D/g, ''))}
-              placeholder="10-digit primary mobile"
+              placeholder="10-digit primary mobile number"
               disabled={isReadOnly}
               required
             />
           </div>
 
-          <div className="form-group">
-            <label className="form-label" htmlFor="owner-alternateNumber">
-              Alternate Number
-            </label>
-            <input
-              id="owner-alternateNumber"
-              type="text"
-              maxLength={10}
-              className="form-control"
-              value={owner.alternateNumber || ''}
-              onChange={(e) => handleFieldChange('owner', 'alternateNumber', e.target.value.replace(/\D/g, ''))}
-              placeholder="10-digit alternate mobile"
-              disabled={isReadOnly}
-            />
-          </div>
-
+          {/* 4. Owner Email - Optional */}
           <div className="form-group">
             <label className="form-label" htmlFor="owner-email">
-              Email ID <span style={{ color: 'var(--color-danger)' }}>*</span>
+              Owner Email
             </label>
             <input
               id="owner-email"
@@ -322,13 +273,13 @@ export function Submodule2Personnel({
               onChange={(e) => handleFieldChange('owner', 'email', e.target.value)}
               placeholder="owner@institution.edu.in"
               disabled={isReadOnly}
-              required
             />
           </div>
 
+          {/* 5. Owner Aadhaar Number - Mandatory (UI Masked) */}
           <div className="form-group">
             <label className="form-label" htmlFor="owner-aadhaarNumber">
-              Aadhaar Number (Masked Display) <span style={{ color: 'var(--color-danger)' }}>*</span>
+              Owner Aadhaar Number <span style={{ color: 'var(--color-danger, #dc2626)' }}>*</span>
             </label>
             <div style={{ position: 'relative' }}>
               <input
@@ -346,163 +297,299 @@ export function Submodule2Personnel({
             </div>
           </div>
 
+          {/* 6. Owner Father's Name - Optional */}
           <div className="form-group">
-            <label className="form-label" htmlFor="owner-panNumber">
-              PAN Number <span style={{ color: 'var(--color-danger)' }}>*</span>
+            <label className="form-label" htmlFor="owner-fatherName">
+              Owner Father's Name
             </label>
             <input
-              id="owner-panNumber"
+              id="owner-fatherName"
               type="text"
-              maxLength={10}
               className="form-control"
-              style={{ textTransform: 'uppercase' }}
-              value={owner.panNumber || ''}
-              onChange={(e) => handleFieldChange('owner', 'panNumber', e.target.value.trim().toUpperCase())}
-              placeholder="10-character PAN"
+              value={owner.fatherName || ''}
+              onChange={(e) => handleFieldChange('owner', 'fatherName', e.target.value)}
+              placeholder="Father's full name"
               disabled={isReadOnly}
-              required
             />
           </div>
 
+          {/* 7. Owner Mother's Name - Optional */}
           <div className="form-group">
-            <label className="form-label" htmlFor="owner-policeVerification">
-              Police Verification Status
+            <label className="form-label" htmlFor="owner-motherName">
+              Owner Mother's Name
             </label>
             <input
-              id="owner-policeVerification"
+              id="owner-motherName"
               type="text"
               className="form-control"
-              value={owner.policeVerification || ''}
-              onChange={(e) => handleFieldChange('owner', 'policeVerification', e.target.value)}
-              placeholder="Clear / Verification Certificate No."
+              value={owner.motherName || ''}
+              onChange={(e) => handleFieldChange('owner', 'motherName', e.target.value)}
+              placeholder="Mother's full name"
               disabled={isReadOnly}
             />
           </div>
 
-          <div className="form-group" style={{ gridColumn: '1 / -1' }}>
-            <label className="form-label" htmlFor="owner-residentialAddress">
-              Residential Address
-            </label>
-            <input
-              id="owner-residentialAddress"
-              type="text"
-              className="form-control"
-              value={owner.residentialAddress || owner.currentAddress || ''}
-              onChange={(e) => {
-                handleFieldChange('owner', 'residentialAddress', e.target.value);
-                handleFieldChange('owner', 'currentAddress', e.target.value);
-              }}
-              placeholder="Current residential address"
-              disabled={isReadOnly}
-            />
-          </div>
-
+          {/* 8. Owner Permanent Address - Mandatory */}
           <div className="form-group" style={{ gridColumn: '1 / -1' }}>
             <label className="form-label" htmlFor="owner-permanentAddress">
-              Permanent Address
+              Owner Permanent Address <span style={{ color: 'var(--color-danger, #dc2626)' }}>*</span>
             </label>
-            <input
+            <textarea
               id="owner-permanentAddress"
-              type="text"
+              rows={2}
               className="form-control"
               value={owner.permanentAddress || ''}
               onChange={(e) => handleFieldChange('owner', 'permanentAddress', e.target.value)}
               placeholder="Permanent residential address as per Aadhaar"
               disabled={isReadOnly}
+              required
             />
+          </div>
+
+          {/* 9. Owner Current Address - Mandatory */}
+          <div className="form-group" style={{ gridColumn: '1 / -1' }}>
+            <label className="form-label" htmlFor="owner-currentAddress">
+              Owner Current Address <span style={{ color: 'var(--color-danger, #dc2626)' }}>*</span>
+            </label>
+            <textarea
+              id="owner-currentAddress"
+              rows={2}
+              className="form-control"
+              value={owner.currentAddress || owner.residentialAddress || ''}
+              onChange={(e) => {
+                handleFieldChange('owner', 'currentAddress', e.target.value);
+                handleFieldChange('owner', 'residentialAddress', e.target.value);
+              }}
+              placeholder="Current residential address"
+              disabled={isReadOnly}
+              required
+            />
+          </div>
+
+          {/* 10. Owner Passport Photograph - Mandatory */}
+          <div
+            className="form-group"
+            style={{
+              padding: 14,
+              borderRadius: 'var(--radius-md, 8px)',
+              background: 'var(--bg-subtle, #f8fafc)',
+              border: '1px solid var(--border-color, #e2e8f0)',
+              display: 'flex',
+              flexDirection: 'column',
+              justifyContent: 'space-between',
+              gap: 10,
+            }}
+          >
+            <div>
+              <label className="form-label" style={{ marginBottom: 4, fontWeight: 700 }}>
+                Owner Passport Photograph <span style={{ color: 'var(--color-danger, #dc2626)' }}>*</span>
+              </label>
+              <span style={{ fontSize: '0.75rem', color: 'var(--text-secondary, #64748b)' }}>
+                Recent color passport photograph (JPG/JPEG format only, ≤ 2MB).
+              </span>
+            </div>
+
+            <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+              {owner.photoUrl ? (
+                <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                  <img
+                    src={owner.photoUrl}
+                    alt="Owner Passport Photo"
+                    style={{ width: 56, height: 56, borderRadius: 8, objectFit: 'cover', border: '1px solid var(--border-color)' }}
+                  />
+                  {!isReadOnly && (
+                    <label className="btn btn-xs btn-secondary" style={{ cursor: 'pointer' }}>
+                      <Camera size={12} style={{ marginRight: 4 }} /> Change Photo
+                      <input
+                        type="file"
+                        accept=".jpg,.jpeg,image/jpeg"
+                        style={{ display: 'none' }}
+                        onChange={(e) => handlePhotoSelect('owner', 'photo', 'Owner Passport Photograph', e.target.files?.[0])}
+                      />
+                    </label>
+                  )}
+                </div>
+              ) : (
+                !isReadOnly && (
+                  <label className="btn btn-xs btn-primary" style={{ cursor: 'pointer', display: 'inline-flex', alignItems: 'center', gap: 6 }}>
+                    <Upload size={12} className={uploadingRole === 'owner-photo' ? 'animate-spin' : ''} />
+                    {uploadingRole === 'owner-photo' ? 'Uploading...' : 'Capture / Upload Photo'}
+                    <input
+                      type="file"
+                      accept=".jpg,.jpeg,image/jpeg"
+                      style={{ display: 'none' }}
+                      onChange={(e) => handlePhotoSelect('owner', 'photo', 'Owner Passport Photograph', e.target.files?.[0])}
+                      disabled={uploadingRole === 'owner-photo'}
+                    />
+                  </label>
+                )
+              )}
+            </div>
+          </div>
+
+          {/* 11. Owner ID Proof - Mandatory */}
+          <div
+            className="form-group"
+            style={{
+              padding: 14,
+              borderRadius: 'var(--radius-md, 8px)',
+              background: 'var(--bg-subtle, #f8fafc)',
+              border: '1px solid var(--border-color, #e2e8f0)',
+              display: 'flex',
+              flexDirection: 'column',
+              justifyContent: 'space-between',
+              gap: 10,
+            }}
+          >
+            <div>
+              <label className="form-label" style={{ marginBottom: 4, fontWeight: 700 }}>
+                Owner ID Proof (Aadhar Card/Voter ID Card/Passport/Ration Card) <span style={{ color: 'var(--color-danger, #dc2626)' }}>*</span>
+              </label>
+              <span style={{ fontSize: '0.75rem', color: 'var(--text-secondary, #64748b)' }}>
+                Government issued photo ID proof (PDF format only, ≤ 10MB).
+              </span>
+            </div>
+
+            <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+              {owner.idProofUrl ? (
+                <div style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: '0.8125rem', color: 'var(--color-primary)' }}>
+                  <FileText size={16} />
+                  <span>ID Proof Uploaded</span>
+                  <a href={owner.idProofUrl} target="_blank" rel="noreferrer" className="btn btn-xs btn-secondary" style={{ display: 'inline-flex', alignItems: 'center', gap: 4 }}>
+                    <Eye size={12} /> View
+                  </a>
+                  {!isReadOnly && (
+                    <label className="btn btn-xs btn-secondary" style={{ cursor: 'pointer' }}>
+                      Replace
+                      <input
+                        type="file"
+                        accept=".pdf,application/pdf"
+                        style={{ display: 'none' }}
+                        onChange={(e) => handleDocUpload('owner', 'idProof', 'Owner ID Proof', e.target.files?.[0])}
+                      />
+                    </label>
+                  )}
+                </div>
+              ) : (
+                !isReadOnly && (
+                  <label className="btn btn-xs btn-primary" style={{ cursor: 'pointer', display: 'inline-flex', alignItems: 'center', gap: 6 }}>
+                    <Upload size={12} className={uploadingRole === 'owner-idProof' ? 'animate-spin' : ''} />
+                    {uploadingRole === 'owner-idProof' ? 'Uploading...' : 'Upload ID Proof (PDF)'}
+                    <input
+                      type="file"
+                      accept=".pdf,application/pdf"
+                      style={{ display: 'none' }}
+                      onChange={(e) => handleDocUpload('owner', 'idProof', 'Owner ID Proof', e.target.files?.[0])}
+                      disabled={uploadingRole === 'owner-idProof'}
+                    />
+                  </label>
+                )
+              )}
+            </div>
+          </div>
+
+          {/* 12. Owner Police Verification - Mandatory */}
+          <div
+            className="form-group"
+            style={{
+              padding: 14,
+              borderRadius: 'var(--radius-md, 8px)',
+              background: 'var(--bg-subtle, #f8fafc)',
+              border: '1px solid var(--border-color, #e2e8f0)',
+              display: 'flex',
+              flexDirection: 'column',
+              justifyContent: 'space-between',
+              gap: 10,
+            }}
+          >
+            <div>
+              <label className="form-label" style={{ marginBottom: 4, fontWeight: 700 }}>
+                Owner Police Verification <span style={{ color: 'var(--color-danger, #dc2626)' }}>*</span>
+              </label>
+              <span style={{ fontSize: '0.75rem', color: 'var(--text-secondary, #64748b)' }}>
+                Police verification certificate / character clearance (PDF format only, ≤ 10MB).
+              </span>
+            </div>
+
+            <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+              {owner.policeVerificationUrl ? (
+                <div style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: '0.8125rem', color: 'var(--color-primary)' }}>
+                  <FileText size={16} />
+                  <span>Police Verification Uploaded</span>
+                  <a href={owner.policeVerificationUrl} target="_blank" rel="noreferrer" className="btn btn-xs btn-secondary" style={{ display: 'inline-flex', alignItems: 'center', gap: 4 }}>
+                    <Eye size={12} /> View
+                  </a>
+                  {!isReadOnly && (
+                    <label className="btn btn-xs btn-secondary" style={{ cursor: 'pointer' }}>
+                      Replace
+                      <input
+                        type="file"
+                        accept=".pdf,application/pdf"
+                        style={{ display: 'none' }}
+                        onChange={(e) => handleDocUpload('owner', 'policeVerification', 'Owner Police Verification', e.target.files?.[0])}
+                      />
+                    </label>
+                  )}
+                </div>
+              ) : (
+                !isReadOnly && (
+                  <label className="btn btn-xs btn-primary" style={{ cursor: 'pointer', display: 'inline-flex', alignItems: 'center', gap: 6 }}>
+                    <Upload size={12} className={uploadingRole === 'owner-policeVerification' ? 'animate-spin' : ''} />
+                    {uploadingRole === 'owner-policeVerification' ? 'Uploading...' : 'Upload Police Verification (PDF)'}
+                    <input
+                      type="file"
+                      accept=".pdf,application/pdf"
+                      style={{ display: 'none' }}
+                      onChange={(e) => handleDocUpload('owner', 'policeVerification', 'Owner Police Verification', e.target.files?.[0])}
+                      disabled={uploadingRole === 'owner-policeVerification'}
+                    />
+                  </label>
+                )
+              )}
+            </div>
           </div>
         </div>
       </div>
 
-      {/* ── 2. CENTRE SUPERINTENDENT / TCA DETAILS (FRD Sec. 7.2) ── */}
+      {/* ── 2. CENTRE SUPERINTENDENT DETAILS (FRD Sec. 7.2) ── */}
       <div className="card" style={{ padding: 24 }}>
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 16 }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 18 }}>
+          <ShieldCheck size={20} color="var(--color-primary, #2563eb)" />
           <div>
-            <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-              <ShieldCheck size={18} color="var(--color-primary, #2563eb)" />
-              <h3 style={{ margin: 0, fontSize: '1.05rem', fontWeight: 700, color: 'var(--text-primary, #1e293b)' }}>
-                2. Centre Superintendent (CS / TCA) Details (FRD Sec. 7)
-              </h3>
-              <span className="badge badge-primary" style={{ fontSize: '0.7rem' }}>Mandatory</span>
-            </div>
-            <p style={{ margin: '4px 0 0', fontSize: '0.8125rem', color: 'var(--text-secondary, #64748b)' }}>
-              Operational chief physically present at the centre to supervise exam conduct, confidentiality, and session adherence.
-            </p>
-          </div>
-
-          {/* Photo Upload */}
-          <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-            {cs.photoUrl ? (
-              <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                <img
-                  src={cs.photoUrl}
-                  alt="CS Photo"
-                  style={{ width: 52, height: 52, borderRadius: 8, objectFit: 'cover', border: '1px solid var(--border-color)' }}
-                />
-                {!isReadOnly && (
-                  <label className="btn btn-xs btn-secondary" style={{ cursor: 'pointer' }}>
-                    <Camera size={12} style={{ marginRight: 4 }} /> Change
-                    <input
-                      type="file"
-                      accept=".jpg,.jpeg"
-                      style={{ display: 'none' }}
-                      onChange={(e) => handlePhotoSelect('cs', 'Centre CS', e.target.files?.[0])}
-                    />
-                  </label>
-                )}
-              </div>
-            ) : (
-              !isReadOnly && (
-                <label className="btn btn-xs btn-secondary" style={{ cursor: 'pointer', display: 'inline-flex', alignItems: 'center', gap: 6 }}>
-                  <Upload size={12} /> Upload Photo (JPG ≤ 2MB)
-                  <input
-                    type="file"
-                    accept=".jpg,.jpeg"
-                    style={{ display: 'none' }}
-                    onChange={(e) => handlePhotoSelect('cs', 'Centre CS', e.target.files?.[0])}
-                  />
-                </label>
-              )
-            )}
+            <h3 style={{ margin: 0, fontSize: '1.05rem', fontWeight: 700, color: 'var(--text-primary, #1e293b)' }}>
+              2. Centre Superintendent Details (FRD Sec. 7.2)
+            </h3>
+            <span style={{ fontSize: '0.8125rem', color: 'var(--text-secondary, #64748b)' }}>
+              Test Centre Administrator (TCA) physically present to supervise examination session integrity.
+            </span>
           </div>
         </div>
 
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(240px, 1fr))', gap: 16 }}>
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(260px, 1fr))', gap: 16 }}>
+          {/* 1. TCA Name - Mandatory */}
           <div className="form-group">
-            <label className="form-label" htmlFor="cs-designation">
-              Designation <span style={{ color: 'var(--color-danger)' }}>*</span>
+            <label className="form-label" htmlFor="cs-name">
+              TCA Name <span style={{ color: 'var(--color-danger, #dc2626)' }}>*</span>
             </label>
             <input
-              id="cs-designation"
+              id="cs-name"
               type="text"
               className="form-control"
-              value={cs.designation || ''}
-              onChange={(e) => handleFieldChange('cs', 'designation', e.target.value)}
-              placeholder="e.g. Chief Superintendent / Vice Principal"
+              value={cs.fullName || cs.name || ''}
+              onChange={(e) => {
+                handleFieldChange('cs', 'fullName', e.target.value);
+                handleFieldChange('cs', 'name', e.target.value);
+              }}
+              placeholder="Full legal name of Test Centre Administrator"
               disabled={isReadOnly}
               required
             />
           </div>
 
-          <div className="form-group">
-            <label className="form-label" htmlFor="cs-fullName">
-              Full Name <span style={{ color: 'var(--color-danger)' }}>*</span>
-            </label>
-            <input
-              id="cs-fullName"
-              type="text"
-              className="form-control"
-              value={cs.fullName || ''}
-              onChange={(e) => handleFieldChange('cs', 'fullName', e.target.value)}
-              placeholder="Full legal name"
-              disabled={isReadOnly}
-              required
-            />
-          </div>
-
+          {/* 2. TCA Contact Number - Mandatory */}
           <div className="form-group">
             <label className="form-label" htmlFor="cs-contactNumber">
-              Contact Number (10 Digits) <span style={{ color: 'var(--color-danger)' }}>*</span>
+              TCA Contact Number <span style={{ color: 'var(--color-danger, #dc2626)' }}>*</span>
             </label>
             <input
               id="cs-contactNumber"
@@ -511,15 +598,16 @@ export function Submodule2Personnel({
               className="form-control"
               value={cs.contactNumber || ''}
               onChange={(e) => handleFieldChange('cs', 'contactNumber', e.target.value.replace(/\D/g, ''))}
-              placeholder="10-digit mobile"
+              placeholder="10-digit primary mobile number"
               disabled={isReadOnly}
               required
             />
           </div>
 
+          {/* 3. TCA Email - Optional */}
           <div className="form-group">
             <label className="form-label" htmlFor="cs-email">
-              Email ID <span style={{ color: 'var(--color-danger)' }}>*</span>
+              TCA Email
             </label>
             <input
               id="cs-email"
@@ -527,31 +615,15 @@ export function Submodule2Personnel({
               className="form-control"
               value={cs.email || ''}
               onChange={(e) => handleFieldChange('cs', 'email', e.target.value)}
-              placeholder="cs@institution.edu.in"
-              disabled={isReadOnly}
-              required
-            />
-          </div>
-
-          <div className="form-group">
-            <label className="form-label" htmlFor="cs-alternateNumber">
-              Alternate Number
-            </label>
-            <input
-              id="cs-alternateNumber"
-              type="text"
-              maxLength={10}
-              className="form-control"
-              value={cs.alternateNumber || ''}
-              onChange={(e) => handleFieldChange('cs', 'alternateNumber', e.target.value.replace(/\D/g, ''))}
-              placeholder="Alternate mobile"
+              placeholder="tca@institution.edu.in"
               disabled={isReadOnly}
             />
           </div>
 
+          {/* 4. TCA Aadhaar Number - Mandatory (UI Masked) */}
           <div className="form-group">
             <label className="form-label" htmlFor="cs-aadhaarNumber">
-              Aadhaar Number (Masked Display) <span style={{ color: 'var(--color-danger)' }}>*</span>
+              TCA Aadhaar Number <span style={{ color: 'var(--color-danger, #dc2626)' }}>*</span>
             </label>
             <div style={{ position: 'relative' }}>
               <input
@@ -569,84 +641,312 @@ export function Submodule2Personnel({
             </div>
           </div>
 
+          {/* 5. TCA Father's Name - Optional */}
           <div className="form-group">
-            <label className="form-label" htmlFor="cs-panNumber">
-              PAN Number
+            <label className="form-label" htmlFor="cs-fatherName">
+              TCA Father's Name
             </label>
             <input
-              id="cs-panNumber"
+              id="cs-fatherName"
               type="text"
-              maxLength={10}
               className="form-control"
-              style={{ textTransform: 'uppercase' }}
-              value={cs.panNumber || ''}
-              onChange={(e) => handleFieldChange('cs', 'panNumber', e.target.value.trim().toUpperCase())}
-              placeholder="10-character PAN"
+              value={cs.fatherName || ''}
+              onChange={(e) => handleFieldChange('cs', 'fatherName', e.target.value)}
+              placeholder="Father's full name"
               disabled={isReadOnly}
             />
           </div>
 
+          {/* 6. TCA Mother's Name - Optional */}
           <div className="form-group">
-            <label className="form-label" htmlFor="cs-policeVerification">
-              Police Verification Status
+            <label className="form-label" htmlFor="cs-motherName">
+              TCA Mother's Name
             </label>
             <input
-              id="cs-policeVerification"
+              id="cs-motherName"
               type="text"
               className="form-control"
-              value={cs.policeVerification || ''}
-              onChange={(e) => handleFieldChange('cs', 'policeVerification', e.target.value)}
-              placeholder="Status / Reference ID"
+              value={cs.motherName || ''}
+              onChange={(e) => handleFieldChange('cs', 'motherName', e.target.value)}
+              placeholder="Mother's full name"
               disabled={isReadOnly}
             />
           </div>
 
+          {/* 7. TCA Permanent Address - Mandatory */}
           <div className="form-group" style={{ gridColumn: '1 / -1' }}>
-            <label className="form-label" htmlFor="cs-address">
-              Address
+            <label className="form-label" htmlFor="cs-permanentAddress">
+              TCA Permanent Address <span style={{ color: 'var(--color-danger, #dc2626)' }}>*</span>
             </label>
-            <input
-              id="cs-address"
-              type="text"
+            <textarea
+              id="cs-permanentAddress"
+              rows={2}
               className="form-control"
-              value={cs.address || cs.permanentAddress || ''}
-              onChange={(e) => handleFieldChange('cs', 'address', e.target.value)}
-              placeholder="Residential address"
+              value={cs.permanentAddress || ''}
+              onChange={(e) => handleFieldChange('cs', 'permanentAddress', e.target.value)}
+              placeholder="Permanent address as per Aadhaar"
               disabled={isReadOnly}
+              required
             />
           </div>
 
-          {/* TCA Authorization Letter Upload */}
+          {/* 8. TCA Current Address - Mandatory */}
           <div className="form-group" style={{ gridColumn: '1 / -1' }}>
-            <label className="form-label">
-              TCA Authorization Letter (PDF) <span style={{ color: 'var(--color-danger)' }}>*</span>
+            <label className="form-label" htmlFor="cs-currentAddress">
+              TCA Current Address <span style={{ color: 'var(--color-danger, #dc2626)' }}>*</span>
             </label>
-            <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
-              {cs.tcaLetterUrl || cs.tcaAuthorizationLetterUrl ? (
+            <textarea
+              id="cs-currentAddress"
+              rows={2}
+              className="form-control"
+              value={cs.currentAddress || cs.address || ''}
+              onChange={(e) => {
+                handleFieldChange('cs', 'currentAddress', e.target.value);
+                handleFieldChange('cs', 'address', e.target.value);
+              }}
+              placeholder="Current residential address"
+              disabled={isReadOnly}
+              required
+            />
+          </div>
+
+          {/* 9. TCA ID Proof - Mandatory */}
+          <div
+            className="form-group"
+            style={{
+              padding: 14,
+              borderRadius: 'var(--radius-md, 8px)',
+              background: 'var(--bg-subtle, #f8fafc)',
+              border: '1px solid var(--border-color, #e2e8f0)',
+              display: 'flex',
+              flexDirection: 'column',
+              justifyContent: 'space-between',
+              gap: 10,
+            }}
+          >
+            <div>
+              <label className="form-label" style={{ marginBottom: 4, fontWeight: 700 }}>
+                TCA ID Proof (Aadhar Card/Voter ID Card/Passport/Ration Card) <span style={{ color: 'var(--color-danger, #dc2626)' }}>*</span>
+              </label>
+              <span style={{ fontSize: '0.75rem', color: 'var(--text-secondary, #64748b)' }}>
+                Government issued photo ID proof (PDF format only, ≤ 10MB).
+              </span>
+            </div>
+
+            <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+              {cs.idProofUrl ? (
                 <div style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: '0.8125rem', color: 'var(--color-primary)' }}>
                   <FileText size={16} />
-                  <span>Authorized Letter Uploaded</span>
+                  <span>ID Proof Uploaded</span>
+                  <a href={cs.idProofUrl} target="_blank" rel="noreferrer" className="btn btn-xs btn-secondary" style={{ display: 'inline-flex', alignItems: 'center', gap: 4 }}>
+                    <Eye size={12} /> View
+                  </a>
                   {!isReadOnly && (
                     <label className="btn btn-xs btn-secondary" style={{ cursor: 'pointer' }}>
-                      Replace PDF
+                      Replace
                       <input
                         type="file"
                         accept=".pdf,application/pdf"
                         style={{ display: 'none' }}
-                        onChange={(e) => handleDocUpload('cs', 'tcaLetter', 'TCA Letter', e.target.files?.[0])}
+                        onChange={(e) => handleDocUpload('cs', 'idProof', 'TCA ID Proof', e.target.files?.[0])}
                       />
                     </label>
                   )}
                 </div>
               ) : (
                 !isReadOnly && (
-                  <label className="btn btn-xs btn-secondary" style={{ cursor: 'pointer', display: 'inline-flex', alignItems: 'center', gap: 6 }}>
-                    <Upload size={12} /> Upload TCA Authorization Letter (PDF ≤ 10MB)
+                  <label className="btn btn-xs btn-primary" style={{ cursor: 'pointer', display: 'inline-flex', alignItems: 'center', gap: 6 }}>
+                    <Upload size={12} className={uploadingRole === 'cs-idProof' ? 'animate-spin' : ''} />
+                    {uploadingRole === 'cs-idProof' ? 'Uploading...' : 'Upload ID Proof (PDF)'}
                     <input
                       type="file"
                       accept=".pdf,application/pdf"
                       style={{ display: 'none' }}
-                      onChange={(e) => handleDocUpload('cs', 'tcaLetter', 'TCA Letter', e.target.files?.[0])}
+                      onChange={(e) => handleDocUpload('cs', 'idProof', 'TCA ID Proof', e.target.files?.[0])}
+                      disabled={uploadingRole === 'cs-idProof'}
+                    />
+                  </label>
+                )
+              )}
+            </div>
+          </div>
+
+          {/* 10. TCA Passport Photograph - Mandatory */}
+          <div
+            className="form-group"
+            style={{
+              padding: 14,
+              borderRadius: 'var(--radius-md, 8px)',
+              background: 'var(--bg-subtle, #f8fafc)',
+              border: '1px solid var(--border-color, #e2e8f0)',
+              display: 'flex',
+              flexDirection: 'column',
+              justifyContent: 'space-between',
+              gap: 10,
+            }}
+          >
+            <div>
+              <label className="form-label" style={{ marginBottom: 4, fontWeight: 700 }}>
+                TCA Passport Photograph <span style={{ color: 'var(--color-danger, #dc2626)' }}>*</span>
+              </label>
+              <span style={{ fontSize: '0.75rem', color: 'var(--text-secondary, #64748b)' }}>
+                Recent color passport photograph (JPG/JPEG format only, ≤ 2MB).
+              </span>
+            </div>
+
+            <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+              {cs.photoUrl ? (
+                <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                  <img
+                    src={cs.photoUrl}
+                    alt="TCA Passport Photo"
+                    style={{ width: 56, height: 56, borderRadius: 8, objectFit: 'cover', border: '1px solid var(--border-color)' }}
+                  />
+                  {!isReadOnly && (
+                    <label className="btn btn-xs btn-secondary" style={{ cursor: 'pointer' }}>
+                      <Camera size={12} style={{ marginRight: 4 }} /> Change Photo
+                      <input
+                        type="file"
+                        accept=".jpg,.jpeg,image/jpeg"
+                        style={{ display: 'none' }}
+                        onChange={(e) => handlePhotoSelect('cs', 'photo', 'TCA Passport Photograph', e.target.files?.[0])}
+                      />
+                    </label>
+                  )}
+                </div>
+              ) : (
+                !isReadOnly && (
+                  <label className="btn btn-xs btn-primary" style={{ cursor: 'pointer', display: 'inline-flex', alignItems: 'center', gap: 6 }}>
+                    <Upload size={12} className={uploadingRole === 'cs-photo' ? 'animate-spin' : ''} />
+                    {uploadingRole === 'cs-photo' ? 'Uploading...' : 'Capture / Upload Photo'}
+                    <input
+                      type="file"
+                      accept=".jpg,.jpeg,image/jpeg"
+                      style={{ display: 'none' }}
+                      onChange={(e) => handlePhotoSelect('cs', 'photo', 'TCA Passport Photograph', e.target.files?.[0])}
+                      disabled={uploadingRole === 'cs-photo'}
+                    />
+                  </label>
+                )
+              )}
+            </div>
+          </div>
+
+          {/* 11. TCA Police Verification - Mandatory */}
+          <div
+            className="form-group"
+            style={{
+              padding: 14,
+              borderRadius: 'var(--radius-md, 8px)',
+              background: 'var(--bg-subtle, #f8fafc)',
+              border: '1px solid var(--border-color, #e2e8f0)',
+              display: 'flex',
+              flexDirection: 'column',
+              justifyContent: 'space-between',
+              gap: 10,
+            }}
+          >
+            <div>
+              <label className="form-label" style={{ marginBottom: 4, fontWeight: 700 }}>
+                TCA Police Verification <span style={{ color: 'var(--color-danger, #dc2626)' }}>*</span>
+              </label>
+              <span style={{ fontSize: '0.75rem', color: 'var(--text-secondary, #64748b)' }}>
+                Police verification certificate / clearance (PDF format only, ≤ 10MB).
+              </span>
+            </div>
+
+            <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+              {cs.policeVerificationUrl ? (
+                <div style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: '0.8125rem', color: 'var(--color-primary)' }}>
+                  <FileText size={16} />
+                  <span>Police Verification Uploaded</span>
+                  <a href={cs.policeVerificationUrl} target="_blank" rel="noreferrer" className="btn btn-xs btn-secondary" style={{ display: 'inline-flex', alignItems: 'center', gap: 4 }}>
+                    <Eye size={12} /> View
+                  </a>
+                  {!isReadOnly && (
+                    <label className="btn btn-xs btn-secondary" style={{ cursor: 'pointer' }}>
+                      Replace
+                      <input
+                        type="file"
+                        accept=".pdf,application/pdf"
+                        style={{ display: 'none' }}
+                        onChange={(e) => handleDocUpload('cs', 'policeVerification', 'TCA Police Verification', e.target.files?.[0])}
+                      />
+                    </label>
+                  )}
+                </div>
+              ) : (
+                !isReadOnly && (
+                  <label className="btn btn-xs btn-primary" style={{ cursor: 'pointer', display: 'inline-flex', alignItems: 'center', gap: 6 }}>
+                    <Upload size={12} className={uploadingRole === 'cs-policeVerification' ? 'animate-spin' : ''} />
+                    {uploadingRole === 'cs-policeVerification' ? 'Uploading...' : 'Upload Police Verification (PDF)'}
+                    <input
+                      type="file"
+                      accept=".pdf,application/pdf"
+                      style={{ display: 'none' }}
+                      onChange={(e) => handleDocUpload('cs', 'policeVerification', 'TCA Police Verification', e.target.files?.[0])}
+                      disabled={uploadingRole === 'cs-policeVerification'}
+                    />
+                  </label>
+                )
+              )}
+            </div>
+          </div>
+
+          {/* 12. TCA Authorization Letter - Mandatory */}
+          <div
+            className="form-group"
+            style={{
+              padding: 14,
+              borderRadius: 'var(--radius-md, 8px)',
+              background: 'var(--bg-subtle, #f8fafc)',
+              border: '1px solid var(--border-color, #e2e8f0)',
+              display: 'flex',
+              flexDirection: 'column',
+              justifyContent: 'space-between',
+              gap: 10,
+            }}
+          >
+            <div>
+              <label className="form-label" style={{ marginBottom: 4, fontWeight: 700 }}>
+                TCA Authorization Letter <span style={{ color: 'var(--color-danger, #dc2626)' }}>*</span>
+              </label>
+              <span style={{ fontSize: '0.75rem', color: 'var(--text-secondary, #64748b)' }}>
+                Official authorization letter on letterhead assigning TCA duties (PDF ≤ 10MB).
+              </span>
+            </div>
+
+            <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+              {cs.tcaLetterUrl || cs.tcaAuthorizationLetterUrl ? (
+                <div style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: '0.8125rem', color: 'var(--color-primary)' }}>
+                  <FileText size={16} />
+                  <span>Authorized Letter Uploaded</span>
+                  <a href={cs.tcaLetterUrl || cs.tcaAuthorizationLetterUrl} target="_blank" rel="noreferrer" className="btn btn-xs btn-secondary" style={{ display: 'inline-flex', alignItems: 'center', gap: 4 }}>
+                    <Eye size={12} /> View
+                  </a>
+                  {!isReadOnly && (
+                    <label className="btn btn-xs btn-secondary" style={{ cursor: 'pointer' }}>
+                      Replace
+                      <input
+                        type="file"
+                        accept=".pdf,application/pdf"
+                        style={{ display: 'none' }}
+                        onChange={(e) => handleDocUpload('cs', 'tcaLetter', 'TCA Authorization Letter', e.target.files?.[0])}
+                      />
+                    </label>
+                  )}
+                </div>
+              ) : (
+                !isReadOnly && (
+                  <label className="btn btn-xs btn-primary" style={{ cursor: 'pointer', display: 'inline-flex', alignItems: 'center', gap: 6 }}>
+                    <Upload size={12} className={uploadingRole === 'cs-tcaLetter' ? 'animate-spin' : ''} />
+                    {uploadingRole === 'cs-tcaLetter' ? 'Uploading...' : 'Upload Authorization Letter (PDF)'}
+                    <input
+                      type="file"
+                      accept=".pdf,application/pdf"
+                      style={{ display: 'none' }}
+                      onChange={(e) => handleDocUpload('cs', 'tcaLetter', 'TCA Authorization Letter', e.target.files?.[0])}
+                      disabled={uploadingRole === 'cs-tcaLetter'}
                     />
                   </label>
                 )
@@ -656,79 +956,45 @@ export function Submodule2Personnel({
         </div>
       </div>
 
-      {/* ── 3. CENTRE IT PERSON (FRD Sec. 7.3) ── */}
+      {/* ── 3. CENTRE IT PERSON DETAILS (FRD Sec. 7.3) ── */}
       <div className="card" style={{ padding: 24 }}>
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 16 }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 18 }}>
+          <Cpu size={20} color="var(--color-primary, #2563eb)" />
           <div>
-            <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-              <Cpu size={18} color="var(--color-primary, #2563eb)" />
-              <h3 style={{ margin: 0, fontSize: '1.05rem', fontWeight: 700, color: 'var(--text-primary, #1e293b)' }}>
-                3. Centre IT Person Details (FRD Sec. 7)
-              </h3>
-              <span className="badge badge-primary" style={{ fontSize: '0.7rem' }}>Mandatory</span>
-            </div>
-            <p style={{ margin: '4px 0 0', fontSize: '0.8125rem', color: 'var(--text-secondary, #64748b)' }}>
+            <h3 style={{ margin: 0, fontSize: '1.05rem', fontWeight: 700, color: 'var(--text-primary, #1e293b)' }}>
+              3. Centre IT Person Details (FRD Sec. 7.3)
+            </h3>
+            <span style={{ fontSize: '0.8125rem', color: 'var(--text-secondary, #64748b)' }}>
               Technical lead accountable for lab networking, LAN switches, IP addressing, and client server operations.
-            </p>
-          </div>
-
-          {/* Photo Upload */}
-          <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-            {it.photoUrl ? (
-              <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                <img
-                  src={it.photoUrl}
-                  alt="IT Person Photo"
-                  style={{ width: 52, height: 52, borderRadius: 8, objectFit: 'cover', border: '1px solid var(--border-color)' }}
-                />
-                {!isReadOnly && (
-                  <label className="btn btn-xs btn-secondary" style={{ cursor: 'pointer' }}>
-                    <Camera size={12} style={{ marginRight: 4 }} /> Change
-                    <input
-                      type="file"
-                      accept=".jpg,.jpeg"
-                      style={{ display: 'none' }}
-                      onChange={(e) => handlePhotoSelect('it', 'IT Person', e.target.files?.[0])}
-                    />
-                  </label>
-                )}
-              </div>
-            ) : (
-              !isReadOnly && (
-                <label className="btn btn-xs btn-secondary" style={{ cursor: 'pointer', display: 'inline-flex', alignItems: 'center', gap: 6 }}>
-                  <Upload size={12} /> Upload Photo (JPG ≤ 2MB)
-                  <input
-                    type="file"
-                    accept=".jpg,.jpeg"
-                    style={{ display: 'none' }}
-                    onChange={(e) => handlePhotoSelect('it', 'IT Person', e.target.files?.[0])}
-                  />
-                </label>
-              )
-            )}
+            </span>
           </div>
         </div>
 
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(240px, 1fr))', gap: 16 }}>
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(260px, 1fr))', gap: 16 }}>
+          {/* 1. Centre IT Person Name - Mandatory */}
           <div className="form-group">
-            <label className="form-label" htmlFor="it-fullName">
-              Full Name <span style={{ color: 'var(--color-danger)' }}>*</span>
+            <label className="form-label" htmlFor="it-name">
+              Centre IT Person Name <span style={{ color: 'var(--color-danger, #dc2626)' }}>*</span>
             </label>
             <input
-              id="it-fullName"
+              id="it-name"
               type="text"
               className="form-control"
-              value={it.fullName || ''}
-              onChange={(e) => handleFieldChange('it', 'fullName', e.target.value)}
+              value={it.fullName || it.name || ''}
+              onChange={(e) => {
+                handleFieldChange('it', 'fullName', e.target.value);
+                handleFieldChange('it', 'name', e.target.value);
+              }}
               placeholder="IT Administrator full legal name"
               disabled={isReadOnly}
               required
             />
           </div>
 
+          {/* 2. Centre IT Person Contact Number - Mandatory */}
           <div className="form-group">
             <label className="form-label" htmlFor="it-contactNumber">
-              Contact Number (10 Digits) <span style={{ color: 'var(--color-danger)' }}>*</span>
+              Centre IT Person Contact Number <span style={{ color: 'var(--color-danger, #dc2626)' }}>*</span>
             </label>
             <input
               id="it-contactNumber"
@@ -737,15 +1003,16 @@ export function Submodule2Personnel({
               className="form-control"
               value={it.contactNumber || ''}
               onChange={(e) => handleFieldChange('it', 'contactNumber', e.target.value.replace(/\D/g, ''))}
-              placeholder="10-digit mobile"
+              placeholder="10-digit primary mobile number"
               disabled={isReadOnly}
               required
             />
           </div>
 
+          {/* 3. Centre IT Person Email - Optional */}
           <div className="form-group">
             <label className="form-label" htmlFor="it-email">
-              Email ID <span style={{ color: 'var(--color-danger)' }}>*</span>
+              Centre IT Person Email
             </label>
             <input
               id="it-email"
@@ -755,29 +1022,13 @@ export function Submodule2Personnel({
               onChange={(e) => handleFieldChange('it', 'email', e.target.value)}
               placeholder="it.lead@institution.edu.in"
               disabled={isReadOnly}
-              required
             />
           </div>
 
-          <div className="form-group">
-            <label className="form-label" htmlFor="it-alternateNumber">
-              Alternate Number
-            </label>
-            <input
-              id="it-alternateNumber"
-              type="text"
-              maxLength={10}
-              className="form-control"
-              value={it.alternateNumber || ''}
-              onChange={(e) => handleFieldChange('it', 'alternateNumber', e.target.value.replace(/\D/g, ''))}
-              placeholder="Alternate mobile"
-              disabled={isReadOnly}
-            />
-          </div>
-
+          {/* 4. Centre IT Person Aadhaar Number - Mandatory (UI Masked) */}
           <div className="form-group">
             <label className="form-label" htmlFor="it-aadhaarNumber">
-              Aadhaar Number (Masked Display) <span style={{ color: 'var(--color-danger)' }}>*</span>
+              Centre IT Person Aadhaar Number <span style={{ color: 'var(--color-danger, #dc2626)' }}>*</span>
             </label>
             <div style={{ position: 'relative' }}>
               <input
@@ -795,108 +1046,300 @@ export function Submodule2Personnel({
             </div>
           </div>
 
+          {/* 5. Centre IT Person Father's Name - Optional */}
           <div className="form-group">
-            <label className="form-label" htmlFor="it-panNumber">
-              PAN Number
+            <label className="form-label" htmlFor="it-fatherName">
+              Centre IT Person Father's Name
             </label>
             <input
-              id="it-panNumber"
-              type="text"
-              maxLength={10}
-              className="form-control"
-              style={{ textTransform: 'uppercase' }}
-              value={it.panNumber || ''}
-              onChange={(e) => handleFieldChange('it', 'panNumber', e.target.value.trim().toUpperCase())}
-              placeholder="10-character PAN"
-              disabled={isReadOnly}
-            />
-          </div>
-
-          <div className="form-group">
-            <label className="form-label" htmlFor="it-qualification">
-              Qualification
-            </label>
-            <input
-              id="it-qualification"
+              id="it-fatherName"
               type="text"
               className="form-control"
-              value={it.qualification || ''}
-              onChange={(e) => handleFieldChange('it', 'qualification', e.target.value)}
-              placeholder="e.g. B.Tech (CS/IT) / MCA / Diploma in Hardware & Networking"
+              value={it.fatherName || ''}
+              onChange={(e) => handleFieldChange('it', 'fatherName', e.target.value)}
+              placeholder="Father's full name"
               disabled={isReadOnly}
             />
           </div>
 
+          {/* 6. Centre IT Person Mother's Name - Optional */}
           <div className="form-group">
-            <label className="form-label" htmlFor="it-experienceYears">
-              Total Experience (Years)
+            <label className="form-label" htmlFor="it-motherName">
+              Centre IT Person Mother's Name
             </label>
             <input
-              id="it-experienceYears"
-              type="number"
-              min={0}
+              id="it-motherName"
+              type="text"
               className="form-control"
-              value={it.experienceYears ?? 3}
-              onChange={(e) => handleFieldChange('it', 'experienceYears', Number(e.target.value))}
-              placeholder="e.g. 5"
+              value={it.motherName || ''}
+              onChange={(e) => handleFieldChange('it', 'motherName', e.target.value)}
+              placeholder="Mother's full name"
               disabled={isReadOnly}
             />
           </div>
 
+          {/* 7. Centre IT Person Permanent Address - Mandatory */}
           <div className="form-group" style={{ gridColumn: '1 / -1' }}>
-            <label className="form-label" htmlFor="it-address">
-              Address
+            <label className="form-label" htmlFor="it-permanentAddress">
+              Centre IT Person Permanent Address <span style={{ color: 'var(--color-danger, #dc2626)' }}>*</span>
             </label>
-            <input
-              id="it-address"
-              type="text"
+            <textarea
+              id="it-permanentAddress"
+              rows={2}
               className="form-control"
-              value={it.address || it.permanentAddress || ''}
-              onChange={(e) => handleFieldChange('it', 'address', e.target.value)}
-              placeholder="Residential address"
+              value={it.permanentAddress || ''}
+              onChange={(e) => handleFieldChange('it', 'permanentAddress', e.target.value)}
+              placeholder="Permanent address as per Aadhaar"
               disabled={isReadOnly}
+              required
             />
+          </div>
+
+          {/* 8. Centre IT Person Current Address - Mandatory */}
+          <div className="form-group" style={{ gridColumn: '1 / -1' }}>
+            <label className="form-label" htmlFor="it-currentAddress">
+              Centre IT Person Current Address <span style={{ color: 'var(--color-danger, #dc2626)' }}>*</span>
+            </label>
+            <textarea
+              id="it-currentAddress"
+              rows={2}
+              className="form-control"
+              value={it.currentAddress || it.address || ''}
+              onChange={(e) => {
+                handleFieldChange('it', 'currentAddress', e.target.value);
+                handleFieldChange('it', 'address', e.target.value);
+              }}
+              placeholder="Current residential address"
+              disabled={isReadOnly}
+              required
+            />
+          </div>
+
+          {/* 9. Centre IT Person ID Proof - Mandatory */}
+          <div
+            className="form-group"
+            style={{
+              padding: 14,
+              borderRadius: 'var(--radius-md, 8px)',
+              background: 'var(--bg-subtle, #f8fafc)',
+              border: '1px solid var(--border-color, #e2e8f0)',
+              display: 'flex',
+              flexDirection: 'column',
+              justifyContent: 'space-between',
+              gap: 10,
+            }}
+          >
+            <div>
+              <label className="form-label" style={{ marginBottom: 4, fontWeight: 700 }}>
+                Centre IT Person ID Proof (Aadhar Card/Voter ID Card/Passport/Ration Card) <span style={{ color: 'var(--color-danger, #dc2626)' }}>*</span>
+              </label>
+              <span style={{ fontSize: '0.75rem', color: 'var(--text-secondary, #64748b)' }}>
+                Government issued photo ID proof (PDF format only, ≤ 10MB).
+              </span>
+            </div>
+
+            <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+              {it.idProofUrl ? (
+                <div style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: '0.8125rem', color: 'var(--color-primary)' }}>
+                  <FileText size={16} />
+                  <span>ID Proof Uploaded</span>
+                  <a href={it.idProofUrl} target="_blank" rel="noreferrer" className="btn btn-xs btn-secondary" style={{ display: 'inline-flex', alignItems: 'center', gap: 4 }}>
+                    <Eye size={12} /> View
+                  </a>
+                  {!isReadOnly && (
+                    <label className="btn btn-xs btn-secondary" style={{ cursor: 'pointer' }}>
+                      Replace
+                      <input
+                        type="file"
+                        accept=".pdf,application/pdf"
+                        style={{ display: 'none' }}
+                        onChange={(e) => handleDocUpload('it', 'idProof', 'IT Person ID Proof', e.target.files?.[0])}
+                      />
+                    </label>
+                  )}
+                </div>
+              ) : (
+                !isReadOnly && (
+                  <label className="btn btn-xs btn-primary" style={{ cursor: 'pointer', display: 'inline-flex', alignItems: 'center', gap: 6 }}>
+                    <Upload size={12} className={uploadingRole === 'it-idProof' ? 'animate-spin' : ''} />
+                    {uploadingRole === 'it-idProof' ? 'Uploading...' : 'Upload ID Proof (PDF)'}
+                    <input
+                      type="file"
+                      accept=".pdf,application/pdf"
+                      style={{ display: 'none' }}
+                      onChange={(e) => handleDocUpload('it', 'idProof', 'IT Person ID Proof', e.target.files?.[0])}
+                      disabled={uploadingRole === 'it-idProof'}
+                    />
+                  </label>
+                )
+              )}
+            </div>
+          </div>
+
+          {/* 10. Centre IT Person Passport Photograph - Mandatory */}
+          <div
+            className="form-group"
+            style={{
+              padding: 14,
+              borderRadius: 'var(--radius-md, 8px)',
+              background: 'var(--bg-subtle, #f8fafc)',
+              border: '1px solid var(--border-color, #e2e8f0)',
+              display: 'flex',
+              flexDirection: 'column',
+              justifyContent: 'space-between',
+              gap: 10,
+            }}
+          >
+            <div>
+              <label className="form-label" style={{ marginBottom: 4, fontWeight: 700 }}>
+                Centre IT Person Passport Photograph <span style={{ color: 'var(--color-danger, #dc2626)' }}>*</span>
+              </label>
+              <span style={{ fontSize: '0.75rem', color: 'var(--text-secondary, #64748b)' }}>
+                Recent color passport photograph (JPG/JPEG format only, ≤ 2MB).
+              </span>
+            </div>
+
+            <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+              {it.photoUrl ? (
+                <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                  <img
+                    src={it.photoUrl}
+                    alt="IT Person Passport Photo"
+                    style={{ width: 56, height: 56, borderRadius: 8, objectFit: 'cover', border: '1px solid var(--border-color)' }}
+                  />
+                  {!isReadOnly && (
+                    <label className="btn btn-xs btn-secondary" style={{ cursor: 'pointer' }}>
+                      <Camera size={12} style={{ marginRight: 4 }} /> Change Photo
+                      <input
+                        type="file"
+                        accept=".jpg,.jpeg,image/jpeg"
+                        style={{ display: 'none' }}
+                        onChange={(e) => handlePhotoSelect('it', 'photo', 'Centre IT Person Passport Photograph', e.target.files?.[0])}
+                      />
+                    </label>
+                  )}
+                </div>
+              ) : (
+                !isReadOnly && (
+                  <label className="btn btn-xs btn-primary" style={{ cursor: 'pointer', display: 'inline-flex', alignItems: 'center', gap: 6 }}>
+                    <Upload size={12} className={uploadingRole === 'it-photo' ? 'animate-spin' : ''} />
+                    {uploadingRole === 'it-photo' ? 'Uploading...' : 'Capture / Upload Photo'}
+                    <input
+                      type="file"
+                      accept=".jpg,.jpeg,image/jpeg"
+                      style={{ display: 'none' }}
+                      onChange={(e) => handlePhotoSelect('it', 'photo', 'Centre IT Person Passport Photograph', e.target.files?.[0])}
+                      disabled={uploadingRole === 'it-photo'}
+                    />
+                  </label>
+                )
+              )}
+            </div>
+          </div>
+
+          {/* 11. Centre IT Person Police Verification - Mandatory */}
+          <div
+            className="form-group"
+            style={{
+              padding: 14,
+              borderRadius: 'var(--radius-md, 8px)',
+              background: 'var(--bg-subtle, #f8fafc)',
+              border: '1px solid var(--border-color, #e2e8f0)',
+              display: 'flex',
+              flexDirection: 'column',
+              justifyContent: 'space-between',
+              gap: 10,
+            }}
+          >
+            <div>
+              <label className="form-label" style={{ marginBottom: 4, fontWeight: 700 }}>
+                Centre IT Person Police Verification <span style={{ color: 'var(--color-danger, #dc2626)' }}>*</span>
+              </label>
+              <span style={{ fontSize: '0.75rem', color: 'var(--text-secondary, #64748b)' }}>
+                Police verification certificate / character certificate (PDF format only, ≤ 10MB).
+              </span>
+            </div>
+
+            <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+              {it.policeVerificationUrl ? (
+                <div style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: '0.8125rem', color: 'var(--color-primary)' }}>
+                  <FileText size={16} />
+                  <span>Police Verification Uploaded</span>
+                  <a href={it.policeVerificationUrl} target="_blank" rel="noreferrer" className="btn btn-xs btn-secondary" style={{ display: 'inline-flex', alignItems: 'center', gap: 4 }}>
+                    <Eye size={12} /> View
+                  </a>
+                  {!isReadOnly && (
+                    <label className="btn btn-xs btn-secondary" style={{ cursor: 'pointer' }}>
+                      Replace
+                      <input
+                        type="file"
+                        accept=".pdf,application/pdf"
+                        style={{ display: 'none' }}
+                        onChange={(e) => handleDocUpload('it', 'policeVerification', 'IT Person Police Verification', e.target.files?.[0])}
+                      />
+                    </label>
+                  )}
+                </div>
+              ) : (
+                !isReadOnly && (
+                  <label className="btn btn-xs btn-primary" style={{ cursor: 'pointer', display: 'inline-flex', alignItems: 'center', gap: 6 }}>
+                    <Upload size={12} className={uploadingRole === 'it-policeVerification' ? 'animate-spin' : ''} />
+                    {uploadingRole === 'it-policeVerification' ? 'Uploading...' : 'Upload Police Verification (PDF)'}
+                    <input
+                      type="file"
+                      accept=".pdf,application/pdf"
+                      style={{ display: 'none' }}
+                      onChange={(e) => handleDocUpload('it', 'policeVerification', 'IT Person Police Verification', e.target.files?.[0])}
+                      disabled={uploadingRole === 'it-policeVerification'}
+                    />
+                  </label>
+                )
+              )}
+            </div>
           </div>
         </div>
       </div>
 
       {/* ── 4. ELECTRICIAN DETAILS (FRD Sec. 7.4) ── */}
       <div className="card" style={{ padding: 24 }}>
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 16 }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 18 }}>
+          <Wrench size={20} color="var(--color-primary, #2563eb)" />
           <div>
-            <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-              <Wrench size={18} color="var(--color-primary, #2563eb)" />
-              <h3 style={{ margin: 0, fontSize: '1.05rem', fontWeight: 700, color: 'var(--text-primary, #1e293b)' }}>
-                4. Centre Electrician Details (FRD Sec. 7)
-              </h3>
-              <span className="badge badge-subtle" style={{ fontSize: '0.7rem' }}>SLA / On-Site</span>
-            </div>
-            <p style={{ margin: '4px 0 0', fontSize: '0.8125rem', color: 'var(--text-secondary, #64748b)' }}>
+            <h3 style={{ margin: 0, fontSize: '1.05rem', fontWeight: 700, color: 'var(--text-primary, #1e293b)' }}>
+              4. Electrician Details (FRD Sec. 7.4)
+            </h3>
+            <span style={{ fontSize: '0.8125rem', color: 'var(--text-secondary, #64748b)' }}>
               Certified electrician available on-site for UPS failover, DG switchover, and electrical safety.
-            </p>
+            </span>
           </div>
         </div>
 
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(240px, 1fr))', gap: 16 }}>
+        {/* Top Input Row: 3 Fields per FRD Table 7.4 */}
+        <div className="grid-3" style={{ gap: 16, marginBottom: 16 }}>
+          {/* 1. Electrician Name - Mandatory */}
           <div className="form-group">
-            <label className="form-label" htmlFor="el-fullName">
-              Full Name <span style={{ color: 'var(--color-danger)' }}>*</span>
+            <label className="form-label" htmlFor="el-name">
+              Electrician Name <span style={{ color: 'var(--color-danger, #dc2626)' }}>*</span>
             </label>
             <input
-              id="el-fullName"
+              id="el-name"
               type="text"
               className="form-control"
-              value={electrician.fullName || ''}
-              onChange={(e) => handleFieldChange('electrician', 'fullName', e.target.value)}
-              placeholder="Electrician full name"
+              value={electrician.fullName || electrician.name || ''}
+              onChange={(e) => {
+                handleFieldChange('electrician', 'fullName', e.target.value);
+                handleFieldChange('electrician', 'name', e.target.value);
+              }}
+              placeholder="Electrician full legal name"
               disabled={isReadOnly}
               required
             />
           </div>
 
+          {/* 2. Electrician Contact Number - Mandatory */}
           <div className="form-group">
             <label className="form-label" htmlFor="el-contactNumber">
-              Contact Number (10 Digits) <span style={{ color: 'var(--color-danger)' }}>*</span>
+              Electrician Contact Number <span style={{ color: 'var(--color-danger, #dc2626)' }}>*</span>
             </label>
             <input
               id="el-contactNumber"
@@ -905,70 +1348,130 @@ export function Submodule2Personnel({
               className="form-control"
               value={electrician.contactNumber || ''}
               onChange={(e) => handleFieldChange('electrician', 'contactNumber', e.target.value.replace(/\D/g, ''))}
-              placeholder="10-digit mobile"
+              placeholder="10-digit primary mobile number"
               disabled={isReadOnly}
               required
             />
           </div>
 
+          {/* 3. Electrician Aadhaar Number - Mandatory (UI Masked) */}
           <div className="form-group">
-            <label className="form-label" htmlFor="el-alternateNumber">
-              Alternate Number
+            <label className="form-label" htmlFor="el-aadhaarNumber">
+              Electrician Aadhaar Number <span style={{ color: 'var(--color-danger, #dc2626)' }}>*</span>
             </label>
-            <input
-              id="el-alternateNumber"
-              type="text"
-              maxLength={10}
-              className="form-control"
-              value={electrician.alternateNumber || ''}
-              onChange={(e) => handleFieldChange('electrician', 'alternateNumber', e.target.value.replace(/\D/g, ''))}
-              placeholder="Alternate mobile"
-              disabled={isReadOnly}
-            />
+            <div style={{ position: 'relative' }}>
+              <input
+                id="el-aadhaarNumber"
+                type="text"
+                maxLength={14}
+                className="form-control"
+                value={electrician.aadhaarNumber ? (isReadOnly ? formatMaskedAadhaar(electrician.aadhaarNumber) : electrician.aadhaarNumber) : ''}
+                onChange={(e) => handleFieldChange('electrician', 'aadhaarNumber', e.target.value.replace(/\D/g, ''))}
+                placeholder="12-digit Aadhaar number"
+                disabled={isReadOnly}
+                required
+              />
+              <Shield size={14} color="var(--text-muted)" style={{ position: 'absolute', right: 12, top: 12 }} />
+            </div>
+          </div>
+        </div>
+
+        {/* Bottom Upload Row: All 3 Upload Cards Aligned Together (FRD Sec. 7.4) */}
+        <div className="grid-3" style={{ gap: 16, alignItems: 'stretch' }}>
+          {/* 4. Electrician Passport Photograph - Mandatory */}
+          <div
+            className="form-group"
+            style={{
+              padding: 14,
+              borderRadius: 'var(--radius-md, 8px)',
+              background: 'var(--bg-subtle, #f8fafc)',
+              border: '1px solid var(--border-color, #e2e8f0)',
+              display: 'flex',
+              flexDirection: 'column',
+              justifyContent: 'space-between',
+              gap: 12,
+              minHeight: 140,
+            }}
+          >
+            <div style={{ minHeight: 52 }}>
+              <label className="form-label" style={{ marginBottom: 4, fontWeight: 700 }}>
+                Electrician Passport Photograph <span style={{ color: 'var(--color-danger, #dc2626)' }}>*</span>
+              </label>
+              <span style={{ fontSize: '0.75rem', color: 'var(--text-secondary, #64748b)', display: 'block', lineHeight: 1.4 }}>
+                Recent color passport photograph (JPG/JPEG format only, ≤ 2MB).
+              </span>
+            </div>
+
+            <div style={{ display: 'flex', alignItems: 'center', gap: 12, minHeight: 40 }}>
+              {electrician.photoUrl ? (
+                <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                  <img
+                    src={electrician.photoUrl}
+                    alt="Electrician Passport Photo"
+                    style={{ width: 56, height: 56, borderRadius: 8, objectFit: 'cover', border: '1px solid var(--border-color)' }}
+                  />
+                  {!isReadOnly && (
+                    <label className="btn btn-xs btn-secondary" style={{ cursor: 'pointer' }}>
+                      <Camera size={12} style={{ marginRight: 4 }} /> Change Photo
+                      <input
+                        type="file"
+                        accept=".jpg,.jpeg,image/jpeg"
+                        style={{ display: 'none' }}
+                        onChange={(e) => handlePhotoSelect('electrician', 'photo', 'Electrician Passport Photograph', e.target.files?.[0])}
+                      />
+                    </label>
+                  )}
+                </div>
+              ) : (
+                !isReadOnly && (
+                  <label className="btn btn-xs btn-primary" style={{ cursor: 'pointer', display: 'inline-flex', alignItems: 'center', gap: 6 }}>
+                    <Upload size={12} className={uploadingRole === 'electrician-photo' ? 'animate-spin' : ''} />
+                    {uploadingRole === 'electrician-photo' ? 'Uploading...' : 'Capture / Upload Photo'}
+                    <input
+                      type="file"
+                      accept=".jpg,.jpeg,image/jpeg"
+                      style={{ display: 'none' }}
+                      onChange={(e) => handlePhotoSelect('electrician', 'photo', 'Electrician Passport Photograph', e.target.files?.[0])}
+                      disabled={uploadingRole === 'electrician-photo'}
+                    />
+                  </label>
+                )
+              )}
+            </div>
           </div>
 
-          <div className="form-group">
-            <label className="form-label" htmlFor="el-licenseNumber">
-              Electrician License / Certificate Number
-            </label>
-            <input
-              id="el-licenseNumber"
-              type="text"
-              className="form-control"
-              value={electrician.licenseNumber || ''}
-              onChange={(e) => handleFieldChange('electrician', 'licenseNumber', e.target.value)}
-              placeholder="e.g. ELEC-LIC-2024-9821"
-              disabled={isReadOnly}
-            />
-          </div>
+          {/* 5. Electrician ID Proof - Mandatory */}
+          <div
+            className="form-group"
+            style={{
+              padding: 14,
+              borderRadius: 'var(--radius-md, 8px)',
+              background: 'var(--bg-subtle, #f8fafc)',
+              border: '1px solid var(--border-color, #e2e8f0)',
+              display: 'flex',
+              flexDirection: 'column',
+              justifyContent: 'space-between',
+              gap: 12,
+              minHeight: 140,
+            }}
+          >
+            <div style={{ minHeight: 52 }}>
+              <label className="form-label" style={{ marginBottom: 4, fontWeight: 700 }}>
+                Electrician ID Proof (Aadhar Card/Voter ID Card/Passport/Ration Card) <span style={{ color: 'var(--color-danger, #dc2626)' }}>*</span>
+              </label>
+              <span style={{ fontSize: '0.75rem', color: 'var(--text-secondary, #64748b)', display: 'block', lineHeight: 1.4 }}>
+                Government issued photo ID proof (PDF format only, ≤ 10MB).
+              </span>
+            </div>
 
-          <div className="form-group">
-            <label className="form-label" htmlFor="el-availabilityType">
-              Availability Type
-            </label>
-            <select
-              id="el-availabilityType"
-              className="form-control"
-              value={electrician.availabilityType || 'Full-time'}
-              onChange={(e) => handleFieldChange('electrician', 'availabilityType', e.target.value)}
-              disabled={isReadOnly}
-            >
-              <option value="Full-time">Full-time On-Campus</option>
-              <option value="On-call">On-Call for Exam Shifts</option>
-              <option value="Contract">Contract / Third-Party Vendor SLA</option>
-            </select>
-          </div>
-
-          {/* Electrician License Document Upload */}
-          <div className="form-group">
-            <label className="form-label">
-              Electrician License Document (PDF)
-            </label>
-            <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginTop: 4 }}>
-              {electrician.licenseDocUrl ? (
+            <div style={{ display: 'flex', alignItems: 'center', gap: 10, minHeight: 40 }}>
+              {electrician.idProofUrl ? (
                 <div style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: '0.8125rem', color: 'var(--color-primary)' }}>
                   <FileText size={16} />
-                  <span>License Uploaded</span>
+                  <span>ID Proof Uploaded</span>
+                  <a href={electrician.idProofUrl} target="_blank" rel="noreferrer" className="btn btn-xs btn-secondary" style={{ display: 'inline-flex', alignItems: 'center', gap: 4 }}>
+                    <Eye size={12} /> View
+                  </a>
                   {!isReadOnly && (
                     <label className="btn btn-xs btn-secondary" style={{ cursor: 'pointer' }}>
                       Replace
@@ -976,20 +1479,84 @@ export function Submodule2Personnel({
                         type="file"
                         accept=".pdf,application/pdf"
                         style={{ display: 'none' }}
-                        onChange={(e) => handleDocUpload('electrician', 'licenseDoc', 'License Document', e.target.files?.[0])}
+                        onChange={(e) => handleDocUpload('electrician', 'idProof', 'Electrician ID Proof', e.target.files?.[0])}
                       />
                     </label>
                   )}
                 </div>
               ) : (
                 !isReadOnly && (
-                  <label className="btn btn-xs btn-secondary" style={{ cursor: 'pointer', display: 'inline-flex', alignItems: 'center', gap: 6 }}>
-                    <Upload size={12} /> Upload License PDF
+                  <label className="btn btn-xs btn-primary" style={{ cursor: 'pointer', display: 'inline-flex', alignItems: 'center', gap: 6 }}>
+                    <Upload size={12} className={uploadingRole === 'electrician-idProof' ? 'animate-spin' : ''} />
+                    {uploadingRole === 'electrician-idProof' ? 'Uploading...' : 'Upload ID Proof (PDF)'}
                     <input
                       type="file"
                       accept=".pdf,application/pdf"
                       style={{ display: 'none' }}
-                      onChange={(e) => handleDocUpload('electrician', 'licenseDoc', 'License Document', e.target.files?.[0])}
+                      onChange={(e) => handleDocUpload('electrician', 'idProof', 'Electrician ID Proof', e.target.files?.[0])}
+                      disabled={uploadingRole === 'electrician-idProof'}
+                    />
+                  </label>
+                )
+              )}
+            </div>
+          </div>
+
+          {/* 6. Electrician Police Verification - Mandatory */}
+          <div
+            className="form-group"
+            style={{
+              padding: 14,
+              borderRadius: 'var(--radius-md, 8px)',
+              background: 'var(--bg-subtle, #f8fafc)',
+              border: '1px solid var(--border-color, #e2e8f0)',
+              display: 'flex',
+              flexDirection: 'column',
+              justifyContent: 'space-between',
+              gap: 12,
+              minHeight: 140,
+            }}
+          >
+            <div style={{ minHeight: 52 }}>
+              <label className="form-label" style={{ marginBottom: 4, fontWeight: 700 }}>
+                Electrician Police Verification <span style={{ color: 'var(--color-danger, #dc2626)' }}>*</span>
+              </label>
+              <span style={{ fontSize: '0.75rem', color: 'var(--text-secondary, #64748b)', display: 'block', lineHeight: 1.4 }}>
+                Police verification certificate / character certificate (PDF format only, ≤ 10MB).
+              </span>
+            </div>
+
+            <div style={{ display: 'flex', alignItems: 'center', gap: 10, minHeight: 40 }}>
+              {electrician.policeVerificationUrl ? (
+                <div style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: '0.8125rem', color: 'var(--color-primary)' }}>
+                  <FileText size={16} />
+                  <span>Police Verification Uploaded</span>
+                  <a href={electrician.policeVerificationUrl} target="_blank" rel="noreferrer" className="btn btn-xs btn-secondary" style={{ display: 'inline-flex', alignItems: 'center', gap: 4 }}>
+                    <Eye size={12} /> View
+                  </a>
+                  {!isReadOnly && (
+                    <label className="btn btn-xs btn-secondary" style={{ cursor: 'pointer' }}>
+                      Replace
+                      <input
+                        type="file"
+                        accept=".pdf,application/pdf"
+                        style={{ display: 'none' }}
+                        onChange={(e) => handleDocUpload('electrician', 'policeVerification', 'Electrician Police Verification', e.target.files?.[0])}
+                      />
+                    </label>
+                  )}
+                </div>
+              ) : (
+                !isReadOnly && (
+                  <label className="btn btn-xs btn-primary" style={{ cursor: 'pointer', display: 'inline-flex', alignItems: 'center', gap: 6 }}>
+                    <Upload size={12} className={uploadingRole === 'electrician-policeVerification' ? 'animate-spin' : ''} />
+                    {uploadingRole === 'electrician-policeVerification' ? 'Uploading...' : 'Upload Police Verification (PDF)'}
+                    <input
+                      type="file"
+                      accept=".pdf,application/pdf"
+                      style={{ display: 'none' }}
+                      onChange={(e) => handleDocUpload('electrician', 'policeVerification', 'Electrician Police Verification', e.target.files?.[0])}
+                      disabled={uploadingRole === 'electrician-policeVerification'}
                     />
                   </label>
                 )
