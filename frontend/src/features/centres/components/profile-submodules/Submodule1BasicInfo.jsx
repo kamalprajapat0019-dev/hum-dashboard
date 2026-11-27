@@ -1,6 +1,12 @@
 import React from 'react';
-import { AlertCircle, CheckCircle2, Building, MapPin, Monitor, Navigation, Utensils } from 'lucide-react';
-import { INDIAN_STATES, CENTRE_CATEGORIES, ORGANIZATION_TYPES, REGIONS } from './constants';
+import {
+  AlertCircle, CheckCircle2, Building, MapPin, Monitor, Navigation,
+  Utensils, Phone, Mail, Globe, Train, Bus, Hotel
+} from 'lucide-react';
+import {
+  INDIAN_STATES, CENTRE_CATEGORIES, ORGANIZATION_TYPES,
+  REGIONS, REGION_LABELS
+} from './constants';
 
 export function Submodule1BasicInfo({
   basicInfo = {},
@@ -24,12 +30,8 @@ export function Submodule1BasicInfo({
     const num = Math.max(0, parseInt(value, 10) || 0);
     setBasicInfo((prev) => {
       const next = { ...prev, [field]: num };
-      // Auto-compute buffer nodes if actual & exam are present
-      if (field === 'actualNodes' || field === 'examNodes') {
-        const actual = field === 'actualNodes' ? num : (prev.actualNodes || 0);
-        const exam = field === 'examNodes' ? num : (prev.examNodes || 0);
-        next.bufferNodes = Math.max(0, actual - exam);
-        next.totalNodes = actual;
+      if (field === 'actualNodes') {
+        next.totalNodes = num;
       }
       return next;
     });
@@ -83,19 +85,19 @@ export function Submodule1BasicInfo({
         </div>
       )}
 
-      {/* ── Section 1: Centre Identification & Category ── */}
+      {/* ── Section 1: Centre Identification & Category (FRD Sec. 6.1) ── */}
       <div className="card" style={{ padding: 24 }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 18 }}>
           <Building size={20} color="var(--color-primary, #2563eb)" />
           <h3 style={{ margin: 0, fontSize: '1.05rem', fontWeight: 700, color: 'var(--text-primary, #1e293b)' }}>
-            1. Centre Identification & Organization Type
+            1. Centre Identification & Category (FRD Sec. 6.1)
           </h3>
         </div>
 
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(260px, 1fr))', gap: 16 }}>
-          <div className="form-group">
+          <div className="form-group" style={{ gridColumn: '1 / -1' }}>
             <label className="form-label" htmlFor="centreName">
-              Centre Name (As per Legal Document) <span style={{ color: 'var(--color-danger, #dc2626)' }}>*</span>
+              Centre Name (As per Document) <span style={{ color: 'var(--color-danger, #dc2626)' }}>*</span>
             </label>
             <input
               id="centreName"
@@ -121,7 +123,7 @@ export function Submodule1BasicInfo({
             <select
               id="centreCategory"
               className="form-control"
-              value={basicInfo.centreCategory || 'Engineering College'}
+              value={basicInfo.centreCategory || 'College'}
               onChange={(e) => handleChange('centreCategory', e.target.value)}
               disabled={isReadOnly}
             >
@@ -134,7 +136,7 @@ export function Submodule1BasicInfo({
           {basicInfo.centreCategory === 'Other' && (
             <div className="form-group">
               <label className="form-label" htmlFor="customCentreCategory">
-                Specify Other Category <span style={{ color: 'var(--color-danger, #dc2626)' }}>*</span>
+                Specify Centre Category <span style={{ color: 'var(--color-danger, #dc2626)' }}>*</span>
               </label>
               <input
                 id="customCentreCategory"
@@ -151,12 +153,12 @@ export function Submodule1BasicInfo({
 
           <div className="form-group">
             <label className="form-label" htmlFor="organizationType">
-              Organization Legal Structure <span style={{ color: 'var(--color-danger, #dc2626)' }}>*</span>
+              Centre Type / Legal Entity <span style={{ color: 'var(--color-danger, #dc2626)' }}>*</span>
             </label>
             <select
               id="organizationType"
               className="form-control"
-              value={basicInfo.organizationType || 'Trust'}
+              value={basicInfo.organizationType || 'Trust/Society'}
               onChange={(e) => handleChange('organizationType', e.target.value)}
               disabled={isReadOnly}
             >
@@ -168,76 +170,29 @@ export function Submodule1BasicInfo({
 
           <div className="form-group">
             <label className="form-label" htmlFor="regionId">
-              Geographic Region <span style={{ color: 'var(--color-danger, #dc2626)' }}>*</span>
+              Region (FRD 8 Zones) <span style={{ color: 'var(--color-danger, #dc2626)' }}>*</span>
             </label>
             <select
               id="regionId"
               className="form-control"
-              value={basicInfo.regionId || 'North'}
+              value={basicInfo.regionId || 'NR'}
               onChange={(e) => handleChange('regionId', e.target.value)}
               disabled={isReadOnly}
             >
               {REGIONS.map((r) => (
-                <option key={r} value={r}>{r}</option>
+                <option key={r} value={r}>{REGION_LABELS[r] || r}</option>
               ))}
             </select>
-          </div>
-
-          <div className="form-group">
-            <label className="form-label" htmlFor="venueStatus">
-              Venue Classification
-            </label>
-            <select
-              id="venueStatus"
-              className="form-control"
-              value={basicInfo.venueStatus || 'COMMERCIAL'}
-              onChange={(e) => handleChange('venueStatus', e.target.value)}
-              disabled={isReadOnly}
-            >
-              <option value="COMMERCIAL">Commercial Venue</option>
-              <option value="INSTITUTIONAL">Institutional / Academic Campus</option>
-              <option value="GOVERNMENT">Government Premises</option>
-            </select>
-          </div>
-
-          <div className="form-group">
-            <label className="form-label" htmlFor="eduCode">
-              EDU Code (if allotted)
-            </label>
-            <input
-              id="eduCode"
-              type="text"
-              className="form-control"
-              value={basicInfo.eduCode || ''}
-              onChange={(e) => handleChange('eduCode', e.target.value)}
-              placeholder="e.g. EDU-10492"
-              disabled={isReadOnly}
-            />
-          </div>
-
-          <div className="form-group">
-            <label className="form-label" htmlFor="tcCode">
-              Test Centre (TC) Code
-            </label>
-            <input
-              id="tcCode"
-              type="text"
-              className="form-control"
-              value={basicInfo.tcCode || ''}
-              onChange={(e) => handleChange('tcCode', e.target.value)}
-              placeholder="e.g. TC-8921"
-              disabled={isReadOnly}
-            />
           </div>
         </div>
       </div>
 
-      {/* ── Section 2: Address & Geographic Location ── */}
+      {/* ── Section 2: Address & Geographic Location (FRD Sec. 6.1) ── */}
       <div className="card" style={{ padding: 24 }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 18 }}>
           <MapPin size={20} color="var(--color-primary, #2563eb)" />
           <h3 style={{ margin: 0, fontSize: '1.05rem', fontWeight: 700, color: 'var(--text-primary, #1e293b)' }}>
-            2. Address & Communication Details
+            2. Address & Communication Details (FRD Sec. 6.1)
           </h3>
         </div>
 
@@ -252,7 +207,7 @@ export function Submodule1BasicInfo({
               className={`form-control ${validationErrors.centreAddress ? 'is-invalid' : ''}`}
               value={basicInfo.centreAddress || ''}
               onChange={(e) => handleChange('centreAddress', e.target.value)}
-              placeholder="Plot No., Street, Landmark, Area"
+              placeholder="Plot No., Campus Road, Landmark, Area"
               disabled={isReadOnly}
               required
             />
@@ -260,7 +215,7 @@ export function Submodule1BasicInfo({
 
           <div className="form-group">
             <label className="form-label" htmlFor="stateName">
-              State / UT <span style={{ color: 'var(--color-danger, #dc2626)' }}>*</span>
+              State <span style={{ color: 'var(--color-danger, #dc2626)' }}>*</span>
             </label>
             <select
               id="stateName"
@@ -301,7 +256,7 @@ export function Submodule1BasicInfo({
               className="form-control"
               value={basicInfo.district || ''}
               onChange={(e) => handleChange('district', e.target.value)}
-              placeholder="e.g. North West Delhi"
+              placeholder="e.g. Gautam Buddha Nagar"
               disabled={isReadOnly}
             />
           </div>
@@ -316,14 +271,14 @@ export function Submodule1BasicInfo({
               className="form-control"
               value={basicInfo.taluka || ''}
               onChange={(e) => handleChange('taluka', e.target.value)}
-              placeholder="e.g. Rohini"
+              placeholder="e.g. Dadri"
               disabled={isReadOnly}
             />
           </div>
 
           <div className="form-group">
             <label className="form-label" htmlFor="pincode">
-              PIN Code (6 Digits) <span style={{ color: 'var(--color-danger, #dc2626)' }}>*</span>
+              Pin Code (6 Digits) <span style={{ color: 'var(--color-danger, #dc2626)' }}>*</span>
             </label>
             <input
               id="pincode"
@@ -332,7 +287,7 @@ export function Submodule1BasicInfo({
               className={`form-control ${validationErrors.pincode ? 'is-invalid' : ''}`}
               value={basicInfo.pincode || ''}
               onChange={(e) => handleChange('pincode', e.target.value.replace(/\D/g, ''))}
-              placeholder="e.g. 110085"
+              placeholder="e.g. 201310"
               disabled={isReadOnly}
               required
             />
@@ -340,7 +295,7 @@ export function Submodule1BasicInfo({
 
           <div className="form-group">
             <label className="form-label" htmlFor="googleMapLink">
-              Google Maps Location Link
+              Google Map Link
             </label>
             <input
               id="googleMapLink"
@@ -353,34 +308,83 @@ export function Submodule1BasicInfo({
             />
           </div>
 
+          {/* Contact Fields per FRD Sec. 6.1 */}
           <div className="form-group">
-            <label className="form-label" htmlFor="officialEmail">
-              Official Email Address <span style={{ color: 'var(--color-danger, #dc2626)' }}>*</span>
+            <label className="form-label" htmlFor="centreOfficialEmail">
+              Centre Official Email <span style={{ color: 'var(--color-danger, #dc2626)' }}>*</span>
             </label>
             <input
-              id="officialEmail"
+              id="centreOfficialEmail"
               type="email"
               className="form-control"
-              value={basicInfo.officialEmail || ''}
-              onChange={(e) => handleChange('officialEmail', e.target.value)}
-              placeholder="centre@institution.ac.in"
+              value={basicInfo.centreOfficialEmail || basicInfo.officialEmail || ''}
+              onChange={(e) => {
+                const val = e.target.value;
+                handleChange('centreOfficialEmail', val);
+                handleChange('officialEmail', val);
+              }}
+              placeholder="official@institution.edu.in"
               disabled={isReadOnly}
               required
             />
           </div>
 
           <div className="form-group">
+            <label className="form-label" htmlFor="alternativeEmail">
+              Centre Alternate Email ID
+            </label>
+            <input
+              id="alternativeEmail"
+              type="email"
+              className="form-control"
+              value={basicInfo.centreAlternateEmail || basicInfo.alternativeEmail || ''}
+              onChange={(e) => {
+                const val = e.target.value;
+                handleChange('alternativeEmail', val);
+                handleChange('centreAlternateEmail', val);
+              }}
+              placeholder="alternate@institution.edu.in"
+              disabled={isReadOnly}
+            />
+          </div>
+
+          <div className="form-group">
             <label className="form-label" htmlFor="officialMobile">
-              Official Contact Mobile (10 Digits) <span style={{ color: 'var(--color-danger, #dc2626)' }}>*</span>
+              Centre Official Mobile Number <span style={{ color: 'var(--color-danger, #dc2626)' }}>*</span>
             </label>
             <input
               id="officialMobile"
               type="text"
               maxLength={10}
               className="form-control"
-              value={basicInfo.officialMobile || ''}
-              onChange={(e) => handleChange('officialMobile', e.target.value.replace(/\D/g, ''))}
-              placeholder="10-digit primary mobile"
+              value={basicInfo.centreOfficialMobile || basicInfo.officialMobile || ''}
+              onChange={(e) => {
+                const val = e.target.value.replace(/\D/g, '');
+                handleChange('officialMobile', val);
+                handleChange('centreOfficialMobile', val);
+              }}
+              placeholder="10-digit official mobile"
+              disabled={isReadOnly}
+              required
+            />
+          </div>
+
+          <div className="form-group">
+            <label className="form-label" htmlFor="whatsappMobile">
+              Centre WhatsApp Mobile Number <span style={{ color: 'var(--color-danger, #dc2626)' }}>*</span>
+            </label>
+            <input
+              id="whatsappMobile"
+              type="text"
+              maxLength={10}
+              className="form-control"
+              value={basicInfo.centreWhatsappMobile || basicInfo.whatsappMobile || ''}
+              onChange={(e) => {
+                const val = e.target.value.replace(/\D/g, '');
+                handleChange('whatsappMobile', val);
+                handleChange('centreWhatsappMobile', val);
+              }}
+              placeholder="10-digit WhatsApp number"
               disabled={isReadOnly}
               required
             />
@@ -388,40 +392,64 @@ export function Submodule1BasicInfo({
 
           <div className="form-group">
             <label className="form-label" htmlFor="alternateMobile">
-              Alternate Mobile / Landline
+              Centre Alternate Mobile Number
             </label>
             <input
               id="alternateMobile"
               type="text"
-              maxLength={12}
+              maxLength={10}
               className="form-control"
-              value={basicInfo.alternateMobile || ''}
-              onChange={(e) => handleChange('alternateMobile', e.target.value)}
-              placeholder="Alternate contact number"
+              value={basicInfo.centreAlternateMobile || basicInfo.alternateMobile || ''}
+              onChange={(e) => {
+                const val = e.target.value.replace(/\D/g, '');
+                handleChange('alternateMobile', val);
+                handleChange('centreAlternateMobile', val);
+              }}
+              placeholder="10-digit alternate mobile"
+              disabled={isReadOnly}
+            />
+          </div>
+
+          <div className="form-group" style={{ gridColumn: '1 / -1' }}>
+            <label className="form-label" htmlFor="phoneStd">
+              Centre Phone Number with STD Code
+            </label>
+            <input
+              id="phoneStd"
+              type="text"
+              maxLength={15}
+              className="form-control"
+              value={basicInfo.phoneStd || basicInfo.landlineStd || ''}
+              onChange={(e) => {
+                const val = e.target.value;
+                handleChange('phoneStd', val);
+                handleChange('landlineStd', val);
+              }}
+              placeholder="e.g. 011-23456789"
               disabled={isReadOnly}
             />
           </div>
         </div>
       </div>
 
-      {/* ── Section 3: Node Capacity Summary ── */}
+      {/* ── Section 3: Node Capacity Summary (FRD Sec. 6.1) ── */}
       <div className="card" style={{ padding: 24 }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 18 }}>
           <Monitor size={20} color="var(--color-primary, #2563eb)" />
           <div>
             <h3 style={{ margin: 0, fontSize: '1.05rem', fontWeight: 700, color: 'var(--text-primary, #1e293b)' }}>
-              3. Computer Node Capacity
+              3. Computer Node Capacity (FRD Sec. 6.1)
             </h3>
             <span style={{ fontSize: '0.8125rem', color: 'var(--text-secondary, #64748b)' }}>
-              Summary capacity across all examination labs.
+              Actual Nodes vs Active Exam Nodes.
             </span>
           </div>
         </div>
 
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: 16 }}>
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(260px, 1fr))', gap: 16 }}>
           <div className="form-group">
             <label className="form-label" htmlFor="actualNodes">
-              Total Actual Physical Nodes <span style={{ color: 'var(--color-danger, #dc2626)' }}>*</span>
+              Actual Nodes (Total Functional) <span style={{ color: 'var(--color-danger, #dc2626)' }}>*</span>
             </label>
             <input
               id="actualNodes"
@@ -434,61 +462,52 @@ export function Submodule1BasicInfo({
               required
             />
             <span style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>
-              Total functional PCs in the venue.
+              Physical computer systems installed in centre labs.
             </span>
           </div>
 
           <div className="form-group">
             <label className="form-label" htmlFor="examNodes">
-              Active Exam Node Capacity <span style={{ color: 'var(--color-danger, #dc2626)' }}>*</span>
+              Exam Nodes (For Candidates) <span style={{ color: 'var(--color-danger, #dc2626)' }}>*</span>
             </label>
             <input
               id="examNodes"
               type="number"
               min={1}
-              className="form-control"
+              className={`form-control ${
+                basicInfo.actualNodes && Number(basicInfo.examNodes || 0) > Number(basicInfo.actualNodes)
+                  ? 'is-invalid'
+                  : ''
+              }`}
               value={basicInfo.examNodes ?? 80}
               onChange={(e) => handleCapacityChange('examNodes', e.target.value)}
               disabled={isReadOnly}
               required
             />
             <span style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>
-              Nodes committed for candidates per shift.
+              Systems allotted per shift for candidate testing (Must be ≤ Actual Nodes).
             </span>
-          </div>
-
-          <div className="form-group">
-            <label className="form-label" htmlFor="bufferNodes">
-              Mandatory Buffer Nodes
-            </label>
-            <input
-              id="bufferNodes"
-              type="number"
-              min={0}
-              className="form-control"
-              value={basicInfo.bufferNodes ?? 20}
-              onChange={(e) => handleCapacityChange('bufferNodes', e.target.value)}
-              disabled={isReadOnly}
-            />
-            <span style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>
-              Reserve hot-standby nodes (min 15-20%).
-            </span>
+            {basicInfo.actualNodes && Number(basicInfo.examNodes || 0) > Number(basicInfo.actualNodes) && (
+              <span className="form-feedback" style={{ color: 'var(--color-danger, #dc2626)', fontSize: '0.75rem', marginTop: 4, display: 'block' }}>
+                Exam Nodes cannot exceed Actual Nodes ({basicInfo.actualNodes}).
+              </span>
+            )}
           </div>
         </div>
       </div>
 
-      {/* ── Section 4: Exam History & Experience ── */}
+      {/* ── Section 4: Previous Exam Conducted Track Record (FRD Sec. 6.1) ── */}
       <div className="card" style={{ padding: 24 }}>
         <h3 style={{ margin: '0 0 14px', fontSize: '1.05rem', fontWeight: 700, color: 'var(--text-primary, #1e293b)' }}>
-          4. Previous Examination Track Record
+          4. Previous Exam Conducted? (FRD Sec. 6.1)
         </h3>
 
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(260px, 1fr))', gap: 16 }}>
-          <div className="form-group">
+          <div className="form-group" style={{ gridColumn: '1 / -1' }}>
             <label className="form-label">
-              Has this venue conducted computer-based tests (CBT) previously?
+              Has this venue conducted any computer-based tests (CBT) previously?
             </label>
-            <div style={{ display: 'flex', gap: 20, marginTop: 6 }}>
+            <div style={{ display: 'flex', gap: 24, marginTop: 6 }}>
               <label style={{ display: 'flex', alignItems: 'center', gap: 8, cursor: 'pointer' }}>
                 <input
                   type="radio"
@@ -513,122 +532,398 @@ export function Submodule1BasicInfo({
           </div>
 
           {basicInfo.previousExamConducted && (
-            <div className="form-group" style={{ gridColumn: '1 / -1' }}>
-              <label className="form-label" htmlFor="previousEduExam">
-                Details of Previous Exams Conducted (Clients, Year, Max Nodes)
-              </label>
-              <textarea
-                id="previousEduExam"
-                rows={2}
-                className="form-control"
-                value={basicInfo.previousEduExam || ''}
-                onChange={(e) => handleChange('previousEduExam', e.target.value)}
-                placeholder="e.g. NTA JEE Mains (2024, 250 nodes), TCS iON banking tests (2023)"
-                disabled={isReadOnly}
-              />
-            </div>
+            <>
+              <div className="form-group">
+                <label className="form-label" htmlFor="previousExamName">
+                  Name of Exam
+                </label>
+                <input
+                  id="previousExamName"
+                  type="text"
+                  className="form-control"
+                  value={basicInfo.previousExamName || ''}
+                  onChange={(e) => handleChange('previousExamName', e.target.value)}
+                  placeholder="e.g. JEE Mains / IBPS PO"
+                  disabled={isReadOnly}
+                />
+              </div>
+
+              <div className="form-group">
+                <label className="form-label" htmlFor="previousExamDate">
+                  Date of Exam
+                </label>
+                <input
+                  id="previousExamDate"
+                  type="date"
+                  className="form-control"
+                  value={
+                    basicInfo.previousExamDate
+                      ? new Date(basicInfo.previousExamDate).toISOString().split('T')[0]
+                      : ''
+                  }
+                  onChange={(e) => handleChange('previousExamDate', e.target.value)}
+                  disabled={isReadOnly}
+                />
+              </div>
+
+              <div className="form-group" style={{ gridColumn: '1 / -1' }}>
+                <label className="form-label" htmlFor="previousEduExam">
+                  Previous Exam Conducted Details
+                </label>
+                <textarea
+                  id="previousEduExam"
+                  rows={2}
+                  className="form-control"
+                  value={basicInfo.previousEduExam || ''}
+                  onChange={(e) => handleChange('previousEduExam', e.target.value)}
+                  placeholder="Clients, vendor details, peak concurrent nodes conducted..."
+                  disabled={isReadOnly}
+                />
+              </div>
+            </>
           )}
         </div>
       </div>
 
-      {/* ── Section 5: Transport, Accessibility & Food ── */}
+      {/* ── Section 5: Transportation & Accessibility (FRD Sec. 6.1) ── */}
       <div className="card" style={{ padding: 24 }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 18 }}>
           <Navigation size={20} color="var(--color-primary, #2563eb)" />
           <h3 style={{ margin: 0, fontSize: '1.05rem', fontWeight: 700, color: 'var(--text-primary, #1e293b)' }}>
-            5. Transport Accessibility & Canteen Facilities
+            5. Transportation & Accessibility (FRD Sec. 6.1)
           </h3>
         </div>
 
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(240px, 1fr))', gap: 16 }}>
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(260px, 1fr))', gap: 16 }}>
+          {/* Bus Stand */}
           <div className="form-group">
-            <label className="form-label" htmlFor="busStandDistanceKm">
-              Distance from Nearest Bus Stand (km)
+            <label className="form-label">Bus Stand Nearby?</label>
+            <div style={{ display: 'flex', gap: 20, marginTop: 4, marginBottom: 8 }}>
+              <label style={{ display: 'flex', alignItems: 'center', gap: 8, cursor: 'pointer' }}>
+                <input
+                  type="radio"
+                  name="busStandNearby"
+                  checked={Boolean(basicInfo.busStandNearby)}
+                  onChange={() => handleChange('busStandNearby', true)}
+                  disabled={isReadOnly}
+                />
+                Yes
+              </label>
+              <label style={{ display: 'flex', alignItems: 'center', gap: 8, cursor: 'pointer' }}>
+                <input
+                  type="radio"
+                  name="busStandNearby"
+                  checked={!basicInfo.busStandNearby}
+                  onChange={() => handleChange('busStandNearby', false)}
+                  disabled={isReadOnly}
+                />
+                No
+              </label>
+            </div>
+            {basicInfo.busStandNearby && (
+              <input
+                type="text"
+                className="form-control"
+                value={basicInfo.busStandName || ''}
+                onChange={(e) => handleChange('busStandName', e.target.value)}
+                placeholder="Name of nearest Bus Stand"
+                disabled={isReadOnly}
+              />
+            )}
+          </div>
+
+          {/* Railway Station */}
+          <div className="form-group">
+            <label className="form-label">Railway Station Nearby?</label>
+            <div style={{ display: 'flex', gap: 20, marginTop: 4, marginBottom: 8 }}>
+              <label style={{ display: 'flex', alignItems: 'center', gap: 8, cursor: 'pointer' }}>
+                <input
+                  type="radio"
+                  name="railwayStationNearby"
+                  checked={Boolean(basicInfo.railwayStationNearby)}
+                  onChange={() => handleChange('railwayStationNearby', true)}
+                  disabled={isReadOnly}
+                />
+                Yes
+              </label>
+              <label style={{ display: 'flex', alignItems: 'center', gap: 8, cursor: 'pointer' }}>
+                <input
+                  type="radio"
+                  name="railwayStationNearby"
+                  checked={!basicInfo.railwayStationNearby}
+                  onChange={() => handleChange('railwayStationNearby', false)}
+                  disabled={isReadOnly}
+                />
+                No
+              </label>
+            </div>
+            {basicInfo.railwayStationNearby && (
+              <input
+                type="text"
+                className="form-control"
+                value={basicInfo.railwayStationName || ''}
+                onChange={(e) => handleChange('railwayStationName', e.target.value)}
+                placeholder="Name of nearest Railway Station"
+                disabled={isReadOnly}
+              />
+            )}
+          </div>
+
+          {/* Distance from Main Road */}
+          <div className="form-group">
+            <label className="form-label" htmlFor="mainRoadDistanceKm">
+              Distance from Main Road (km)
             </label>
             <input
-              id="busStandDistanceKm"
+              id="mainRoadDistanceKm"
               type="number"
               step="0.1"
               min={0}
               className="form-control"
-              value={basicInfo.busStandDistanceKm ?? basicInfo.distanceFromBusStand ?? ''}
-              onChange={(e) => handleChange('busStandDistanceKm', e.target.value)}
-              placeholder="e.g. 1.5"
+              value={basicInfo.mainRoadDistanceKm ?? basicInfo.distanceFromMainRoad ?? 0.5}
+              onChange={(e) => {
+                const val = Number(e.target.value);
+                handleChange('mainRoadDistanceKm', val);
+                handleChange('distanceFromMainRoad', val);
+              }}
+              placeholder="e.g. 0.5"
               disabled={isReadOnly}
             />
           </div>
 
+          {/* Sign Boards */}
           <div className="form-group">
-            <label className="form-label" htmlFor="metroStationDistanceKm">
-              Distance from Metro / Railway Station (km)
-            </label>
-            <input
-              id="metroStationDistanceKm"
-              type="number"
-              step="0.1"
-              min={0}
-              className="form-control"
-              value={basicInfo.metroStationDistanceKm ?? basicInfo.distanceFromRailway ?? ''}
-              onChange={(e) => handleChange('metroStationDistanceKm', e.target.value)}
-              placeholder="e.g. 3.0"
-              disabled={isReadOnly}
-            />
+            <label className="form-label">Sign Boards Available?</label>
+            <div style={{ display: 'flex', gap: 20, marginTop: 4 }}>
+              <label style={{ display: 'flex', alignItems: 'center', gap: 8, cursor: 'pointer' }}>
+                <input
+                  type="radio"
+                  name="signBoardsAvailable"
+                  checked={Boolean(basicInfo.signBoardsAvailable ?? basicInfo.signBoards)}
+                  onChange={() => {
+                    handleChange('signBoardsAvailable', true);
+                    handleChange('signBoards', true);
+                  }}
+                  disabled={isReadOnly}
+                />
+                Yes, Visible Direction Boards
+              </label>
+              <label style={{ display: 'flex', alignItems: 'center', gap: 8, cursor: 'pointer' }}>
+                <input
+                  type="radio"
+                  name="signBoardsAvailable"
+                  checked={!(basicInfo.signBoardsAvailable ?? basicInfo.signBoards)}
+                  onChange={() => {
+                    handleChange('signBoardsAvailable', false);
+                    handleChange('signBoards', false);
+                  }}
+                  disabled={isReadOnly}
+                />
+                No
+              </label>
+            </div>
           </div>
+        </div>
+      </div>
 
+      {/* ── Section 6: Accommodation & Food Facilities (FRD Sec. 6.1) ── */}
+      <div className="card" style={{ padding: 24 }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 18 }}>
+          <Utensils size={20} color="var(--color-primary, #2563eb)" />
+          <h3 style={{ margin: 0, fontSize: '1.05rem', fontWeight: 700, color: 'var(--text-primary, #1e293b)' }}>
+            6. Accommodation & Food Facilities (FRD Sec. 6.1)
+          </h3>
+        </div>
+
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(260px, 1fr))', gap: 16 }}>
+          {/* Hotels Nearby */}
           <div className="form-group">
-            <label className="form-label" htmlFor="distanceFromMainRoad">
-              Distance from Main Arterial Road (km)
-            </label>
-            <input
-              id="distanceFromMainRoad"
-              type="number"
-              step="0.1"
-              min={0}
-              className="form-control"
-              value={basicInfo.distanceFromMainRoad ?? 0.5}
-              onChange={(e) => handleChange('distanceFromMainRoad', e.target.value)}
-              placeholder="e.g. 0.2"
-              disabled={isReadOnly}
-            />
+            <label className="form-label">Hotels Nearby?</label>
+            <div style={{ display: 'flex', gap: 20, marginTop: 4, marginBottom: 8 }}>
+              <label style={{ display: 'flex', alignItems: 'center', gap: 8, cursor: 'pointer' }}>
+                <input
+                  type="radio"
+                  name="hotelsNearby"
+                  checked={Boolean(basicInfo.hotelsNearby)}
+                  onChange={() => handleChange('hotelsNearby', true)}
+                  disabled={isReadOnly}
+                />
+                Yes
+              </label>
+              <label style={{ display: 'flex', alignItems: 'center', gap: 8, cursor: 'pointer' }}>
+                <input
+                  type="radio"
+                  name="hotelsNearby"
+                  checked={!basicInfo.hotelsNearby}
+                  onChange={() => handleChange('hotelsNearby', false)}
+                  disabled={isReadOnly}
+                />
+                No
+              </label>
+            </div>
+            {basicInfo.hotelsNearby && (
+              <input
+                type="number"
+                step="0.1"
+                min={0}
+                className="form-control"
+                value={basicInfo.nearestHotelDistanceKm ?? ''}
+                onChange={(e) => handleChange('nearestHotelDistanceKm', Number(e.target.value))}
+                placeholder="Distance in km (e.g. 1.5)"
+                disabled={isReadOnly}
+              />
+            )}
           </div>
 
+          {/* Canteen within Campus */}
+          <div className="form-group">
+            <label className="form-label">Canteen Within Campus?</label>
+            <div style={{ display: 'flex', gap: 20, marginTop: 4 }}>
+              <label style={{ display: 'flex', alignItems: 'center', gap: 8, cursor: 'pointer' }}>
+                <input
+                  type="radio"
+                  name="canteenAvailable"
+                  checked={Boolean(basicInfo.canteenAvailable ?? basicInfo.canteenArrangement)}
+                  onChange={() => {
+                    handleChange('canteenAvailable', true);
+                    handleChange('canteenArrangement', true);
+                  }}
+                  disabled={isReadOnly}
+                />
+                Yes
+              </label>
+              <label style={{ display: 'flex', alignItems: 'center', gap: 8, cursor: 'pointer' }}>
+                <input
+                  type="radio"
+                  name="canteenAvailable"
+                  checked={!(basicInfo.canteenAvailable ?? basicInfo.canteenArrangement)}
+                  onChange={() => {
+                    handleChange('canteenAvailable', false);
+                    handleChange('canteenArrangement', false);
+                  }}
+                  disabled={isReadOnly}
+                />
+                No
+              </label>
+            </div>
+          </div>
+
+          {/* Canteen Food for Staff */}
+          <div className="form-group">
+            <label className="form-label">Canteen Food for Staff / Coordinators / Observers?</label>
+            <div style={{ display: 'flex', gap: 20, marginTop: 4 }}>
+              <label style={{ display: 'flex', alignItems: 'center', gap: 8, cursor: 'pointer' }}>
+                <input
+                  type="radio"
+                  name="canteenFoodForStaff"
+                  checked={Boolean(basicInfo.canteenFoodForStaff)}
+                  onChange={() => handleChange('canteenFoodForStaff', true)}
+                  disabled={isReadOnly}
+                />
+                Yes
+              </label>
+              <label style={{ display: 'flex', alignItems: 'center', gap: 8, cursor: 'pointer' }}>
+                <input
+                  type="radio"
+                  name="canteenFoodForStaff"
+                  checked={!basicInfo.canteenFoodForStaff}
+                  onChange={() => handleChange('canteenFoodForStaff', false)}
+                  disabled={isReadOnly}
+                />
+                No
+              </label>
+            </div>
+          </div>
+
+          {/* Food for Testing Days */}
+          <div className="form-group">
+            <label className="form-label">Food for Testing Days?</label>
+            <div style={{ display: 'flex', gap: 20, marginTop: 4 }}>
+              <label style={{ display: 'flex', alignItems: 'center', gap: 8, cursor: 'pointer' }}>
+                <input
+                  type="radio"
+                  name="foodForTestingDays"
+                  checked={Boolean(basicInfo.foodForTestingDays)}
+                  onChange={() => handleChange('foodForTestingDays', true)}
+                  disabled={isReadOnly}
+                />
+                Yes
+              </label>
+              <label style={{ display: 'flex', alignItems: 'center', gap: 8, cursor: 'pointer' }}>
+                <input
+                  type="radio"
+                  name="foodForTestingDays"
+                  checked={!basicInfo.foodForTestingDays}
+                  onChange={() => handleChange('foodForTestingDays', false)}
+                  disabled={isReadOnly}
+                />
+                No
+              </label>
+            </div>
+          </div>
+
+          {/* Food for Mock Days */}
+          <div className="form-group">
+            <label className="form-label">Food for Mock Days?</label>
+            <div style={{ display: 'flex', gap: 20, marginTop: 4 }}>
+              <label style={{ display: 'flex', alignItems: 'center', gap: 8, cursor: 'pointer' }}>
+                <input
+                  type="radio"
+                  name="foodForMockDays"
+                  checked={Boolean(basicInfo.foodForMockDays)}
+                  onChange={() => handleChange('foodForMockDays', true)}
+                  disabled={isReadOnly}
+                />
+                Yes
+              </label>
+              <label style={{ display: 'flex', alignItems: 'center', gap: 8, cursor: 'pointer' }}>
+                <input
+                  type="radio"
+                  name="foodForMockDays"
+                  checked={!basicInfo.foodForMockDays}
+                  onChange={() => handleChange('foodForMockDays', false)}
+                  disabled={isReadOnly}
+                />
+                No
+              </label>
+            </div>
+          </div>
+
+          {/* Outside Food Possible */}
           <div className="form-group" style={{ gridColumn: '1 / -1' }}>
-            <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 8 }}>
-              <Utensils size={16} color="var(--color-primary)" />
-              <label className="form-label" style={{ margin: 0 }}>
-                Nearby Canteen / Food Arrangement Available for Candidates & Staff?
-              </label>
-            </div>
-            <div style={{ display: 'flex', gap: 20, marginBottom: 12 }}>
+            <label className="form-label">Outside Food Possible?</label>
+            <div style={{ display: 'flex', gap: 20, marginTop: 4, marginBottom: 8 }}>
               <label style={{ display: 'flex', alignItems: 'center', gap: 8, cursor: 'pointer' }}>
                 <input
                   type="radio"
-                  name="canteenArrangement"
-                  checked={Boolean(basicInfo.canteenArrangement ?? basicInfo.canteenAvailable)}
-                  onChange={() => handleChange('canteenArrangement', true)}
+                  name="outsideFoodPossible"
+                  checked={Boolean(basicInfo.outsideFoodPossible)}
+                  onChange={() => handleChange('outsideFoodPossible', true)}
                   disabled={isReadOnly}
                 />
-                Yes, On-Campus / Adjacent Canteen Available
+                Yes, Outside Packed Catering Allowed
               </label>
               <label style={{ display: 'flex', alignItems: 'center', gap: 8, cursor: 'pointer' }}>
                 <input
                   type="radio"
-                  name="canteenArrangement"
-                  checked={!(basicInfo.canteenArrangement ?? basicInfo.canteenAvailable)}
-                  onChange={() => handleChange('canteenArrangement', false)}
+                  name="outsideFoodPossible"
+                  checked={!basicInfo.outsideFoodPossible}
+                  onChange={() => handleChange('outsideFoodPossible', false)}
                   disabled={isReadOnly}
                 />
-                No (Nearby commercial shops only)
+                No
               </label>
             </div>
-            <input
-              type="text"
-              className="form-control"
-              value={basicInfo.canteenRemarks || ''}
-              onChange={(e) => handleChange('canteenRemarks', e.target.value)}
-              placeholder="Canteen capacity, operating hours, drinking water points..."
-              disabled={isReadOnly}
-            />
+            {basicInfo.outsideFoodPossible && (
+              <textarea
+                rows={2}
+                className="form-control"
+                value={basicInfo.outsideFoodDetails || ''}
+                onChange={(e) => handleChange('outsideFoodDetails', e.target.value)}
+                placeholder="Details of food arrangements, preferred vendors, dining halls..."
+                disabled={isReadOnly}
+              />
+            )}
           </div>
         </div>
       </div>

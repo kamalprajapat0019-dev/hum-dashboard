@@ -1,9 +1,11 @@
 import React, { useState } from 'react';
 import {
   AlertCircle, CheckCircle2, Building2, Layers, Monitor, Plus, Trash2,
-  ChevronDown, ChevronRight, Shield, Flame, Check, HelpCircle, Save
+  ChevronDown, ChevronRight, Shield, Flame, Check, HelpCircle, Save,
+  Upload, Eye, FileText, Camera, ShieldCheck
 } from 'lucide-react';
 import { BUILDING_TYPES, LAB_TYPES, PARTITION_TYPES, SYSTEM_OWNERSHIP_TYPES } from './constants';
+import { validateDocumentFile, validateAndCompressPhoto } from '@/utils/fileValidation';
 
 export function Submodule4BuildingInfra({
   infrastructure = {},
@@ -14,12 +16,59 @@ export function Submodule4BuildingInfra({
   reviewStatus = 'NOT_STARTED',
   reworkReason = '',
   onSaveAndAddBuilding,
+  onUploadDocument,
+  onUploadMedia,
+  documents = [],
+  mediaAssets = [],
 }) {
   const isRework = reviewStatus === 'REWORK_REQUIRED';
   const isVerified = reviewStatus === 'VERIFIED';
 
   const [activeBuildingIndex, setActiveBuildingIndex] = useState(0);
   const [expandedFloors, setExpandedFloors] = useState({});
+  const [uploadingDoc, setUploadingDoc] = useState(null);
+  const [uploadError, setUploadError] = useState(null);
+
+  const getDoc = (type) => documents.find((d) => d.documentType === type || d.documentType === type?.toLowerCase());
+
+  const handleFileUpload = async (file, docType, docName, isPhotoOnly = false) => {
+    if (!file) return;
+    setUploadError(null);
+    setUploadingDoc(docType);
+
+    try {
+      let result;
+      const isPdf = file.type === 'application/pdf';
+
+      if (isPhotoOnly) {
+        result = await validateAndCompressPhoto(file);
+      } else if (isPdf) {
+        result = await validateDocumentFile(file);
+      } else {
+        result = await validateAndCompressPhoto(file);
+      }
+
+      if (!result.success) {
+        setUploadError(result.error);
+        return;
+      }
+
+      if (onUploadDocument) {
+        await onUploadDocument({
+          documentType: docType,
+          documentName: docName,
+          fileName: result.fileName,
+          fileUrl: result.fileUrl,
+          fileSize: result.finalSizeBytes,
+          mimeType: result.mimeType,
+        });
+      }
+    } catch (err) {
+      setUploadError(err.message || `Failed to upload ${docName}`);
+    } finally {
+      setUploadingDoc(null);
+    }
+  };
 
   const handleInfraChange = (field, value) => {
     setInfrastructure((prev) => ({
@@ -367,20 +416,121 @@ export function Submodule4BuildingInfra({
         </div>
       </div>
 
-      {/* ── Section A: Common Centre Facilities & Safety ── */}
+      {/* ── Section A: Common Centre Facilities & Safety Standards (FRD Sec. 9) ── */}
       <div className="card" style={{ padding: 24 }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 18 }}>
           <Building2 size={20} color="var(--color-primary, #2563eb)" />
-          <h3 style={{ margin: 0, fontSize: '1.05rem', fontWeight: 700, color: 'var(--text-primary, #1e293b)' }}>
-            A. Common Campus Facilities & Safety Standards
-          </h3>
+          <div>
+            <h3 style={{ margin: 0, fontSize: '1.05rem', fontWeight: 700, color: 'var(--text-primary, #1e293b)' }}>
+              A. Common Campus Facilities & Safety Standards (FRD Sec. 9)
+            </h3>
+            <span style={{ fontSize: '0.8125rem', color: 'var(--text-secondary, #64748b)' }}>
+              Physical entry access, security surveillance, candidate amenities, and fire clearance parameters.
+            </span>
+          </div>
         </div>
 
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(240px, 1fr))', gap: 16 }}>
+        {uploadError && (
+          <div
+            style={{
+              padding: '10px 14px',
+              borderRadius: 'var(--radius-md, 6px)',
+              background: 'var(--color-danger-bg, #fef2f2)',
+              border: '1px solid var(--color-danger-border, #fca5a5)',
+              color: 'var(--color-danger, #b91c1c)',
+              fontSize: '0.8125rem',
+              marginBottom: 16,
+            }}
+          >
+            {uploadError}
+          </div>
+        )}
+
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(260px, 1fr))', gap: 16 }}>
+          {/* 1. Gates & Campus Access */}
           <div className="form-group">
-            <label className="form-label" htmlFor="totalWashrooms">Total Common Washrooms</label>
+            <label className="form-label">Entry Gate Count (1 - 10) *</label>
             <input
-              id="totalWashrooms"
+              type="number"
+              min={1}
+              max={10}
+              className="form-control"
+              value={infrastructure.noOfEntryGates ?? infrastructure.entryGateCount ?? 1}
+              onChange={(e) => {
+                const val = Number(e.target.value);
+                handleInfraChange('noOfEntryGates', val);
+                handleInfraChange('entryGateCount', val);
+              }}
+              disabled={isReadOnly}
+            />
+          </div>
+
+          <div className="form-group">
+            <label className="form-label">Exit Gate Count (1 - 10) *</label>
+            <input
+              type="number"
+              min={1}
+              max={10}
+              className="form-control"
+              value={infrastructure.noOfExitGates ?? infrastructure.exitGateCount ?? 1}
+              onChange={(e) => {
+                const val = Number(e.target.value);
+                handleInfraChange('noOfExitGates', val);
+                handleInfraChange('exitGateCount', val);
+              }}
+              disabled={isReadOnly}
+            />
+          </div>
+
+          <div className="form-group">
+            <label className="form-label">Separate Entry & Exit Gates?</label>
+            <select
+              className="form-control"
+              value={infrastructure.separateEntryExit ? 'Yes' : 'No'}
+              onChange={(e) => handleInfraChange('separateEntryExit', e.target.value === 'Yes')}
+              disabled={isReadOnly}
+            >
+              <option value="Yes">Yes, Dedicated Separate Gates</option>
+              <option value="No">No, Shared Single Gate</option>
+            </select>
+          </div>
+
+          {/* 2. Lift / Elevator */}
+          <div className="form-group">
+            <label className="form-label">Elevator / Lift Available?</label>
+            <select
+              className="form-control"
+              value={infrastructure.elevatorAvailable ?? infrastructure.liftAvailable ? 'Yes' : 'No'}
+              onChange={(e) => {
+                const val = e.target.value === 'Yes';
+                handleInfraChange('elevatorAvailable', val);
+                handleInfraChange('liftAvailable', val);
+              }}
+              disabled={isReadOnly}
+            >
+              <option value="Yes">Yes, Operable Lifts Available</option>
+              <option value="No">No</option>
+            </select>
+          </div>
+
+          {(infrastructure.elevatorAvailable ?? infrastructure.liftAvailable) && (
+            <div className="form-group">
+              <label className="form-label">Number of Lifts Active</label>
+              <input
+                type="number"
+                min={1}
+                className="form-control"
+                value={infrastructure.noOfLifts ?? 1}
+                onChange={(e) => handleInfraChange('noOfLifts', Number(e.target.value))}
+                disabled={isReadOnly}
+              />
+            </div>
+          )}
+
+          {/* 3. Common Washrooms */}
+          <div className="form-group">
+            <label className="form-label">Total Common Washrooms</label>
+            <input
               type="number"
               min={1}
               className="form-control"
@@ -391,9 +541,8 @@ export function Submodule4BuildingInfra({
           </div>
 
           <div className="form-group">
-            <label className="form-label" htmlFor="maleWashrooms">Male Washrooms</label>
+            <label className="form-label">Male Washrooms</label>
             <input
-              id="maleWashrooms"
               type="number"
               min={1}
               className="form-control"
@@ -404,9 +553,8 @@ export function Submodule4BuildingInfra({
           </div>
 
           <div className="form-group">
-            <label className="form-label" htmlFor="femaleWashrooms">Female Washrooms</label>
+            <label className="form-label">Female Washrooms</label>
             <input
-              id="femaleWashrooms"
               type="number"
               min={1}
               className="form-control"
@@ -416,10 +564,23 @@ export function Submodule4BuildingInfra({
             />
           </div>
 
+          {/* 4. CCTV Surveillance */}
           <div className="form-group">
-            <label className="form-label" htmlFor="fireExtinguishers">Fire Extinguishers Active Units</label>
+            <label className="form-label">Total CCTV Cameras Installed *</label>
             <input
-              id="fireExtinguishers"
+              type="number"
+              min={1}
+              className="form-control"
+              value={infrastructure.noOfCctvCameras ?? 16}
+              onChange={(e) => handleInfraChange('noOfCctvCameras', Number(e.target.value))}
+              disabled={isReadOnly}
+            />
+          </div>
+
+          {/* 5. Fire Extinguishers */}
+          <div className="form-group">
+            <label className="form-label">Fire Extinguishers Active Units *</label>
+            <input
               type="number"
               min={1}
               className="form-control"
@@ -428,20 +589,45 @@ export function Submodule4BuildingInfra({
               disabled={isReadOnly}
             />
           </div>
+
+          <div className="form-group">
+            <label className="form-label">Extinguishers Last Refill Date</label>
+            <input
+              type="date"
+              className="form-control"
+              value={
+                infrastructure.fireExtinguisherRefillDate
+                  ? String(infrastructure.fireExtinguisherRefillDate).split('T')[0]
+                  : ''
+              }
+              onChange={(e) => handleInfraChange('fireExtinguisherRefillDate', e.target.value)}
+              disabled={isReadOnly}
+            />
+          </div>
         </div>
 
-        <div style={{ marginTop: 18 }}>
+        {/* ── FRD Facility Checkboxes & Controls ── */}
+        <div style={{ marginTop: 20 }}>
           <h4 style={{ margin: '0 0 12px', fontSize: '0.875rem', fontWeight: 600, color: 'var(--text-secondary)' }}>
-            Mandatory Infrastructure Checklist
+            Mandatory FRD Facilities & Compliance Checklist
           </h4>
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: 10 }}>
             {[
-              { key: 'dedicatedServerRoom', label: 'Dedicated Lockable Server Room with AC & UPS' },
               { key: 'drinkingWater', label: 'Clean Drinking Water / RO Stations Available' },
-              { key: 'cctvCoverage', label: 'CCTV Surveillance Active at Entry Gates & Corridors' },
-              { key: 'pwdAccessible', label: 'PWD Barrier-Free Access (Ramps / Wide Doors / Lifts)' },
+              { key: 'lockerFacility', label: 'Baggage / Locker Counter Available for Candidates' },
+              { key: 'parkingAvailable', label: '2-Wheeler Parking Facility Inside Campus' },
+              { key: 'candidateParkingInside', label: '4-Wheeler Parking Facility Inside Campus' },
+              { key: 'printerAvailable', label: 'Heavy-Duty Laser Printer Available for Attendance & Admit Cards' },
+              { key: 'jammerAvailable', label: 'Mobile Signal Jammer Compatible & Installable' },
+              { key: 'pwdAccessible', label: 'PWD Barrier-Free Access (Ramps / Wide Doors)' },
+              { key: 'wheelchairAvailable', label: 'Wheelchair Available Onsite for PWD Candidates' },
+              { key: 'suitablePwd', label: 'Dedicated Accessible PWD Washroom Available' },
+              { key: 'dedicatedServerRoom', label: 'Dedicated Lockable Server Room with AC & UPS' },
+              { key: 'acInServerRoom', label: 'Dedicated AC Functioning in Server Room' },
+              { key: 'serverRoomUpsNetwork', label: 'Server Room on Dedicated UPS Backup' },
               { key: 'firstAidAvailable', label: 'First Aid Kit & Emergency Medical Assistance Onsite' },
               { key: 'emergencyExitsMarked', label: 'Clear Illuminated Emergency Exit Signages Marked' },
+              { key: 'fireSafetyClearance', label: 'Fire Safety NOC / Clearance Available' },
             ].map((chk) => (
               <label
                 key={chk.key}
@@ -466,6 +652,79 @@ export function Submodule4BuildingInfra({
                 {chk.label}
               </label>
             ))}
+          </div>
+        </div>
+
+        {/* ── Photo & Attachment Upload Row ── */}
+        <div style={{ marginTop: 20 }}>
+          <h4 style={{ margin: '0 0 12px', fontSize: '0.875rem', fontWeight: 600, color: 'var(--text-secondary)' }}>
+            Facility Photos & Fire NOC Documentation (FRD Sec. 9)
+          </h4>
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(260px, 1fr))', gap: 12 }}>
+            {[
+              { type: 'gate_photo', name: 'Campus Entry Gate Photo', isPhoto: true },
+              { type: 'server_room_photo', name: 'Server Room Photo', isPhoto: true },
+              { type: 'water_station_photo', name: 'RO Drinking Water Photo', isPhoto: true },
+              { type: 'pwd_ramp_photo', name: 'PWD Ramp & Wheelchair Photo', isPhoto: true },
+              { type: 'fire_noc', name: 'Fire NOC Certificate (PDF ≤ 10MB)', isPhoto: false },
+            ].map((item) => {
+              const doc = getDoc(item.type);
+              return (
+                <div
+                  key={item.type}
+                  style={{
+                    padding: 12,
+                    borderRadius: 'var(--radius-md, 6px)',
+                    background: 'var(--bg-subtle, #f8fafc)',
+                    border: '1px solid var(--border-color, #e2e8f0)',
+                    display: 'flex',
+                    justifyContent: 'space-between',
+                    alignItems: 'center',
+                  }}
+                >
+                  <div>
+                    <strong style={{ fontSize: '0.8125rem', display: 'block' }}>{item.name}</strong>
+                    {doc ? (
+                      <span style={{ fontSize: '0.72rem', color: 'var(--color-success)', display: 'inline-flex', alignItems: 'center', gap: 4 }}>
+                        <Check size={12} /> {doc.fileName || 'Uploaded'}
+                      </span>
+                    ) : (
+                      <span style={{ fontSize: '0.72rem', color: 'var(--text-muted)' }}>Not uploaded</span>
+                    )}
+                  </div>
+                  <div style={{ display: 'flex', gap: 6 }}>
+                    {doc && (
+                      <a
+                        href={doc.fileUrl}
+                        target="_blank"
+                        rel="noreferrer"
+                        className="btn btn-xs btn-secondary"
+                        style={{ display: 'inline-flex', alignItems: 'center', gap: 2 }}
+                      >
+                        <Eye size={11} /> View
+                      </a>
+                    )}
+                    {!isReadOnly && (
+                      <label className="btn btn-xs btn-secondary" style={{ cursor: 'pointer' }}>
+                        <Upload size={11} className={uploadingDoc === item.type ? 'animate-spin' : ''} />
+                        {uploadingDoc === item.type ? '...' : doc ? 'Replace' : 'Upload'}
+                        <input
+                          type="file"
+                          accept={item.isPhoto ? '.jpg,.jpeg,image/jpeg' : '.pdf,application/pdf,.jpg,.jpeg,image/jpeg'}
+                          style={{ display: 'none' }}
+                          onChange={(e) => {
+                            if (e.target.files?.[0]) {
+                              handleFileUpload(e.target.files[0], item.type, item.name, item.isPhoto);
+                            }
+                          }}
+                          disabled={uploadingDoc === item.type}
+                        />
+                      </label>
+                    )}
+                  </div>
+                </div>
+              );
+            })}
           </div>
         </div>
       </div>

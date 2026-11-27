@@ -22,8 +22,8 @@ import ClientsPage from '../features/clients/ClientsPage';
 import ProjectsPage from '../features/projects/ProjectsPage';
 import CentresPage from '../features/centres/CentresPage';
 import MyCentreProfilePage from '../features/centres/MyCentreProfilePage';
-import CentreDocuments from '../features/centres/CentreDocuments';
-import CentreConsentPage from '../features/centres/CentreConsentPage';
+import CentrePoliciesPage from '../features/centres/CentrePoliciesPage';
+import InviteRegisterPage from '../features/auth/pages/InviteRegisterPage';
 import UsersPage from '../features/users/UsersPage';
 import EligibilityPage from '../features/eligibility/EligibilityPage';
 import ConfigPage from '../features/admin/ConfigPage';
@@ -103,6 +103,14 @@ export function AppRouter() {
       <Route
         path={ROUTES.ACTIVATE_ACCOUNT}
         element={<SetNewPasswordPage />}
+      />
+      <Route
+        path={ROUTES.INVITE_REGISTER}
+        element={<InviteRegisterPage />}
+      />
+      <Route
+        path={ROUTES.REGISTER}
+        element={<InviteRegisterPage />}
       />
       <Route path={ROUTES.UNAUTHORIZED} element={<Unauthorized />} />
       <Route path={ROUTES.HOME} element={<RoleRedirect />} />
@@ -204,11 +212,11 @@ export function AppRouter() {
         </ProtectedRoute>
       } />
       <Route path={ROUTES.CENTRE.BOOKING} element={<ProtectedRoute allowedRoles={[ROLES.CENTRE, ROLES.ADMIN]}><DashboardLayout><BookingLockingPage /></DashboardLayout></ProtectedRoute>} />
-      <Route path={ROUTES.CENTRE.CONSENT} element={<ProtectedRoute allowedRoles={[ROLES.CENTRE, ROLES.ADMIN]}><DashboardLayout><CentreConsentPage /></DashboardLayout></ProtectedRoute>} />
-      <Route path={ROUTES.CENTRE.DOCUMENTS} element={<ProtectedRoute allowedRoles={[ROLES.CENTRE, ROLES.ADMIN]}><DashboardLayout><CentreDocuments /></DashboardLayout></ProtectedRoute>} />
-      <Route path={ROUTES.CENTRE.INFRA} element={<ProtectedRoute allowedRoles={[ROLES.CENTRE, ROLES.ADMIN]}><DashboardLayout><ReadinessExamPage /></DashboardLayout></ProtectedRoute>} />
-      <Route path={ROUTES.CENTRE.QUOTATION} element={<ProtectedRoute allowedRoles={[ROLES.CENTRE, ROLES.ADMIN]}><DashboardLayout><CostSheetPage /></DashboardLayout></ProtectedRoute>} />
-      <Route path={ROUTES.CENTRE.MOU} element={<ProtectedRoute allowedRoles={[ROLES.CENTRE, ROLES.ADMIN]}><DashboardLayout><CentreDocuments /></DashboardLayout></ProtectedRoute>} />
+      <Route path={ROUTES.CENTRE.CONSENT} element={<Navigate to={ROUTES.CENTRE.BOOKING} replace />} />
+      <Route path={ROUTES.CENTRE.DOCUMENTS} element={<Navigate to={ROUTES.CENTRE.PROFILE} replace />} />
+      <Route path={ROUTES.CENTRE.INFRA} element={<Navigate to={ROUTES.CENTRE.PROFILE} replace />} />
+      <Route path={ROUTES.CENTRE.QUOTATION} element={<Navigate to={ROUTES.CENTRE.PROFILE} replace />} />
+      <Route path={ROUTES.CENTRE.MOU} element={<Navigate to={ROUTES.CENTRE.PROFILE} replace />} />
       <Route path={ROUTES.CENTRE.ALLOCATION} element={<ProtectedRoute allowedRoles={[ROLES.CENTRE, ROLES.ADMIN]}><DashboardLayout><AllocationManagementPage /></DashboardLayout></ProtectedRoute>} />
       <Route path={ROUTES.CENTRE.READINESS} element={<ProtectedRoute allowedRoles={[ROLES.CENTRE, ROLES.ADMIN]}><DashboardLayout><ReadinessExamPage /></DashboardLayout></ProtectedRoute>} />
       <Route path={ROUTES.CENTRE.EXAMDAY} element={<ProtectedRoute allowedRoles={[ROLES.CENTRE, ROLES.ADMIN]}><DashboardLayout><ReadinessExamPage /></DashboardLayout></ProtectedRoute>} />
@@ -216,7 +224,7 @@ export function AppRouter() {
       <Route path={ROUTES.CENTRE.SUPPORT} element={<ProtectedRoute allowedRoles={[ROLES.CENTRE, ROLES.ADMIN]}><DashboardLayout><IncidentManagementPage /></DashboardLayout></ProtectedRoute>} />
       <Route path={ROUTES.CENTRE.INVOICE} element={<ProtectedRoute allowedRoles={[ROLES.CENTRE, ROLES.ADMIN]}><DashboardLayout><InvoiceManagementPage /></DashboardLayout></ProtectedRoute>} />
       <Route path={ROUTES.CENTRE.HISTORY} element={<ProtectedRoute allowedRoles={[ROLES.CENTRE, ROLES.ADMIN]}><DashboardLayout><PaymentReconciliationPage /></DashboardLayout></ProtectedRoute>} />
-      <Route path={ROUTES.CENTRE.POLICIES} element={<ProtectedRoute allowedRoles={[ROLES.CENTRE, ROLES.ADMIN]}><DashboardLayout><CentreDocuments /></DashboardLayout></ProtectedRoute>} />
+      <Route path={ROUTES.CENTRE.POLICIES} element={<ProtectedRoute allowedRoles={[ROLES.CENTRE, ROLES.ADMIN]}><DashboardLayout><CentrePoliciesPage /></DashboardLayout></ProtectedRoute>} />
 
       {/* 404 / Fallback */}
       <Route path="*" element={<Navigate to={ROUTES.HOME} replace />} />

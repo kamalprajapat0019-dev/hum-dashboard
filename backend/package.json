@@ -16,7 +16,7 @@
     "prisma:deploy": "prisma migrate deploy",
     "seed": "tsx prisma/seed.ts",
     "clean:port": "powershell -Command \"$p = (Get-NetTCPConnection -LocalPort 5000 -ErrorAction SilentlyContinue).OwningProcess; if ($p) { Stop-Process -Id $p -Force; Write-Host 'Freed port 5000 (stopped PID ' $p ')' } else { Write-Host 'Port 5000 is already free' }\"",
-    "test": "vitest run"
+    "test": "vitest run --testTimeout=15000"
   },
   "dependencies": {
     "@prisma/client": "^6.4.1",

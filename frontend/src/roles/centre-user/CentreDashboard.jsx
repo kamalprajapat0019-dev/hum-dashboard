@@ -263,9 +263,15 @@ export default function CentreDashboard() {
                 </div>
               </div>
               <div>
-                <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>Official Email</div>
+                <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>Centre Official Email</div>
                 <div style={{ fontSize: '0.875rem', marginTop: 2 }}>
-                  {centreProfile.officialEmail || '—'}
+                  {centreProfile.centreOfficialEmail || centreProfile.officialEmail || '—'}
+                </div>
+              </div>
+              <div>
+                <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>Centre Official Mobile</div>
+                <div style={{ fontSize: '0.875rem', marginTop: 2 }}>
+                  {centreProfile.centreOfficialMobile || centreProfile.officialMobile || '—'}
                 </div>
               </div>
             </div>

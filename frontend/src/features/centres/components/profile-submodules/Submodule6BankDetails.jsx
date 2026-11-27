@@ -146,7 +146,7 @@ export function Submodule6BankDetails({
             <CreditCard size={20} color="var(--color-primary, #2563eb)" />
             <div>
               <h3 style={{ margin: 0, fontSize: '1.05rem', fontWeight: 700, color: 'var(--text-primary, #1e293b)' }}>
-                Beneficiary Bank Account & Payout Settlement
+                Centre Beneficiary Bank Account & Payout Settlement
               </h3>
               <span style={{ fontSize: '0.8125rem', color: 'var(--text-secondary, #64748b)' }}>
                 Account used for processing booking advances, exam day allowances, and final invoicing.
@@ -169,7 +169,7 @@ export function Submodule6BankDetails({
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(260px, 1fr))', gap: 16 }}>
           <div className="form-group">
             <label className="form-label" htmlFor="accountName">
-              Beneficiary Account Holder Name <span style={{ color: 'var(--color-danger)' }}>*</span>
+              Centre Beneficiary Account Holder Name <span style={{ color: 'var(--color-danger)' }}>*</span>
             </label>
             <input
               id="accountName"
@@ -226,13 +226,12 @@ export function Submodule6BankDetails({
             <select
               id="accountType"
               className="form-control"
-              value={bank.accountType || 'Current Account'}
+              value={bank.accountType?.includes('Savings') ? 'Savings' : 'Current'}
               onChange={(e) => handleChange('accountType', e.target.value)}
               disabled={isReadOnly}
             >
-              <option value="Current Account">Current Account</option>
-              <option value="Savings Account">Savings Account</option>
-              <option value="Overdraft / Cash Credit">Overdraft / Cash Credit</option>
+              <option value="Current">Current</option>
+              <option value="Savings">Savings</option>
             </select>
           </div>
 

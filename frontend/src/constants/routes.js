@@ -7,6 +7,8 @@ export const ROUTES = {
   UNAUTHORIZED: '/unauthorized',
   RESET_PASSWORD: '/reset-password',
   ACTIVATE_ACCOUNT: '/activate-account',
+  INVITE_REGISTER: '/invite/register',
+  REGISTER: '/register',
 
   ADMIN: {
     DASHBOARD: '/admin',

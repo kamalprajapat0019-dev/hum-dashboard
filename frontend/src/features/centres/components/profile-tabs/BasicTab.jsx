@@ -146,8 +146,8 @@ export function BasicTab({
               Capacity & Prior Experience
             </h4>
             <div style={{ display: 'flex', flexDirection: 'column', gap: 10, fontSize: '0.875rem' }}>
-              <div><span style={{ color: '#64748b' }}>Declared Total Nodes:</span> <strong style={{ fontSize: '1.05rem', color: '#1e40af' }}>{capacity.examNodes || centre.totalNodes || 0} nodes</strong></div>
-              <div><span style={{ color: '#64748b' }}>Buffer Percentage:</span> {capacity.bufferPercent || 10}%</div>
+              <div><span style={{ color: '#64748b' }}>Actual Nodes:</span> <strong style={{ fontSize: '1rem', color: '#1e40af' }}>{capacity.totalSystems || centre.totalNodes || 0} nodes</strong></div>
+              <div><span style={{ color: '#64748b' }}>Exam Nodes:</span> <strong style={{ fontSize: '1rem', color: '#0d9488' }}>{capacity.examNodes || centre.totalNodes || 0} nodes</strong></div>
               <div><span style={{ color: '#64748b' }}>Registration Desks:</span> {capacity.regDeskCount || 2}</div>
               <div><span style={{ color: '#64748b' }}>Server Units:</span> {capacity.serverCount || 1}</div>
               <div><span style={{ color: '#64748b' }}>Previous CBT Exam Conducted?</span> <strong>{centre.previousExamConducted ? 'Yes' : 'No'}</strong></div>
@@ -162,10 +162,11 @@ export function BasicTab({
               Official Contact & Transit
             </h4>
             <div style={{ display: 'flex', flexDirection: 'column', gap: 10, fontSize: '0.875rem' }}>
-              <div><span style={{ color: '#64748b' }}>Official Email:</span> {centre.officialEmail || '—'}</div>
-              <div><span style={{ color: '#64748b' }}>Official Mobile:</span> {centre.officialMobile || '—'}</div>
-              <div><span style={{ color: '#64748b' }}>Alternate Mobile:</span> {centre.alternateMobile || '—'}</div>
-              <div><span style={{ color: '#64748b' }}>Landline with STD:</span> {centre.phoneStd || '—'}</div>
+              <div><span style={{ color: '#64748b' }}>Centre Official Email:</span> {centre.centreOfficialEmail || centre.officialEmail || '—'}</div>
+              <div><span style={{ color: '#64748b' }}>Centre Official Mobile:</span> {centre.centreOfficialMobile || centre.officialMobile || '—'}</div>
+              <div><span style={{ color: '#64748b' }}>Centre WhatsApp Mobile:</span> {centre.centreWhatsappMobile || centre.whatsappMobile || '—'}</div>
+              <div><span style={{ color: '#64748b' }}>Centre Alternate Mobile:</span> {centre.centreAlternateMobile || centre.alternateMobile || '—'}</div>
+              <div><span style={{ color: '#64748b' }}>Centre Phone Number with STD:</span> {centre.centrePhoneNumberWithStdCode || centre.phoneStd || '—'}</div>
               <div><span style={{ color: '#64748b' }}>Nearby Bus Stand:</span> {inf.busStandNearby ? `Yes (${inf.busStandName || 'Nearby'})` : 'No'}</div>
               <div><span style={{ color: '#64748b' }}>Nearby Metro Station:</span> {inf.metroNearby ? `Yes (${inf.metroStationName || 'Nearby'})` : 'No'}</div>
               <div><span style={{ color: '#64748b' }}>Distance from Highway:</span> {inf.distanceFromMainRoad !== null ? `${inf.distanceFromMainRoad} km` : '—'}</div>

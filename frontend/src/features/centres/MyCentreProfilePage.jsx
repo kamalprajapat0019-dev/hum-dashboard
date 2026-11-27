@@ -48,32 +48,32 @@ export default function MyCentreProfilePage() {
   // ── Submodule 1: Basic Information ──────────────────────────────────────────
   const [basicInfo, setBasicInfo] = useState({
     centreName: '',
-    centreCategory: 'Engineering College',
+    centreCategory: '',
     customCentreCategory: '',
-    organizationType: 'Trust',
-    regionId: 'North',
+    organizationType: '',
+    regionId: '',
     centreAddress: '',
-    stateName: 'Delhi',
+    stateName: '',
     cityName: '',
     taluka: '',
     district: '',
     pincode: '',
     eduCode: '',
     tcCode: '',
-    venueStatus: 'COMMERCIAL',
+    venueStatus: '',
     googleMapLink: '',
     officialEmail: '',
+    centreOfficialEmail: '',
     officialMobile: '',
     alternateMobile: '',
-    actualNodes: 100,
-    examNodes: 80,
-    bufferNodes: 20,
-    totalNodes: 80,
+    actualNodes: '',
+    examNodes: '',
+    totalNodes: '',
     previousExamConducted: false,
     previousEduExam: '',
-    busStandDistanceKm: 1.5,
-    metroStationDistanceKm: 3.0,
-    distanceFromMainRoad: 0.5,
+    busStandDistanceKm: '',
+    metroStationDistanceKm: '',
+    distanceFromMainRoad: '',
     canteenArrangement: true,
     canteenRemarks: '',
   });
@@ -241,10 +241,10 @@ export default function MyCentreProfilePage() {
         setBasicInfo((prev) => ({
           ...prev,
           centreName: c.centreName || '',
-          centreCategory: c.centreCategory || 'Engineering College',
+          centreCategory: c.centreCategory || 'School',
           customCentreCategory: c.customCentreCategory || '',
-          organizationType: c.organizationType || 'Trust',
-          regionId: c.regionId || 'North',
+          organizationType: c.organizationType || 'Trust/Society',
+          regionId: c.regionId || 'NR',
           centreAddress: c.centreAddress || '',
           stateName: c.stateName || 'Delhi',
           cityName: c.cityName || '',
@@ -253,19 +253,42 @@ export default function MyCentreProfilePage() {
           pincode: c.pincode || '',
           eduCode: c.eduCode || '',
           tcCode: c.tcCode || '',
-          venueStatus: c.venueStatus || 'COMMERCIAL',
+          venueStatus: c.venueStatus || 'Commercial',
           googleMapLink: c.googleMapLink || '',
-          officialEmail: c.officialEmail || '',
-          officialMobile: c.officialMobile || '',
-          alternateMobile: c.alternateMobile || '',
+          officialEmail: c.centreOfficialEmail || c.officialEmail || '',
+          centreOfficialEmail: c.centreOfficialEmail || c.officialEmail || '',
+          alternativeEmail: c.centreAlternateEmail || c.alternativeEmail || '',
+          centreAlternateEmail: c.centreAlternateEmail || c.alternativeEmail || '',
+          officialMobile: c.centreOfficialMobile || c.officialMobile || '',
+          centreOfficialMobile: c.centreOfficialMobile || c.officialMobile || '',
+          whatsappMobile: c.centreWhatsappMobile || c.whatsappMobile || '',
+          centreWhatsappMobile: c.centreWhatsappMobile || c.whatsappMobile || '',
+          alternateMobile: c.centreAlternateMobile || c.alternateMobile || '',
+          centreAlternateMobile: c.centreAlternateMobile || c.alternateMobile || '',
+          phoneStd: c.centrePhoneNumberWithStdCode || c.phoneStd || '',
+          centrePhoneNumberWithStdCode: c.centrePhoneNumberWithStdCode || c.phoneStd || c.landlineStd || '',
+          landlineStd: c.landlineStd || '',
           actualNodes: c.capacity?.totalSystems || c.capacity?.actualNodes || c.actualNodes || 100,
           examNodes: c.capacity?.examNodes || c.examNodes || 80,
-          bufferNodes: c.capacity?.bufferPercent
-            ? Math.round(((c.capacity?.totalSystems || 100) * (c.capacity?.bufferPercent || 20)) / 100)
-            : Math.max(0, (c.capacity?.totalSystems || 100) - (c.capacity?.examNodes || 80)),
-          totalNodes: c.capacity?.examNodes || c.totalNodes || 80,
+          totalNodes: c.capacity?.totalSystems || c.totalNodes || 100,
           previousExamConducted: Boolean(c.previousExamConducted),
           previousEduExam: c.previousEduExam || '',
+          previousExamName: c.previousExamName || '',
+          previousExamDate: c.previousExamDate ? String(c.previousExamDate).split('T')[0] : '',
+          busStandNearby: Boolean(c.busStandNearby),
+          busStandName: c.busStandName || '',
+          railwayStationNearby: Boolean(c.railwayStationNearby),
+          railwayStationName: c.railwayStationName || '',
+          mainRoadDistanceKm: c.mainRoadDistanceKm ?? '',
+          signBoardsAvailable: Boolean(c.signBoardsAvailable),
+          hotelsNearby: Boolean(c.hotelsNearby),
+          nearestHotelDistanceKm: c.nearestHotelDistanceKm ?? '',
+          canteenAvailable: Boolean(c.canteenAvailable),
+          canteenFoodForStaff: Boolean(c.canteenFoodForStaff),
+          foodForTestingDays: Boolean(c.foodForTestingDays),
+          foodForMockDays: Boolean(c.foodForMockDays),
+          outsideFoodPossible: Boolean(c.outsideFoodPossible),
+          outsideFoodDetails: c.outsideFoodDetails || '',
           ...(c.infrastructure || {}),
         }));
 
@@ -309,7 +332,7 @@ export default function MyCentreProfilePage() {
             accountNumber: b.accountNumber || '',
             confirmAccountNumber: b.accountNumber || '',
             ifscCode: b.ifscCode || '',
-            accountType: b.accountType || 'Current Account',
+            accountType: b.accountType?.includes('Savings') ? 'Savings' : 'Current',
             branchAddress: b.branchAddress || '',
             cancelledChequeUrl: b.cancelledChequeUrl || '',
             proofFileName: b.proofFileName || '',
@@ -462,6 +485,9 @@ export default function MyCentreProfilePage() {
     if (!personnel.owner?.contactNumber || personnel.owner.contactNumber.length !== 10) errors.ownerMobile = 'Owner 10-digit mobile required.';
     if (!bank.accountNumber?.trim()) errors.accountNumber = 'Bank account number required.';
     if (!bank.ifscCode?.trim() || bank.ifscCode.length !== 11) errors.ifscCode = 'Valid 11-char IFSC required.';
+    if (Number(basicInfo.examNodes || 0) > Number(basicInfo.actualNodes || basicInfo.totalNodes || 0)) {
+      errors.examNodes = 'Exam Nodes cannot exceed Actual Nodes.';
+    }
 
     if (Object.keys(errors).length > 0) {
       setValidationErrors(errors);
@@ -710,13 +736,13 @@ export default function MyCentreProfilePage() {
                 border: isRevRework
                   ? '2px solid var(--color-danger, #dc2626)'
                   : isActive
-                  ? '2px solid var(--color-primary, #2563eb)'
-                  : '1px solid transparent',
+                    ? '2px solid var(--color-primary, #2563eb)'
+                    : '1px solid transparent',
                 background: isActive
                   ? 'var(--color-primary-bg, #eff6ff)'
                   : isRevRework
-                  ? 'var(--color-danger-bg, #fef2f2)'
-                  : 'transparent',
+                    ? 'var(--color-danger-bg, #fef2f2)'
+                    : 'transparent',
                 cursor: 'pointer',
                 transition: 'all 0.15s ease',
                 position: 'relative',
@@ -729,8 +755,8 @@ export default function MyCentreProfilePage() {
                     isRevRework
                       ? 'var(--color-danger, #dc2626)'
                       : isActive
-                      ? 'var(--color-primary, #2563eb)'
-                      : 'var(--text-secondary, #64748b)'
+                        ? 'var(--color-primary, #2563eb)'
+                        : 'var(--text-secondary, #64748b)'
                   }
                 />
                 <span
@@ -740,8 +766,8 @@ export default function MyCentreProfilePage() {
                     color: isRevRework
                       ? 'var(--color-danger, #dc2626)'
                       : isActive
-                      ? 'var(--color-primary, #2563eb)'
-                      : 'var(--text-primary, #1e293b)',
+                        ? 'var(--color-primary, #2563eb)'
+                        : 'var(--text-primary, #1e293b)',
                   }}
                 >
                   {sub.label}
@@ -838,6 +864,10 @@ export default function MyCentreProfilePage() {
               await handleSaveDraft();
               setActiveTab(4);
             }}
+            onUploadDocument={handleUploadDocument}
+            onUploadMedia={handleUploadMedia}
+            documents={documents}
+            mediaAssets={mediaAssets}
           />
         )}
 
@@ -848,6 +878,10 @@ export default function MyCentreProfilePage() {
             isReadOnly={isReadOnly}
             reviewStatus={currentReview.status}
             reworkReason={currentReview.reworkReason}
+            onUploadDocument={handleUploadDocument}
+            onUploadMedia={handleUploadMedia}
+            documents={documents}
+            mediaAssets={mediaAssets}
           />
         )}
 
@@ -865,7 +899,7 @@ export default function MyCentreProfilePage() {
         )}
       </div>
 
-      {/* ── Bottom Step Navigation & Action Bar ── */}
+      {/* ── Bottom Step Navigation & Action Bar (FRD Sec. 11) ── */}
       <div
         className="card"
         style={{
@@ -888,6 +922,17 @@ export default function MyCentreProfilePage() {
         </button>
 
         <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+          {isReadOnly && (
+            <button
+              type="button"
+              className="btn btn-secondary"
+              onClick={() => setIsReadOnly(false)}
+              style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}
+            >
+              <Edit size={14} /> Edit Profile
+            </button>
+          )}
+
           {!isReadOnly && (
             <button
               type="button"

@@ -225,6 +225,7 @@ model Centre {
   previousExamName          String?                  @db.Text
   previousExamDate          DateTime?
   officialEmail             String?
+  centreOfficialEmail       String?
   alternativeEmail          String?
   officialMobile            String?
   whatsappMobile            String?
@@ -667,7 +668,6 @@ model CentreCapacity {
   centre           Centre   @relation(fields: [centreId], references: [id], onDelete: Cascade)
   totalSystems     Int      @default(0)
   examNodes        Int      @default(0)
-  bufferPercent    Float    @default(10.0)
   regDeskCount     Int      @default(2)
   serverCount      Int      @default(1)
   networkSpeedMbps Float    @default(100.0)

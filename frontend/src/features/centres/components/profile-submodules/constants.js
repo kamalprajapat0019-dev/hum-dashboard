@@ -7,36 +7,90 @@ export const INDIAN_STATES = [
   'Delhi', 'Jammu and Kashmir', 'Ladakh', 'Chandigarh', 'Puducherry'
 ];
 
+/**
+ * FRD Sec. 6.1: Exact Centre Category Options
+ * School; College; University; Government Institution; Private Educational Institution;
+ * IT/Computer Training Institute; Dedicated Examination Centre; Other
+ */
 export const CENTRE_CATEGORIES = [
-  'Engineering College',
-  'Degree College',
-  'Polytechnic',
-  'Standalone CBT Center',
   'School',
+  'College',
   'University',
   'Government Institution',
-  'IT / Computer Training Institute',
+  'Private Educational Institution',
+  'IT/Computer Training Institute',
+  'Dedicated Examination Centre',
   'Other'
 ];
 
+/**
+ * FRD Sec. 8: Centre Legal Structure / Type
+ * Proprietorship; Partnership Firm; Trust/Society
+ */
 export const ORGANIZATION_TYPES = [
-  'Trust',
-  'Society',
-  'Partnership',
+  'Trust/Society',
   'Proprietorship',
-  'Private Limited Company',
-  'Public Limited Company',
-  'Government Entity',
+  'Partnership Firm'
+
+];
+
+/**
+ * FRD Sec. 6.1: Region Options
+ * NR; SR; ER; WR; CR; NER; NWR; MPR
+ */
+export const REGIONS = [
+  'NR',
+  'SR',
+  'ER',
+  'WR',
+  'CR',
+  'NER',
+  'NWR',
+  'MPR'
+];
+
+export const REGION_LABELS = {
+  NR: 'NR — Northern Region',
+  SR: 'SR — Southern Region',
+  ER: 'ER — Eastern Region',
+  WR: 'WR — Western Region',
+  CR: 'CR — Central Region',
+  NER: 'NER — North Eastern Region',
+  NWR: 'NWR — North Western Region',
+  MPR: 'MPR — Madhya Pradesh Region',
+};
+
+/**
+ * FRD Sec. 10: Electricity Connection Types
+ * Domestic; Commercial; Industrial; Other
+ */
+export const ELECTRICITY_CONNECTION_TYPES = [
+  'Commercial',
+  'Industrial',
+  'Domestic',
   'Other'
 ];
 
-export const REGIONS = [
-  'North',
-  'South',
-  'East',
-  'West',
-  'Central',
-  'North-East'
+/**
+ * FRD Sec. 10: Generator Fuel Types
+ * Diesel; Petrol; CNG; Other
+ */
+export const GENERATOR_FUEL_TYPES = [
+  'Diesel',
+  'Petrol',
+  'CNG',
+  'Other'
+];
+
+/**
+ * FRD Sec. 10: LAN Types
+ * Single LAN; LAN
+ */
+export const LAN_TYPES = [
+  'Single LAN',
+  'LAN',
+  'Single Unified LAN',
+  'VLAN Segmented (Cat6)'
 ];
 
 export const BUILDING_TYPES = [
@@ -55,6 +109,17 @@ export const MAJOR_BANKS = [
   'IDBI Bank', 'Central Bank of India', 'Indian Bank', 'Other'
 ];
 
+/**
+ * FRD Sec. 11: Bank Account Types
+ * Savings; Current
+ */
+export const BANK_ACCOUNT_TYPES = [
+  'Current',
+  'Savings',
+  'Current Account',
+  'Savings Account'
+];
+
 export const LAB_TYPES = [
   'Dedicated CBT Lab',
   'College Computer Lab',
@@ -65,10 +130,11 @@ export const LAB_TYPES = [
 ];
 
 export const PARTITION_TYPES = [
+  'Full Wood Partition with Acrylic Shield',
   'Wood',
   'Glass',
-  'Cardboard',
   'Acrylic',
+  'Cardboard',
   'Metal Sheet',
   'None'
 ];
@@ -78,13 +144,6 @@ export const SYSTEM_OWNERSHIP_TYPES = [
   'Rented',
   'Leased',
   'Shared'
-];
-
-export const LAN_TYPES = [
-  'Single Unified LAN',
-  'VLAN Segmented (Cat6)',
-  'VLAN Segmented (Cat5e)',
-  'Mixed Topology'
 ];
 
 export const SUBMODULE_KEYS = {

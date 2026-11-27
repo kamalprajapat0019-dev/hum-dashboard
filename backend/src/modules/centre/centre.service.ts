@@ -233,6 +233,13 @@ export class CentreService {
 
     return {
       ...centre,
+      centreOfficialEmail: centre.centreOfficialEmail || centre.officialEmail,
+      officialEmail: centre.officialEmail || centre.centreOfficialEmail,
+      centreOfficialMobile: centre.officialMobile,
+      centreWhatsappMobile: centre.whatsappMobile,
+      centreAlternateMobile: centre.alternateMobile,
+      centreAlternateEmail: centre.alternativeEmail,
+      centrePhoneNumberWithStdCode: centre.phoneStd || centre.landlineStd,
       contacts: maskedContacts,
       capacity,
       documents,
@@ -280,11 +287,31 @@ export class CentreService {
               venueStatus: data.venueStatus || 'Old',
               previousExamConducted: Boolean(data.previousExamConducted),
               previousEduExam: data.previousEduExam || null,
-              officialEmail: data.officialEmail || userEmail,
-              officialMobile: data.officialMobile || null,
-              alternateMobile: data.alternateMobile || null,
-              phoneStd: data.phoneStd || null,
+              previousExamName: data.previousExamName || null,
+              previousExamDate: data.previousExamDate ? new Date(data.previousExamDate) : null,
+              officialEmail: data.centreOfficialEmail || data.officialEmail || userEmail,
+              centreOfficialEmail: data.centreOfficialEmail || data.officialEmail || userEmail,
+              alternativeEmail: data.centreAlternateEmail || data.alternativeEmail || null,
+              officialMobile: data.centreOfficialMobile || data.officialMobile || null,
+              whatsappMobile: data.centreWhatsappMobile || data.whatsappMobile || null,
+              alternateMobile: data.centreAlternateMobile || data.alternateMobile || null,
+              phoneStd: data.centrePhoneNumberWithStdCode || data.phoneStd || null,
+              landlineStd: data.landlineStd || null,
               googleMapLink: data.googleMapLink || null,
+              busStandNearby: Boolean(data.busStandNearby),
+              busStandName: data.busStandName || null,
+              railwayStationNearby: Boolean(data.railwayStationNearby),
+              railwayStationName: data.railwayStationName || null,
+              mainRoadDistanceKm: data.mainRoadDistanceKm !== undefined ? Number(data.mainRoadDistanceKm) : null,
+              signBoardsAvailable: Boolean(data.signBoardsAvailable),
+              hotelsNearby: Boolean(data.hotelsNearby),
+              nearestHotelDistanceKm: data.nearestHotelDistanceKm !== undefined ? Number(data.nearestHotelDistanceKm) : null,
+              canteenAvailable: Boolean(data.canteenAvailable),
+              canteenFoodForStaff: Boolean(data.canteenFoodForStaff),
+              foodForTestingDays: Boolean(data.foodForTestingDays),
+              foodForMockDays: Boolean(data.foodForMockDays),
+              outsideFoodPossible: Boolean(data.outsideFoodPossible),
+              outsideFoodDetails: data.outsideFoodDetails || null,
               remarks: data.remarks || null,
               organizationType: data.organizationType || 'Trust',
               centreStatus: centre?.centreStatus === 'Registered' ? 'Registered' : 'Draft',
@@ -324,11 +351,31 @@ export class CentreService {
                   ? Boolean(data.previousExamConducted)
                   : centre.previousExamConducted,
               previousEduExam: data.previousEduExam ?? centre.previousEduExam,
-              officialEmail: data.officialEmail ?? centre.officialEmail,
-              officialMobile: data.officialMobile ?? centre.officialMobile,
-              alternateMobile: data.alternateMobile ?? centre.alternateMobile,
-              phoneStd: data.phoneStd ?? centre.phoneStd,
+              previousExamName: data.previousExamName ?? centre.previousExamName,
+              previousExamDate: data.previousExamDate ? new Date(data.previousExamDate) : centre.previousExamDate,
+              officialEmail: data.centreOfficialEmail ?? data.officialEmail ?? centre.officialEmail,
+              centreOfficialEmail: data.centreOfficialEmail ?? data.officialEmail ?? centre.centreOfficialEmail ?? centre.officialEmail,
+              alternativeEmail: data.centreAlternateEmail ?? data.alternativeEmail ?? centre.alternativeEmail,
+              officialMobile: data.centreOfficialMobile ?? data.officialMobile ?? centre.officialMobile,
+              whatsappMobile: data.centreWhatsappMobile ?? data.whatsappMobile ?? centre.whatsappMobile,
+              alternateMobile: data.centreAlternateMobile ?? data.alternateMobile ?? centre.alternateMobile,
+              phoneStd: data.centrePhoneNumberWithStdCode ?? data.phoneStd ?? centre.phoneStd,
+              landlineStd: data.landlineStd ?? centre.landlineStd,
               googleMapLink: data.googleMapLink ?? centre.googleMapLink,
+              busStandNearby: data.busStandNearby !== undefined ? Boolean(data.busStandNearby) : centre.busStandNearby,
+              busStandName: data.busStandName ?? centre.busStandName,
+              railwayStationNearby: data.railwayStationNearby !== undefined ? Boolean(data.railwayStationNearby) : centre.railwayStationNearby,
+              railwayStationName: data.railwayStationName ?? centre.railwayStationName,
+              mainRoadDistanceKm: data.mainRoadDistanceKm !== undefined ? Number(data.mainRoadDistanceKm) : centre.mainRoadDistanceKm,
+              signBoardsAvailable: data.signBoardsAvailable !== undefined ? Boolean(data.signBoardsAvailable) : centre.signBoardsAvailable,
+              hotelsNearby: data.hotelsNearby !== undefined ? Boolean(data.hotelsNearby) : centre.hotelsNearby,
+              nearestHotelDistanceKm: data.nearestHotelDistanceKm !== undefined ? Number(data.nearestHotelDistanceKm) : centre.nearestHotelDistanceKm,
+              canteenAvailable: data.canteenAvailable !== undefined ? Boolean(data.canteenAvailable) : centre.canteenAvailable,
+              canteenFoodForStaff: data.canteenFoodForStaff !== undefined ? Boolean(data.canteenFoodForStaff) : centre.canteenFoodForStaff,
+              foodForTestingDays: data.foodForTestingDays !== undefined ? Boolean(data.foodForTestingDays) : centre.foodForTestingDays,
+              foodForMockDays: data.foodForMockDays !== undefined ? Boolean(data.foodForMockDays) : centre.foodForMockDays,
+              outsideFoodPossible: data.outsideFoodPossible !== undefined ? Boolean(data.outsideFoodPossible) : centre.outsideFoodPossible,
+              outsideFoodDetails: data.outsideFoodDetails ?? centre.outsideFoodDetails,
               remarks: data.remarks ?? centre.remarks,
               organizationType: data.organizationType ?? centre.organizationType,
             },
@@ -337,7 +384,7 @@ export class CentreService {
 
         const centreId = savedCentre.id;
 
-        // 2. Capacity (Total Nodes, Exam Nodes, Buffer)
+        // 2. Capacity (Total Nodes, Exam Nodes)
         if (
           data.totalNodes !== undefined ||
           data.actualNodes !== undefined ||
@@ -348,7 +395,6 @@ export class CentreService {
             data.actualNodes || data.totalNodes || data.capacity?.totalSystems || data.capacity?.examNodes || 0
           );
           const examNodes = Number(data.examNodes || data.capacity?.examNodes || totalNodes);
-          const bufferPercent = Number(data.capacity?.bufferPercent || 10.0);
           const regDeskCount = Number(data.capacity?.regDeskCount || 2);
           const serverCount = Number(data.capacity?.serverCount || 1);
 
@@ -358,14 +404,12 @@ export class CentreService {
               centreId,
               totalSystems: totalNodes,
               examNodes,
-              bufferPercent,
               regDeskCount,
               serverCount,
             },
             update: {
               totalSystems: totalNodes,
               examNodes,
-              bufferPercent,
               regDeskCount,
               serverCount,
             },
@@ -396,6 +440,9 @@ export class CentreService {
                   motherName: c.motherName ?? existingContact.motherName,
                   permanentAddress: c.permanentAddress ?? existingContact.permanentAddress,
                   currentAddress: c.currentAddress ?? existingContact.currentAddress,
+                  alternateContactNumber: c.alternateNumber || c.alternateContactNumber || existingContact.alternateContactNumber,
+                  qualification: c.qualification ?? existingContact.qualification,
+                  experienceYears: c.experienceYears !== undefined ? Number(c.experienceYears) : existingContact.experienceYears,
                   isPrimary: c.personType === 'Owner' || c.personType === 'OWNER',
                 },
               });
@@ -406,6 +453,7 @@ export class CentreService {
                   personType: c.personType,
                   fullName: c.fullName || '—',
                   contactNumber: c.contactNumber || '—',
+                  alternateContactNumber: c.alternateNumber || c.alternateContactNumber || null,
                   email: c.email || null,
                   aadhaarNumber: c.aadhaarNumber || null,
                   panNumber: c.panNumber || null,
@@ -413,6 +461,8 @@ export class CentreService {
                   motherName: c.motherName || null,
                   permanentAddress: c.permanentAddress || null,
                   currentAddress: c.currentAddress || null,
+                  qualification: c.qualification || null,
+                  experienceYears: c.experienceYears !== undefined ? Number(c.experienceYears) : null,
                   isPrimary: c.personType === 'Owner' || c.personType === 'OWNER',
                 },
               });

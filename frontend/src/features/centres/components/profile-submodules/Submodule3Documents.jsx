@@ -18,25 +18,27 @@ export function Submodule3Documents({
 
   const [localError, setLocalError] = useState(null);
 
-  // Generate document checklist based on organizationType
+  // Generate document checklist based on organizationType (FRD Sec. 8)
   const getDocChecklist = () => {
+    const currentYear = new Date().getFullYear();
     const baseDocs = [
       { key: 'centre_pan', label: 'Centre / Legal Entity PAN Card', mandatory: true, hint: 'Clear scanned PDF of Entity or Proprietor PAN' },
-      { key: 'gst_certificate', label: 'GST Registration Certificate', mandatory: true, hint: 'Form GST REG-06 with all annexures' },
-      { key: 'registration_certificate', label: 'Entity Establishment / Registration Certificate', mandatory: true, hint: 'Incorporation, Trust, Society, or Academic registration proof' },
+      { key: 'gst_certificate', label: 'GST Certificate or Non-GST Declaration', mandatory: true, hint: 'Form GST REG-06 or official Non-GST declaration letter' },
+      { key: 'registration_certificate', label: 'Centre Registration Certificate / Establishment Documents / Shop Act / MSME Certificate', mandatory: true, hint: 'Incorporation, Trust, Society, or Academic registration proof' },
       { key: 'current_electricity_bill', label: 'Current Electricity Bill (Last 2 Months)', mandatory: true, hint: 'Utility power bill showing venue address and sanctioned load' },
-      { key: 'ef_data_sheet', label: 'EF Resource & Node Data Sheet', mandatory: true, hint: 'Detailed computer node inventory sheet signed by IT Head' },
-      { key: 'mou', label: 'Signed Centre MOU (₹500 Stamp Paper)', mandatory: true, hint: 'Notarized Master Service Agreement on ₹500 non-judicial stamp paper' },
-      { key: 'nda', label: 'Non-Disclosure Agreement (₹100 Stamp Paper)', mandatory: true, hint: 'Examination confidentiality undertaking' },
-      { key: 'owner_id_proof', label: 'Owner / Authorized Signatory Photo ID', mandatory: true, hint: 'Aadhaar Card, Passport, or Voter ID' },
-      { key: 'cancelled_cheque', label: 'Cancelled Cheque Copy / Bank Passbook', mandatory: true, hint: 'Original cancelled cheque showing Account Name and IFSC' },
+      { key: 'mou', label: `MOU - 500 Stamp Paper (${currentYear}-${currentYear + 1})`, mandatory: true, hint: 'Notarized Master Service Agreement on ₹500 non-judicial stamp paper' },
+      { key: 'nda', label: 'NDA - 100 Stamp Paper', mandatory: true, hint: 'Examination confidentiality undertaking on ₹100 stamp paper' },
+      { key: 'notarized_affidavit', label: 'Notarized Affidavit', mandatory: true, hint: 'Stamp paper affidavit regarding examination integrity & infrastructure declaration' },
+      { key: 'willingness_letter', label: 'Willingness Letter on Centre Letterhead', mandatory: true, hint: 'Signed & stamped willingness undertaking on official letterhead' },
+      { key: 'cancelled_cheque', label: 'Cancelled Cheque / Bank Passbook Copy', mandatory: true, hint: 'Original cancelled cheque showing Account Name and IFSC' },
+      { key: 'rent_agreement', label: 'Rent Agreement in English (if rented/leased)', mandatory: false, hint: 'Registered lease deed / rent agreement if venue premises are rented' },
     ];
 
     const conditionalDocs = [];
-    if (organizationType === 'Trust') {
+    if (organizationType === 'Trust' || organizationType === 'Trust/Society') {
       conditionalDocs.push(
-        { key: 'trust_deed', label: 'Registered Trust Deed', mandatory: true, hint: 'Complete Trust Deed certified by Sub-Registrar' },
-        { key: 'trustee_list', label: 'Certified List of Trustees', mandatory: true, hint: 'Current Board of Trustees with contact information' },
+        { key: 'trust_deed', label: 'Registered Trust Deed / Society Registration Certificate', mandatory: true, hint: 'Complete Trust Deed certified by Sub-Registrar' },
+        { key: 'trustee_list', label: 'Certified List of Trustees / Governing Body Member List', mandatory: true, hint: 'Current Board of Trustees with contact information' },
         { key: 'tax_exemption_12a_80g', label: '12A / 80G Tax Exemption Certificate', mandatory: false, hint: 'Income Tax 12A/80G order (if applicable)' }
       );
     } else if (organizationType === 'Society') {
@@ -45,21 +47,21 @@ export function Submodule3Documents({
         { key: 'moa_rules', label: 'Memorandum of Association (MOA) & Rules', mandatory: true, hint: 'Approved MOA and Bylaws of the Society' },
         { key: 'governing_body', label: 'Certified Governing Body Member List', mandatory: true, hint: 'Current managing council list' }
       );
-    } else if (organizationType === 'Partnership') {
+    } else if (organizationType === 'Partnership' || organizationType === 'Partnership Firm') {
       conditionalDocs.push(
         { key: 'partnership_deed', label: 'Registered Partnership Deed', mandatory: true, hint: 'Partnership agreement registered with Registrar of Firms' },
-        { key: 'partner_kyc', label: 'Managing Partner Authorization & KYC', mandatory: true, hint: 'Consent letter signed by all partners' }
+        { key: 'partner_kyc', label: 'Partner List & Authorization', mandatory: true, hint: 'Certified partner list signed by all partners' }
       );
     } else if (organizationType === 'Proprietorship') {
       conditionalDocs.push(
-        { key: 'proprietor_pan', label: 'Proprietor Personal PAN & Aadhaar', mandatory: true, hint: 'Personal identity and tax documents of Sole Proprietor' },
-        { key: 'udyam_shop_est', label: 'Udyam Registration / Shop & Est. License', mandatory: true, hint: 'MSME Udyam Certificate or Municipal Trade License' }
+        { key: 'proprietor_pan', label: 'Proprietor Personal PAN Card', mandatory: true, hint: 'Personal tax PAN of Sole Proprietor' },
+        { key: 'udyam_shop_est', label: 'Shop Act / Trade License / MSME Certificate', mandatory: true, hint: 'MSME Udyam Certificate or Municipal Trade License' }
       );
     }
 
     const optionalDocs = [
       { key: 'fire_noc', label: 'Fire Safety Certificate / NOC', mandatory: false, hint: 'Valid Fire Service NOC for the academic/commercial building' },
-      { key: 'building_completion_cert', label: 'Building Completion / Occupancy Certificate', mandatory: false, hint: 'Municipal approval for venue premises' },
+      { key: 'ef_data_sheet', label: 'EF Resource & Node Data Sheet', mandatory: false, hint: 'Computer node inventory sheet signed by IT Head' },
     ];
 
     return [...baseDocs, ...conditionalDocs, ...optionalDocs];
