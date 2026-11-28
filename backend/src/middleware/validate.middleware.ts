@@ -25,7 +25,9 @@ export function validateRequest(schema: {
           field: i.path.join('.'),
           message: i.message,
         }));
-        sendError(res, 400, 'VALIDATION_ERROR', 'Request validation failed', issues);
+        const summary = issues.map((i) => i.message).filter(Boolean).join('; ');
+        const message = summary ? `Validation failed: ${summary}` : 'Request validation failed';
+        sendError(res, 400, 'VALIDATION_ERROR', message, issues);
         return;
       }
       next(err);

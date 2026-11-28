@@ -212,7 +212,14 @@ export function SendSignUpLinkModal({
               type="button"
               className="btn btn-primary"
               onClick={onClose}
-              style={{ width: '100%', padding: '10px 0' }}
+              style={{
+                width: '100%',
+                padding: '10px 0',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                textAlign: 'center',
+              }}
             >
               Done
             </button>

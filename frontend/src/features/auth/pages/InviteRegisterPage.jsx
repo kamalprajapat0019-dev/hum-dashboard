@@ -2,11 +2,63 @@ import React, { useState, useEffect } from 'react';
 import { useSearchParams, useNavigate, Link } from 'react-router-dom';
 import {
   Building2, Lock, Eye, EyeOff, CheckCircle2, AlertCircle, ArrowRight,
-  ShieldCheck, Loader2, Phone, Mail, CheckSquare, RefreshCw, KeyRound
+  ShieldCheck, Loader2, Phone, Mail, CheckSquare, RefreshCw, KeyRound, Check, X
 } from 'lucide-react';
 import { apiClient } from '@/services/apiClient';
 import { ENDPOINTS } from '@/services/endpoints';
 import { ROUTES } from '@/constants/routes';
+
+// Password policy rules per backend Zod validation schema
+const PASSWORD_RULES = [
+  { id: 'length', label: 'Min. 8 characters', test: (pwd) => pwd.length >= 8 },
+  { id: 'upper', label: '1 uppercase letter (A-Z)', test: (pwd) => /[A-Z]/.test(pwd) },
+  { id: 'lower', label: '1 lowercase letter (a-z)', test: (pwd) => /[a-z]/.test(pwd) },
+  { id: 'number', label: '1 number (0-9)', test: (pwd) => /[0-9]/.test(pwd) },
+  { id: 'special', label: '1 special character (!@#$%^&*)', test: (pwd) => /[^A-Za-z0-9]/.test(pwd) },
+];
+
+/**
+ * Extracts and formats user-friendly field-level validation errors from API response
+ */
+function parseValidationErrors(err, fallback = 'Operation failed') {
+  if (!err) return { message: fallback, fieldErrors: {} };
+
+  const fieldErrors = {};
+  const messages = [];
+
+  // 1. Check details array from ZodError: [{ field, message }]
+  const details = err.data?.error?.details || err.data?.details;
+  if (Array.isArray(details) && details.length > 0) {
+    details.forEach((item) => {
+      if (item && item.message) {
+        messages.push(item.message);
+        if (item.field) {
+          const fieldKey =
+            item.field === 'mobile' || item.field === 'phone'
+              ? 'mobileNumber'
+              : item.field;
+          fieldErrors[fieldKey] = item.message;
+        }
+      }
+    });
+  }
+
+  // 2. Check main error message
+  const mainMsg = err.data?.error?.message || err.data?.message || err.message;
+  if (mainMsg && typeof mainMsg === 'string') {
+    if (mainMsg.startsWith('Validation failed: ')) {
+      const cleanSummary = mainMsg.replace('Validation failed: ', '');
+      if (messages.length === 0) {
+        messages.push(cleanSummary);
+      }
+    } else if (mainMsg !== 'Request validation failed' && messages.length === 0) {
+      messages.push(mainMsg);
+    }
+  }
+
+  const message = messages.length > 0 ? messages.join(' • ') : (mainMsg || fallback);
+  return { message, fieldErrors };
+}
 
 export default function InviteRegisterPage() {
   const [searchParams] = useSearchParams();
@@ -31,6 +83,9 @@ export default function InviteRegisterPage() {
   const [termsAccepted, setTermsAccepted] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
+
+  // Field-level error state
+  const [fieldErrors, setFieldErrors] = useState({});
 
   // OTP Fields
   const [mobileOtp, setMobileOtp] = useState('');
@@ -71,7 +126,8 @@ export default function InviteRegisterPage() {
         setRequestError(res?.message || 'Failed to request new sign-up link.');
       }
     } catch (err) {
-      setRequestError(err.data?.error?.message || err.message || 'Unable to request sign-up link.');
+      const { message } = parseValidationErrors(err, 'Unable to request sign-up link.');
+      setRequestError(message);
     } finally {
       setRequestingNew(false);
     }
@@ -92,9 +148,13 @@ export default function InviteRegisterPage() {
         if (res && res.success && res.data?.valid) {
           setTokenValid(true);
           setInvitationData(res.data);
-          if (res.data.email) setEmail(res.data.email);
-          if (res.data.mobileNumber || res.data.whatsappMobile) {
-            setMobileNumber(res.data.mobileNumber || res.data.whatsappMobile);
+          const inv = res.data.invitation || res.data;
+          if (inv.email) setEmail(inv.email);
+          if (inv.whatsappNumber || inv.phone || inv.mobileNumber || inv.mobile) {
+            setMobileNumber(inv.whatsappNumber || inv.phone || inv.mobileNumber || inv.mobile);
+          }
+          if (inv.name || inv.centreName) {
+            setCentreName(inv.centreName || inv.name);
           }
         } else {
           setTokenValid(false);
@@ -103,7 +163,8 @@ export default function InviteRegisterPage() {
       })
       .catch((err) => {
         setTokenValid(false);
-        setTokenError(err.data?.error?.message || err.message || 'Invitation link is invalid or expired.');
+        const { message } = parseValidationErrors(err, 'Invitation link is invalid or expired.');
+        setTokenError(message);
       })
       .finally(() => {
         setValidatingToken(false);
@@ -123,29 +184,41 @@ export default function InviteRegisterPage() {
   const handleRegisterSubmit = async (e) => {
     e.preventDefault();
     setFormError('');
+    setFieldErrors({});
 
-    if (!centreName.trim()) {
-      setFormError('Centre Name (As per Document) is required.');
-      return;
+    const cleanName = centreName.trim();
+    const cleanMobile = mobileNumber.replace(/\D/g, '');
+    const cleanEmail = email.trim().toLowerCase();
+
+    // Frontend validation & field mapping
+    const errors = {};
+    if (!cleanName || cleanName.length < 2) {
+      errors.centreName = 'Centre Name (As per Document) must be at least 2 characters.';
     }
-    if (!mobileNumber.trim() || mobileNumber.length !== 10) {
-      setFormError('Valid 10-digit WhatsApp Mobile Number is required.');
-      return;
+    if (!cleanMobile || cleanMobile.length !== 10) {
+      errors.mobileNumber = 'Valid 10-digit WhatsApp Mobile Number is required.';
     }
-    if (!email.trim() || !/\S+@\S+\.\S+/.test(email)) {
-      setFormError('Valid official Centre Email ID is required.');
-      return;
+    if (!cleanEmail || !/\S+@\S+\.\S+/.test(cleanEmail)) {
+      errors.email = 'Valid official Centre Email ID is required.';
     }
-    if (password.length < 8) {
-      setFormError('Password must be at least 8 characters long.');
-      return;
+
+    // Password policy validation
+    const failedRules = PASSWORD_RULES.filter((rule) => !rule.test(password));
+    if (failedRules.length > 0) {
+      errors.password = `Password must satisfy: ${failedRules.map((r) => r.label).join(', ')}`;
     }
-    if (password !== confirmPassword) {
-      setFormError('Passwords do not match.');
-      return;
+    if (!confirmPassword) {
+      errors.confirmPassword = 'Confirm password is required.';
+    } else if (password !== confirmPassword) {
+      errors.confirmPassword = 'Password and Confirm Password must match exactly.';
     }
     if (!termsAccepted) {
-      setFormError('You must accept the OECM Terms and Conditions to proceed.');
+      errors.termsAccepted = 'You must accept the OECM Terms and Conditions to proceed.';
+    }
+
+    if (Object.keys(errors).length > 0) {
+      setFieldErrors(errors);
+      setFormError(Object.values(errors).join(' • '));
       return;
     }
 
@@ -153,12 +226,15 @@ export default function InviteRegisterPage() {
     try {
       const res = await apiClient.post(ENDPOINTS.AUTH.REGISTER_FROM_INVITE, {
         token,
-        centreName: centreName.trim(),
-        mobileNumber: mobileNumber.trim(),
-        email: email.trim().toLowerCase(),
+        centreName: cleanName,
+        name: cleanName,
+        mobile: cleanMobile,
+        mobileNumber: cleanMobile,
+        phone: cleanMobile,
+        email: cleanEmail,
         password,
         confirmPassword,
-        termsAccepted,
+        termsAccepted: true,
       });
 
       if (res && res.success) {
@@ -173,7 +249,12 @@ export default function InviteRegisterPage() {
         setFormError(res?.message || 'Registration failed. Please try again.');
       }
     } catch (err) {
-      setFormError(err.data?.error?.message || err.message || 'Failed to submit centre registration.');
+      const { message, fieldErrors: apiFieldErrors } = parseValidationErrors(
+        err,
+        'Failed to submit centre registration.'
+      );
+      setFormError(message);
+      setFieldErrors(apiFieldErrors);
     } finally {
       setSubmitting(false);
     }
@@ -203,7 +284,8 @@ export default function InviteRegisterPage() {
         setFormError(res?.message || 'Invalid or expired OTP. Please try again.');
       }
     } catch (err) {
-      setFormError(err.data?.error?.message || err.message || 'OTP verification failed.');
+      const { message } = parseValidationErrors(err, 'OTP verification failed.');
+      setFormError(message);
     } finally {
       setSubmitting(false);
     }
@@ -227,7 +309,8 @@ export default function InviteRegisterPage() {
         setFormError(res?.message || 'Failed to resend OTP.');
       }
     } catch (err) {
-      setFormError(err.data?.error?.message || err.message || 'Unable to resend OTP.');
+      const { message } = parseValidationErrors(err, 'Unable to resend OTP.');
+      setFormError(message);
     } finally {
       setResendingOtp(false);
     }
@@ -422,10 +505,18 @@ export default function InviteRegisterPage() {
                 type="text"
                 className="form-control"
                 value={centreName}
-                onChange={(e) => setCentreName(e.target.value)}
+                onChange={(e) => {
+                  setCentreName(e.target.value);
+                  if (fieldErrors.centreName) setFieldErrors((prev) => ({ ...prev, centreName: undefined }));
+                }}
                 placeholder="e.g. Cambridge Institute of Technology"
                 required
               />
+              {fieldErrors.centreName && (
+                <span style={{ color: 'var(--color-danger, #dc2626)', fontSize: '0.75rem', marginTop: 4, display: 'block' }}>
+                  {fieldErrors.centreName}
+                </span>
+              )}
             </div>
 
             <div className="form-group">
@@ -439,7 +530,10 @@ export default function InviteRegisterPage() {
                   maxLength={10}
                   className="form-control"
                   value={mobileNumber}
-                  onChange={(e) => setMobileNumber(e.target.value.replace(/\D/g, ''))}
+                  onChange={(e) => {
+                    setMobileNumber(e.target.value.replace(/\D/g, ''));
+                    if (fieldErrors.mobileNumber) setFieldErrors((prev) => ({ ...prev, mobileNumber: undefined }));
+                  }}
                   placeholder="10-digit Indian mobile number"
                   required
                 />
@@ -448,6 +542,11 @@ export default function InviteRegisterPage() {
               <span style={{ fontSize: '0.75rem', color: '#64748b', marginTop: 4, display: 'block' }}>
                 Valid Indian mobile format + WhatsApp OTP verification.
               </span>
+              {fieldErrors.mobileNumber && (
+                <span style={{ color: 'var(--color-danger, #dc2626)', fontSize: '0.75rem', marginTop: 4, display: 'block' }}>
+                  {fieldErrors.mobileNumber}
+                </span>
+              )}
             </div>
 
             <div className="form-group">
@@ -460,12 +559,20 @@ export default function InviteRegisterPage() {
                   type="email"
                   className="form-control"
                   value={email}
-                  onChange={(e) => setEmail(e.target.value)}
+                  onChange={(e) => {
+                    setEmail(e.target.value);
+                    if (fieldErrors.email) setFieldErrors((prev) => ({ ...prev, email: undefined }));
+                  }}
                   placeholder="official.centre@institution.ac.in"
                   required
                 />
                 <Mail size={15} color="var(--text-muted)" style={{ position: 'absolute', right: 12, top: 12 }} />
               </div>
+              {fieldErrors.email && (
+                <span style={{ color: 'var(--color-danger, #dc2626)', fontSize: '0.75rem', marginTop: 4, display: 'block' }}>
+                  {fieldErrors.email}
+                </span>
+              )}
             </div>
 
             <div className="form-group">
@@ -478,7 +585,10 @@ export default function InviteRegisterPage() {
                   type={showPassword ? 'text' : 'password'}
                   className="form-control"
                   value={password}
-                  onChange={(e) => setPassword(e.target.value)}
+                  onChange={(e) => {
+                    setPassword(e.target.value);
+                    if (fieldErrors.password) setFieldErrors((prev) => ({ ...prev, password: undefined }));
+                  }}
                   placeholder="Min. 8 characters"
                   required
                 />
@@ -498,6 +608,47 @@ export default function InviteRegisterPage() {
                   {showPassword ? <EyeOff size={16} /> : <Eye size={16} />}
                 </button>
               </div>
+
+              {/* Password Policy Helper Card */}
+              <div
+                style={{
+                  background: '#f8fafc',
+                  border: '1px solid #e2e8f0',
+                  borderRadius: 6,
+                  padding: '10px 12px',
+                  marginTop: 6,
+                  fontSize: '0.75rem',
+                }}
+              >
+                <div style={{ fontWeight: 600, color: '#475569', marginBottom: 4 }}>
+                  Password Policy Requirements:
+                </div>
+                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: '3px 8px' }}>
+                  {PASSWORD_RULES.map((rule) => {
+                    const met = rule.test(password);
+                    return (
+                      <div
+                        key={rule.id}
+                        style={{
+                          display: 'flex',
+                          alignItems: 'center',
+                          gap: 5,
+                          color: met ? '#16a34a' : '#64748b',
+                          fontWeight: met ? 600 : 400,
+                        }}
+                      >
+                        <span style={{ fontSize: '0.85rem' }}>{met ? '✓' : '•'}</span>
+                        <span>{rule.label}</span>
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+              {fieldErrors.password && (
+                <span style={{ color: 'var(--color-danger, #dc2626)', fontSize: '0.75rem', marginTop: 4, display: 'block' }}>
+                  {fieldErrors.password}
+                </span>
+              )}
             </div>
 
             <div className="form-group">
@@ -510,7 +661,10 @@ export default function InviteRegisterPage() {
                   type={showConfirmPassword ? 'text' : 'password'}
                   className="form-control"
                   value={confirmPassword}
-                  onChange={(e) => setConfirmPassword(e.target.value)}
+                  onChange={(e) => {
+                    setConfirmPassword(e.target.value);
+                    if (fieldErrors.confirmPassword) setFieldErrors((prev) => ({ ...prev, confirmPassword: undefined }));
+                  }}
                   placeholder="Re-enter password"
                   required
                 />
@@ -530,6 +684,26 @@ export default function InviteRegisterPage() {
                   {showConfirmPassword ? <EyeOff size={16} /> : <Eye size={16} />}
                 </button>
               </div>
+              {confirmPassword && (
+                <div
+                  style={{
+                    fontSize: '0.75rem',
+                    marginTop: 4,
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: 5,
+                    color: password === confirmPassword ? '#16a34a' : '#dc2626',
+                    fontWeight: 500,
+                  }}
+                >
+                  {password === confirmPassword ? '✓ Passwords match' : '✗ Passwords do not match'}
+                </div>
+              )}
+              {fieldErrors.confirmPassword && (
+                <span style={{ color: 'var(--color-danger, #dc2626)', fontSize: '0.75rem', marginTop: 4, display: 'block' }}>
+                  {fieldErrors.confirmPassword}
+                </span>
+              )}
             </div>
 
             <div className="form-group" style={{ marginTop: 4 }}>
@@ -540,7 +714,10 @@ export default function InviteRegisterPage() {
                 <input
                   type="checkbox"
                   checked={termsAccepted}
-                  onChange={(e) => setTermsAccepted(e.target.checked)}
+                  onChange={(e) => {
+                    setTermsAccepted(e.target.checked);
+                    if (fieldErrors.termsAccepted) setFieldErrors((prev) => ({ ...prev, termsAccepted: undefined }));
+                  }}
                   style={{ marginTop: 3 }}
                   required
                 />
@@ -548,6 +725,11 @@ export default function InviteRegisterPage() {
                   I agree to the <strong style={{ color: 'var(--text-primary)' }}>Terms and Conditions</strong> and accept to abide by the examination venue code of conduct, confidential operational guidelines, and portal security compliance standards.
                 </span>
               </label>
+              {fieldErrors.termsAccepted && (
+                <span style={{ color: 'var(--color-danger, #dc2626)', fontSize: '0.75rem', marginTop: 4, display: 'block' }}>
+                  {fieldErrors.termsAccepted}
+                </span>
+              )}
             </div>
 
             <button
