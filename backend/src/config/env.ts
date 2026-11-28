@@ -31,6 +31,29 @@ const envSchema = z
     INITIAL_ADMIN_EMAIL: z.string().email().default('admin@oemportal.in'),
     INITIAL_ADMIN_PASSWORD: z.string().min(6).default('admin_secure_pass_123'),
     INITIAL_ADMIN_NAME: z.string().default('Rajesh Kumar'),
+
+    // Frontend Public URL (for links inside Emails & WhatsApp)
+    FRONTEND_URL: z.string().optional(),
+
+    // SMTP Mailer Configuration
+    SMTP_HOST: z.string().optional(),
+    SMTP_PORT: z.string().optional().transform((val) => (val ? parseInt(val, 10) : undefined)),
+    SMTP_SECURE: z.string().optional().transform((val) => val === 'true' || val === '1'),
+    SMTP_USER: z.string().optional(),
+    SMTP_PASS: z.string().optional(),
+    SMTP_FROM: z.string().default('OECM Portal <no-reply@oemportal.in>'),
+
+    // WhatsApp Dispatch Configuration
+    WHATSAPP_API_URL: z.string().optional(),
+    WHATSAPP_API_KEY: z.string().optional(),
+    WHATSAPP_TOKEN: z.string().optional(),
+    WHATSAPP_PHONE_NUMBER_ID: z.string().optional(),
+    WHATSAPP_SENDER: z.string().optional(),
+
+    // Twilio WhatsApp (Optional alternative)
+    TWILIO_ACCOUNT_SID: z.string().optional(),
+    TWILIO_AUTH_TOKEN: z.string().optional(),
+    TWILIO_WHATSAPP_FROM: z.string().optional(),
   })
   .transform((data) => {
     // Construct database URL with properly encoded credentials (prevent double-encoding)

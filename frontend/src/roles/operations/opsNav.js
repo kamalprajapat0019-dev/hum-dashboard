@@ -1,11 +1,12 @@
 import {
-  LayoutDashboard, CalendarCheck, MessageSquare, FileText,
+  LayoutDashboard, Building2, CalendarCheck, MessageSquare, FileText,
   BookOpen, CheckSquare, AlertCircle, Truck, Bell
 } from 'lucide-react';
 import { ROUTES } from '../../constants/routes';
 
 export const opsNav = [
   { label: 'Operations Board', path: ROUTES.OPS.DASHBOARD, icon: LayoutDashboard },
+  { label: 'Centre Master', path: ROUTES.OPS.CENTRES, icon: Building2 },
   { label: 'Booking & Centres', path: ROUTES.OPS.BOOKING, icon: CalendarCheck },
   { label: 'Consent Mgmt', path: ROUTES.OPS.CONSENT, icon: MessageSquare },
   { label: 'Document Checklist', path: ROUTES.OPS.DOCUMENTS, icon: FileText },

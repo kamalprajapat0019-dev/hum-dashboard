@@ -800,6 +800,13 @@ model UserInvitation {
   emailVerifiedAt  DateTime?
   mobileVerifiedAt DateTime?
   resendCount      Int       @default(0)
+  followUpAction   String?   // CALL, EMAIL
+  followUpNotes    String?   @db.Text
+  lastFollowUpAt   DateTime?
+  emailDispatched     Boolean   @default(false)
+  whatsappDispatched  Boolean   @default(false)
+  lastDispatchedAt    DateTime?
+  dispatchStatus      Json?
   createdAt        DateTime  @default(now())
   updatedAt        DateTime  @updatedAt
 

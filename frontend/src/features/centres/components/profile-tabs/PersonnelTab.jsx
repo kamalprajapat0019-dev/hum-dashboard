@@ -45,8 +45,9 @@ export function PersonnelTab({
                 className="btn btn-sm btn-outline-primary"
                 onClick={() => handleOpenInvite(p.data)}
                 style={{ marginTop: 8, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6, width: '100%' }}
+                title="Send 72-Hour Sign-Up Link to this contact (FRD Sec. 4.1)"
               >
-                <Send size={13} /> Invite as Centre Portal User
+                <Send size={13} /> Send Sign-Up Link
               </button>
             </div>
           ) : (

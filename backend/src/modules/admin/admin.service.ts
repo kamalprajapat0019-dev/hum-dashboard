@@ -51,6 +51,9 @@ export class AdminService {
   static completePasswordReset = UserAdminService.completePasswordReset;
   static verifyResetToken = UserAdminService.verifyResetToken;
   static inviteCentreUser = UserAdminService.inviteCentreUser;
+  static listCentreInvitations = UserAdminService.listCentreInvitations;
+  static recordInvitationFollowUp = UserAdminService.recordInvitationFollowUp;
+  static resendCentreInvitation = UserAdminService.resendCentreInvitation;
   static completeAccountActivation = UserAdminService.completeAccountActivation;
   static verifyInvitationToken = UserAdminService.verifyInvitationToken;
   static getAllowedDomains = UserAdminService.getAllowedDomains;

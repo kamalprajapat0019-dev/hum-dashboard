@@ -161,14 +161,28 @@ export const uploadDocumentSchema = z.object({
   mimeType: z.string().optional(),
 });
 
-export const inviteCentreUserSchema = z.object({
-  email: z.string().email('Valid email is required'),
-  name: z.string().min(2, 'Name must be at least 2 characters'),
-  phoneNumber: z.string().optional(),
-  whatsappNumber: z.string().optional(),
-  role: z.string().optional().default('CENTRE'),
-  centreId: z.string().optional(),
-  scope: z.record(z.unknown()).optional(),
+export const inviteCentreUserSchema = z
+  .object({
+    email: z.string().email('Valid official email is required'),
+    name: z.string().min(2, 'Name / Centre Name must be at least 2 characters'),
+    phoneNumber: z.string().optional(),
+    phone: z.string().optional(),
+    whatsappNumber: z.string().optional(),
+    role: z.string().optional().default('CENTRE'),
+    centreId: z.string().optional(),
+    scope: z.record(z.unknown()).optional(),
+  })
+  .refine(
+    (data) => Boolean(data.whatsappNumber || data.phoneNumber || data.phone),
+    {
+      message: 'Centre WhatsApp Mobile Number is required before sending the sign-up link.',
+      path: ['whatsappNumber'],
+    }
+  );
+
+export const followUpInvitationSchema = z.object({
+  action: z.enum(['call', 'email', 'CALL', 'EMAIL']),
+  notes: z.string().optional(),
 });
 
 export const reviewSubmoduleSchema = z.object({

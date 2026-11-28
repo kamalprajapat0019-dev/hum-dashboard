@@ -43,6 +43,40 @@ export default function InviteRegisterPage() {
   const [formError, setFormError] = useState('');
   const [successMessage, setSuccessMessage] = useState('');
 
+  // Request new sign-up link state
+  const [requestEmail, setRequestEmail] = useState('');
+  const [requestingNew, setRequestingNew] = useState(false);
+  const [requestSuccess, setRequestSuccess] = useState('');
+  const [requestError, setRequestError] = useState('');
+
+  const handleRequestNewLink = async (e) => {
+    e.preventDefault();
+    setRequestError('');
+    setRequestSuccess('');
+    if (!requestEmail.trim()) {
+      setRequestError('Please enter your Centre Official Email.');
+      return;
+    }
+    setRequestingNew(true);
+    try {
+      const res = await apiClient.post(ENDPOINTS.AUTH.REQUEST_NEW_INVITE, {
+        email: requestEmail.trim().toLowerCase(),
+      });
+      if (res && res.success) {
+        setRequestSuccess(
+          res.data?.message ||
+            'A fresh 72-hour sign-up link has been generated and dispatched to your email and WhatsApp mobile number.'
+        );
+      } else {
+        setRequestError(res?.message || 'Failed to request new sign-up link.');
+      }
+    } catch (err) {
+      setRequestError(err.data?.error?.message || err.message || 'Unable to request sign-up link.');
+    } finally {
+      setRequestingNew(false);
+    }
+  };
+
   // 1. Validate 72-hour invite link on mount
   useEffect(() => {
     if (!token) {
@@ -214,17 +248,75 @@ export default function InviteRegisterPage() {
   // ── Render Token Invalid / Expired State ──
   if (!tokenValid) {
     return (
-      <div className="card" style={{ maxWidth: 520, margin: '60px auto', padding: 32, textAlign: 'center' }}>
+      <div className="card" style={{ maxWidth: 540, margin: '60px auto', padding: 32, textAlign: 'center' }}>
         <AlertCircle size={48} color="var(--color-danger, #dc2626)" style={{ margin: '0 auto 16px' }} />
         <h2 style={{ fontSize: '1.25rem', fontWeight: 700, margin: '0 0 10px', color: 'var(--text-primary)' }}>
-          Invitation Link Expired or Invalid
+          Sign-Up Link Expired or Invalid (FRD Sec. 4.1)
         </h2>
-        <p style={{ fontSize: '0.875rem', color: 'var(--text-secondary)', lineHeight: 1.6, margin: '0 0 24px' }}>
+        <p style={{ fontSize: '0.875rem', color: 'var(--text-secondary)', lineHeight: 1.6, margin: '0 0 20px' }}>
           {tokenError}
         </p>
-        <div style={{ fontSize: '0.8125rem', color: 'var(--text-muted)', marginBottom: 20 }}>
-          Per OECM security compliance, all centre registration links expire after 72 hours and can only be used once. Please contact the Operations Team to request a new invitation link.
+
+        {/* Request New Sign-Up Link Section */}
+        <div
+          style={{
+            marginTop: 10,
+            marginBottom: 24,
+            padding: 20,
+            borderRadius: 8,
+            background: '#f8fafc',
+            border: '1px solid #e2e8f0',
+            textAlign: 'left',
+          }}
+        >
+          <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 8, color: '#1e40af' }}>
+            <RefreshCw size={16} />
+            <h4 style={{ margin: 0, fontSize: '0.9375rem', fontWeight: 700 }}>
+              Request Fresh 72-Hour Sign-Up Link
+            </h4>
+          </div>
+          <p style={{ margin: '0 0 14px', fontSize: '0.8125rem', color: '#64748b', lineHeight: 1.5 }}>
+            Per FRD Section 4.1, registration links expire after 72 hours. Enter your official centre email below to dispatch a fresh sign-up link.
+          </p>
+
+          {requestError && (
+            <div style={{ padding: '8px 12px', borderRadius: 6, background: '#fef2f2', border: '1px solid #fca5a5', color: '#b91c1c', fontSize: '0.8125rem', marginBottom: 12 }}>
+              {requestError}
+            </div>
+          )}
+          {requestSuccess && (
+            <div style={{ padding: '8px 12px', borderRadius: 6, background: '#f0fdf4', border: '1px solid #86efac', color: '#16a34a', fontSize: '0.8125rem', marginBottom: 12 }}>
+              {requestSuccess}
+            </div>
+          )}
+
+          {!requestSuccess ? (
+            <form onSubmit={handleRequestNewLink} style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+              <input
+                type="email"
+                className="form-control"
+                placeholder="official@institution.edu.in"
+                value={requestEmail}
+                onChange={(e) => setRequestEmail(e.target.value)}
+                required
+              />
+              <button
+                type="submit"
+                className="btn btn-primary"
+                disabled={requestingNew}
+                style={{ width: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6 }}
+              >
+                {requestingNew ? <Loader2 size={14} className="animate-spin" /> : <Send size={14} />}
+                {requestingNew ? 'Dispatching New Link...' : 'Request New Sign-Up Link'}
+              </button>
+            </form>
+          ) : (
+            <div style={{ fontSize: '0.8125rem', color: '#15803d' }}>
+              ✓ Link dispatched to your email and WhatsApp mobile. Please check your inbox.
+            </div>
+          )}
         </div>
+
         <Link to={ROUTES.LOGIN} className="btn btn-secondary" style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}>
           Return to Login
         </Link>
@@ -338,7 +430,7 @@ export default function InviteRegisterPage() {
 
             <div className="form-group">
               <label className="form-label" htmlFor="mobileNumber">
-                Centre Mobile Number (WhatsApp) <span style={{ color: 'var(--color-danger)' }}>*</span>
+                Centre Mobile Number <span style={{ color: 'var(--color-danger)' }}>*</span>
               </label>
               <div style={{ position: 'relative' }}>
                 <input
@@ -348,11 +440,14 @@ export default function InviteRegisterPage() {
                   className="form-control"
                   value={mobileNumber}
                   onChange={(e) => setMobileNumber(e.target.value.replace(/\D/g, ''))}
-                  placeholder="10-digit WhatsApp mobile"
+                  placeholder="10-digit Indian mobile number"
                   required
                 />
                 <Phone size={15} color="var(--text-muted)" style={{ position: 'absolute', right: 12, top: 12 }} />
               </div>
+              <span style={{ fontSize: '0.75rem', color: '#64748b', marginTop: 4, display: 'block' }}>
+                Valid Indian mobile format + WhatsApp OTP verification.
+              </span>
             </div>
 
             <div className="form-group">
@@ -437,18 +532,23 @@ export default function InviteRegisterPage() {
               </div>
             </div>
 
-            <label style={{ display: 'flex', alignItems: 'flex-start', gap: 10, cursor: 'pointer', marginTop: 4 }}>
-              <input
-                type="checkbox"
-                checked={termsAccepted}
-                onChange={(e) => setTermsAccepted(e.target.checked)}
-                style={{ marginTop: 3 }}
-                required
-              />
-              <span style={{ fontSize: '0.8125rem', color: 'var(--text-secondary)', lineHeight: 1.5 }}>
-                I agree to the <strong style={{ color: 'var(--text-primary)' }}>Terms and Conditions</strong> and accept to abide by the examination venue code of conduct and confidential operational standards.
-              </span>
-            </label>
+            <div className="form-group" style={{ marginTop: 4 }}>
+              <label className="form-label" style={{ fontWeight: 600, marginBottom: 8, display: 'block' }}>
+                Terms and Conditions Acceptance <span style={{ color: 'var(--color-danger)' }}>*</span>
+              </label>
+              <label style={{ display: 'flex', alignItems: 'flex-start', gap: 10, cursor: 'pointer' }}>
+                <input
+                  type="checkbox"
+                  checked={termsAccepted}
+                  onChange={(e) => setTermsAccepted(e.target.checked)}
+                  style={{ marginTop: 3 }}
+                  required
+                />
+                <span style={{ fontSize: '0.8125rem', color: 'var(--text-secondary)', lineHeight: 1.5 }}>
+                  I agree to the <strong style={{ color: 'var(--text-primary)' }}>Terms and Conditions</strong> and accept to abide by the examination venue code of conduct, confidential operational guidelines, and portal security compliance standards.
+                </span>
+              </label>
+            </div>
 
             <button
               type="submit"

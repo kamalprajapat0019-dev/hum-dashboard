@@ -125,7 +125,7 @@ export function AppRouter() {
       <Route path={ROUTES.ADMIN.CLIENTS} element={<ProtectedRoute allowedRoles={[ROLES.ADMIN]}><DashboardLayout><ClientsPage /></DashboardLayout></ProtectedRoute>} />
       <Route path={ROUTES.ADMIN.PROJECTS} element={<ProtectedRoute allowedRoles={[ROLES.ADMIN]}><DashboardLayout><ProjectsPage /></DashboardLayout></ProtectedRoute>} />
       <Route path="/admin/exams/:id" element={<ProtectedRoute allowedRoles={[ROLES.ADMIN]}><DashboardLayout><ProjectsPage /></DashboardLayout></ProtectedRoute>} />
-      <Route path={ROUTES.ADMIN.CENTRES} element={<ProtectedRoute allowedRoles={[ROLES.ADMIN]}><DashboardLayout><CentresPage /></DashboardLayout></ProtectedRoute>} />
+      <Route path={ROUTES.ADMIN.CENTRES} element={<ProtectedRoute allowedRoles={[ROLES.ADMIN, ROLES.PM, ROLES.OPERATIONS]}><DashboardLayout><CentresPage /></DashboardLayout></ProtectedRoute>} />
       <Route path={ROUTES.ADMIN.ELIGIBILITY} element={<ProtectedRoute allowedRoles={[ROLES.ADMIN]}><DashboardLayout><EligibilityPage /></DashboardLayout></ProtectedRoute>} />
       <Route path={ROUTES.ADMIN.BOOKING} element={<ProtectedRoute allowedRoles={[ROLES.ADMIN]}><DashboardLayout><BookingLockingPage /></DashboardLayout></ProtectedRoute>} />
       <Route path={ROUTES.ADMIN.DOCUMENTS} element={<ProtectedRoute allowedRoles={[ROLES.ADMIN]}><DashboardLayout><DocumentReviewPage /></DashboardLayout></ProtectedRoute>} />
@@ -145,6 +145,7 @@ export function AppRouter() {
         </ProtectedRoute>
       } />
       <Route path={ROUTES.PM.SETUP} element={<ProtectedRoute allowedRoles={[ROLES.PM, ROLES.ADMIN]}><DashboardLayout><ProjectsPage /></DashboardLayout></ProtectedRoute>} />
+      <Route path={ROUTES.PM.CENTRES} element={<ProtectedRoute allowedRoles={[ROLES.PM, ROLES.ADMIN]}><DashboardLayout><CentresPage /></DashboardLayout></ProtectedRoute>} />
       <Route path="/pm/exams/:id" element={<ProtectedRoute allowedRoles={[ROLES.PM, ROLES.ADMIN]}><DashboardLayout><ProjectsPage /></DashboardLayout></ProtectedRoute>} />
       <Route path={ROUTES.PM.PIPELINE} element={<ProtectedRoute allowedRoles={[ROLES.PM, ROLES.ADMIN]}><DashboardLayout><BookingLockingPage /></DashboardLayout></ProtectedRoute>} />
       <Route path={ROUTES.PM.ELIGIBILITY} element={<ProtectedRoute allowedRoles={[ROLES.PM, ROLES.ADMIN]}><DashboardLayout><EligibilityPage /></DashboardLayout></ProtectedRoute>} />
@@ -176,6 +177,7 @@ export function AppRouter() {
           <DashboardLayout><OpsDashboard /></DashboardLayout>
         </ProtectedRoute>
       } />
+      <Route path={ROUTES.OPS.CENTRES} element={<ProtectedRoute allowedRoles={[ROLES.OPERATIONS, ROLES.ADMIN]}><DashboardLayout><CentresPage /></DashboardLayout></ProtectedRoute>} />
       <Route path={ROUTES.OPS.BOOKING} element={<ProtectedRoute allowedRoles={[ROLES.OPERATIONS, ROLES.ADMIN]}><DashboardLayout><BookingLockingPage /></DashboardLayout></ProtectedRoute>} />
       <Route path={ROUTES.OPS.CONSENT} element={<ProtectedRoute allowedRoles={[ROLES.OPERATIONS, ROLES.ADMIN]}><DashboardLayout><ConsentManagementPage /></DashboardLayout></ProtectedRoute>} />
       <Route path={ROUTES.OPS.DOCUMENTS} element={<ProtectedRoute allowedRoles={[ROLES.OPERATIONS, ROLES.ADMIN]}><DashboardLayout><DocumentReviewPage /></DashboardLayout></ProtectedRoute>} />

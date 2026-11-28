@@ -1,9 +1,11 @@
+import crypto from 'crypto';
 import { prisma } from '../../config/database.js';
 import { verifyPassword, hashPassword } from '../../utils/hasher.js';
 import { generateToken, generateRefreshToken, verifyRefreshToken, TokenPayload } from '../../utils/jwt.js';
 import { LoginInput, RegisterFromInviteInput } from './auth.schemas.js';
 import { Role } from '@prisma/client';
 import { CentreService } from '../centre/centre.service.js';
+import { NotificationService } from '../../services/notification.service.js';
 
 export class AuthService {
   static async login(input: LoginInput, ipAddress?: string) {
@@ -446,6 +448,74 @@ export class AuthService {
       success: true,
       message: `A new verification code has been dispatched to your ${otpType.toLowerCase()}.`,
       resendCount: inv.resendCount + 1,
+    };
+  }
+
+  /**
+   * Allows requesting a new sign-up link if 72-hour window has expired (FRD Sec. 4.1)
+   */
+  static async requestNewSignUpLink(email: string) {
+    const cleanEmail = email.toLowerCase().trim();
+    const inv = await prisma.userInvitation.findFirst({
+      where: { email: cleanEmail, role: Role.CENTRE },
+      orderBy: { createdAt: 'desc' },
+    });
+
+    if (!inv) {
+      return {
+        success: false,
+        message: 'No previous invitation found for this email address. Please contact Operations to request a sign-up link.',
+      };
+    }
+
+    const token = crypto.randomBytes(32).toString('hex');
+    const expiresAt = new Date(Date.now() + 72 * 60 * 60 * 1000);
+
+    await prisma.userInvitation.update({
+      where: { id: inv.id },
+      data: {
+        token,
+        expiresAt,
+        status: 'Pending',
+        usedAt: null,
+        resendCount: inv.resendCount + 1,
+      },
+    });
+
+    const registrationUrl = `/invite/register?token=${token}`;
+
+    // Actively dispatch renewed 72-hour sign-up link to Email and WhatsApp
+    let dispatchResult: any;
+    try {
+      dispatchResult = await NotificationService.dispatchSignUpLink({
+        centreName: inv.name,
+        email: inv.email,
+        whatsappNumber: inv.whatsappNumber || inv.phone || '',
+        token,
+        registrationUrl,
+        expiresAt,
+      });
+
+      await prisma.userInvitation.update({
+        where: { id: inv.id },
+        data: {
+          emailDispatched: dispatchResult.email.sent,
+          whatsappDispatched: dispatchResult.whatsapp.sent,
+          lastDispatchedAt: new Date(),
+          dispatchStatus: dispatchResult as any,
+        },
+      });
+    } catch (dispatchErr) {
+      console.error('[REQUEST_NEW_INVITE:DISPATCH:ERROR]', dispatchErr);
+    }
+
+    return {
+      success: true,
+      message: 'A fresh 72-hour sign-up link has been generated and dispatched to your email and WhatsApp mobile number.',
+      registrationUrl,
+      fullRegistrationUrl: NotificationService.getFullRegistrationUrl(registrationUrl),
+      expiresAt,
+      dispatch: dispatchResult,
     };
   }
 }

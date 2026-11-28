@@ -182,4 +182,23 @@ export class AuthController {
       sendError(res, 400, 'RESEND_OTP_FAILED', msg);
     }
   }
+
+  static async requestNewSignUpLink(req: Request, res: Response): Promise<void> {
+    try {
+      const { email } = req.body;
+      if (!email) {
+        sendError(res, 400, 'EMAIL_REQUIRED', 'Official email is required to request a new sign-up link');
+        return;
+      }
+      const result = await AuthService.requestNewSignUpLink(email);
+      if (!result.success) {
+        sendError(res, 404, 'INVITATION_NOT_FOUND', result.message);
+        return;
+      }
+      sendSuccess(res, result);
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : 'Failed to request fresh sign-up link';
+      sendError(res, 400, 'REQUEST_SIGNUP_LINK_FAILED', msg);
+    }
+  }
 }

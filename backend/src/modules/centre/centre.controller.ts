@@ -170,4 +170,44 @@ export class CentreController {
       sendError(res, 400, 'INVITATION_FAILED', msg);
     }
   }
+
+  static async getInvitations(req: AuthenticatedRequest, res: Response): Promise<void> {
+    try {
+      const result = await AdminService.listCentreInvitations(req.query as any);
+      sendSuccess(res, result.items, 200, result.meta);
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : 'Failed to retrieve centre invitations';
+      sendError(res, 500, 'INVITATION_RETRIEVAL_ERROR', msg);
+    }
+  }
+
+  static async recordFollowUp(req: AuthenticatedRequest, res: Response): Promise<void> {
+    try {
+      const result = await AdminService.recordInvitationFollowUp(
+        String(req.params.id),
+        req.body.action,
+        req.body.notes,
+        req.user?.userId,
+        req.user?.email
+      );
+      sendSuccess(res, result);
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : 'Failed to record invitation follow-up';
+      sendError(res, 400, 'FOLLOW_UP_FAILED', msg);
+    }
+  }
+
+  static async resendInvitation(req: AuthenticatedRequest, res: Response): Promise<void> {
+    try {
+      const result = await AdminService.resendCentreInvitation(
+        String(req.params.id),
+        req.user?.userId,
+        req.user?.email
+      );
+      sendSuccess(res, result);
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : 'Failed to resend sign-up link';
+      sendError(res, 400, 'RESEND_INVITATION_FAILED', msg);
+    }
+  }
 }

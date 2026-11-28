@@ -8,6 +8,7 @@ import { ROUTES } from '../../constants/routes';
 export const pmNav = [
   { label: 'My Projects', path: ROUTES.PM.DASHBOARD, icon: LayoutDashboard },
   { label: 'Project Setup', path: ROUTES.PM.SETUP, icon: FolderOpen },
+  { label: 'Centre Master', path: ROUTES.PM.CENTRES, icon: Building2 },
   { label: 'Centre Pipeline', path: ROUTES.PM.PIPELINE, icon: Building2 },
   { label: 'Eligibility Review', path: ROUTES.PM.ELIGIBILITY, icon: ShieldCheck },
   { label: 'Consent & Docs', path: ROUTES.PM.CONSENT, icon: FileText },

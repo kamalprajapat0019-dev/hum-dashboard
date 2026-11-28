@@ -40,7 +40,7 @@ export function ClientProvider({ children }) {
   const user = auth?.user;
   const userRole = user?.role ? normalizeRole(user.role) : null;
   const isAuthorizedToFetchClients = Boolean(
-    user && (userRole === ROLES.ADMIN || userRole === ROLES.OPERATIONS)
+    user && (userRole === ROLES.ADMIN || userRole === ROLES.OPERATIONS || userRole === ROLES.PM)
   );
 
   // Pre-seed with verified MySQL enterprise client records so dropdown is never blank
@@ -67,7 +67,10 @@ export function ClientProvider({ children }) {
     setLoadingClients(true);
     setClientError(null);
     try {
-      const res = await apiClient.get(ENDPOINTS.ADMIN.CLIENTS, { params: { limit: 100 } });
+      const clientEndpoint = userRole === ROLES.ADMIN
+        ? ENDPOINTS.ADMIN.CLIENTS
+        : (ENDPOINTS.CENTRE_PORTAL?.CLIENTS || '/centre/clients');
+      const res = await apiClient.get(clientEndpoint, { params: { limit: 100 } });
       if (res?.success && Array.isArray(res.data)) {
         // Filter specifically for the 2 enterprise clients
         const enterpriseClients = res.data.filter((c) => {

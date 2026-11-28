@@ -2,6 +2,7 @@ import crypto from 'crypto';
 import { prisma } from '../../../config/database.js';
 import { hashPassword } from '../../../utils/hasher.js';
 import { Role, UserStatus, Prisma } from '@prisma/client';
+import { NotificationService } from '../../../services/notification.service.js';
 
 export class UserAdminService {
   // ── 2. User Management ───────────────────────────────────────────────────
@@ -679,6 +680,7 @@ export class UserAdminService {
       email: string;
       name: string;
       phoneNumber?: string;
+      phone?: string;
       whatsappNumber?: string;
       centreId?: string;
       clientId?: string;
@@ -689,6 +691,14 @@ export class UserAdminService {
     inviterRole: Role = Role.ADMIN
   ) {
     const cleanEmail = data.email.toLowerCase().trim();
+    const whatsappNum = (data.whatsappNumber || data.phone || data.phoneNumber || '').trim();
+
+    if (!cleanEmail) {
+      throw new Error('Centre Official Email is required before sending the sign-up link.');
+    }
+    if (!whatsappNum) {
+      throw new Error('Centre WhatsApp Mobile Number is required before sending the sign-up link.');
+    }
 
     // Enforce email uniqueness across active users
     const existingUser = await prisma.user.findUnique({
@@ -713,8 +723,8 @@ export class UserAdminService {
           email: cleanEmail,
           name: data.name.trim(),
           role: Role.CENTRE,
-          phone: data.phoneNumber ? data.phoneNumber.trim() : null,
-          whatsappNumber: data.whatsappNumber || (data.phoneNumber ? data.phoneNumber.trim() : null),
+          phone: whatsappNum,
+          whatsappNumber: whatsappNum,
           centreId: data.centreId || null,
           clientId: data.clientId || null,
           scope: data.scope ? (data.scope as Prisma.InputJsonValue) : Prisma.JsonNull,
@@ -732,7 +742,7 @@ export class UserAdminService {
           data: {
             email: cleanEmail,
             name: data.name.trim(),
-            phoneNumber: data.phoneNumber ? data.phoneNumber.trim() : null,
+            phoneNumber: whatsappNum,
             role: Role.CENTRE,
             passwordHash: tempHash,
             status: 'Inactive',
@@ -753,6 +763,7 @@ export class UserAdminService {
           details: {
             email: cleanEmail,
             name: data.name,
+            whatsappNumber: whatsappNum,
             centreId: data.centreId,
             clientId: data.clientId,
           },
@@ -762,11 +773,238 @@ export class UserAdminService {
       return inv;
     });
 
+    const registrationUrl = `/invite/register?token=${token}`;
+
+    // Actively dispatch the 72-hour sign-up link to Email and WhatsApp (FRD Sec. 4.1)
+    let dispatchResult: any;
+    try {
+      dispatchResult = await NotificationService.dispatchSignUpLink({
+        centreName: data.name,
+        email: cleanEmail,
+        whatsappNumber: whatsappNum,
+        token,
+        registrationUrl,
+        expiresAt,
+      });
+
+      await prisma.userInvitation.update({
+        where: { id: invitation.id },
+        data: {
+          emailDispatched: dispatchResult.email.sent,
+          whatsappDispatched: dispatchResult.whatsapp.sent,
+          lastDispatchedAt: new Date(),
+          dispatchStatus: dispatchResult as any,
+        },
+      });
+    } catch (dispatchErr) {
+      console.error('[INVITE:DISPATCH:ERROR]', dispatchErr);
+      dispatchResult = {
+        email: { sent: false, recipient: cleanEmail, status: 'failed', error: String(dispatchErr) },
+        whatsapp: { sent: false, recipient: whatsappNum, status: 'failed', error: String(dispatchErr) },
+      };
+    }
+
     return {
       success: true,
       invitation,
+      registrationUrl,
+      fullRegistrationUrl: NotificationService.getFullRegistrationUrl(registrationUrl),
+      activationUrl: `/activate-account?token=${token}`,
+      token,
+      expiresAt,
+      emailDispatched: dispatchResult.email.sent,
+      whatsappDispatched: dispatchResult.whatsapp.sent,
+      dispatch: dispatchResult,
+    };
+  }
+
+  static async listCentreInvitations(query: {
+    status?: string;
+    search?: string;
+    page?: number;
+    limit?: number;
+  }) {
+    const page = Math.max(1, Number(query.page || 1));
+    const limit = Math.min(100, Math.max(1, Number(query.limit || 20)));
+    const skip = (page - 1) * limit;
+
+    const where: Prisma.UserInvitationWhereInput = {
+      role: Role.CENTRE,
+    };
+
+    if (query.status && query.status !== 'All') {
+      if (query.status === 'Expired') {
+        where.status = 'Pending';
+        where.expiresAt = { lt: new Date() };
+      } else if (query.status === 'Pending') {
+        where.status = 'Pending';
+        where.expiresAt = { gte: new Date() };
+      } else {
+        where.status = query.status;
+      }
+    }
+
+    if (query.search) {
+      const s = query.search.trim();
+      where.OR = [
+        { email: { contains: s } },
+        { name: { contains: s } },
+        { whatsappNumber: { contains: s } },
+        { phone: { contains: s } },
+      ];
+    }
+
+    const [total, items] = await Promise.all([
+      prisma.userInvitation.count({ where }),
+      prisma.userInvitation.findMany({
+        where,
+        include: {
+          inviter: {
+            select: { id: true, name: true, email: true },
+          },
+        },
+        orderBy: { createdAt: 'desc' },
+        skip,
+        take: limit,
+      }),
+    ]);
+
+    const now = new Date();
+    const enriched = items.map((inv) => ({
+      ...inv,
+      isExpired: inv.status === 'Pending' && inv.expiresAt < now,
+      registrationUrl: `/invite/register?token=${inv.token}`,
+    }));
+
+    return {
+      items: enriched,
+      meta: {
+        page,
+        limit,
+        total,
+        totalPages: Math.ceil(total / limit),
+      },
+    };
+  }
+
+  static async recordInvitationFollowUp(
+    invitationId: string,
+    action: string,
+    notes: string = '',
+    actorId?: string,
+    actorEmail?: string
+  ) {
+    const inv = await prisma.userInvitation.findUnique({
+      where: { id: invitationId },
+    });
+    if (!inv) throw new Error('Invitation record not found');
+
+    const normAction = action.toUpperCase();
+    const updated = await prisma.userInvitation.update({
+      where: { id: invitationId },
+      data: {
+        followUpAction: normAction,
+        followUpNotes: notes || null,
+        lastFollowUpAt: new Date(),
+      },
+    });
+
+    if (actorId && actorEmail) {
+      await prisma.auditLog.create({
+        data: {
+          userId: actorId,
+          userEmail: actorEmail,
+          action: 'INVITATION_FOLLOW_UP',
+          entity: 'UserInvitation',
+          entityId: invitationId,
+          details: { action: normAction, notes, email: inv.email },
+        },
+      });
+    }
+
+    return updated;
+  }
+
+  static async resendCentreInvitation(
+    invitationId: string,
+    actorId?: string,
+    actorEmail?: string
+  ) {
+    const inv = await prisma.userInvitation.findUnique({
+      where: { id: invitationId },
+    });
+    if (!inv) throw new Error('Invitation record not found');
+
+    const token = crypto.randomBytes(32).toString('hex');
+    const expiresAt = new Date(Date.now() + 72 * 60 * 60 * 1000);
+
+    const updated = await prisma.userInvitation.update({
+      where: { id: invitationId },
+      data: {
+        token,
+        expiresAt,
+        status: 'Pending',
+        usedAt: null,
+        resendCount: inv.resendCount + 1,
+      },
+      include: {
+        inviter: { select: { id: true, name: true, email: true } },
+      },
+    });
+
+    if (actorId && actorEmail) {
+      await prisma.auditLog.create({
+        data: {
+          userId: actorId,
+          userEmail: actorEmail,
+          action: 'CENTRE_SIGNUP_LINK_RESENT',
+          entity: 'UserInvitation',
+          entityId: invitationId,
+          details: { email: inv.email, resendCount: updated.resendCount },
+        },
+      });
+    }
+
+    const registrationUrl = `/invite/register?token=${token}`;
+
+    // Actively re-dispatch the renewed 72-hour sign-up link to Email and WhatsApp (FRD Sec. 4.1)
+    let dispatchResult: any;
+    try {
+      dispatchResult = await NotificationService.dispatchSignUpLink({
+        centreName: inv.name,
+        email: inv.email,
+        whatsappNumber: inv.whatsappNumber || inv.phone || '',
+        token,
+        registrationUrl,
+        expiresAt,
+      });
+
+      await prisma.userInvitation.update({
+        where: { id: invitationId },
+        data: {
+          emailDispatched: dispatchResult.email.sent,
+          whatsappDispatched: dispatchResult.whatsapp.sent,
+          lastDispatchedAt: new Date(),
+          dispatchStatus: dispatchResult as any,
+        },
+      });
+    } catch (dispatchErr) {
+      console.error('[RESEND:DISPATCH:ERROR]', dispatchErr);
+      dispatchResult = {
+        email: { sent: false, recipient: inv.email, status: 'failed', error: String(dispatchErr) },
+        whatsapp: { sent: false, recipient: inv.whatsappNumber || '', status: 'failed', error: String(dispatchErr) },
+      };
+    }
+
+    return {
+      invitation: updated,
+      registrationUrl,
+      fullRegistrationUrl: NotificationService.getFullRegistrationUrl(registrationUrl),
       activationUrl: `/activate-account?token=${token}`,
       expiresAt,
+      emailDispatched: dispatchResult.email.sent,
+      whatsappDispatched: dispatchResult.whatsapp.sent,
+      dispatch: dispatchResult,
     };
   }
 

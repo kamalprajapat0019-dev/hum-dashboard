@@ -36,6 +36,7 @@ export default function CentreProfileModal({
 }) {
   const roleUpper = (currentUserRole || 'ADMIN').toUpperCase();
   const isPrivileged = roleUpper === 'ADMIN' || roleUpper === 'OPERATIONS' || currentUserRole === 'admin' || currentUserRole === 'operations_executive';
+  const isAdmin = roleUpper === 'ADMIN' || currentUserRole === 'admin';
 
   const [activeTab, setActiveTab] = useState('basic'); // basic | personnel | docs | building | power | safety | bank | history
   const [isEditing, setIsEditing] = useState(initialEditMode);
@@ -108,8 +109,13 @@ export default function CentreProfileModal({
 
   const handleSendInvite = async (e) => {
     e.preventDefault();
+    const cleanMobile = (inviteForm.whatsappNumber || inviteForm.phone || '').replace(/\D/g, '');
     if (!inviteForm.name.trim() || !inviteForm.email.trim()) {
-      showNotification('Contact Name and Email are required.', 'error');
+      showNotification('Centre Representative Name and Email are required.', 'error');
+      return;
+    }
+    if (!cleanMobile || cleanMobile.length !== 10) {
+      showNotification('Valid 10-digit Centre WhatsApp Mobile Number is required.', 'error');
       return;
     }
     setInviting(true);
@@ -118,7 +124,8 @@ export default function CentreProfileModal({
       const res = await apiClient.post(endpoint, {
         name: inviteForm.name.trim(),
         email: inviteForm.email.trim().toLowerCase(),
-        phone: inviteForm.phone.trim() || undefined,
+        phone: cleanMobile,
+        whatsappNumber: cleanMobile,
         centreId: centre.id,
         clientId: centre.clientId,
         role: 'CENTRE',
@@ -126,10 +133,10 @@ export default function CentreProfileModal({
       });
       if (res && res.success && res.data) {
         setInviteResult(res.data);
-        showNotification(`Invitation generated successfully for ${inviteForm.email}!`);
+        showNotification(`72-Hour Sign-Up Link generated & dispatched to ${inviteForm.email}!`);
       }
     } catch (err) {
-      showNotification(err.message || 'Failed to send invitation', 'error');
+      showNotification(err.message || 'Failed to send sign-up link', 'error');
     } finally {
       setInviting(false);
     }
@@ -137,9 +144,11 @@ export default function CentreProfileModal({
 
   const handleCopyLink = () => {
     if (inviteResult?.registrationUrl) {
-      navigator.clipboard.writeText(inviteResult.registrationUrl);
+      const url = inviteResult.registrationUrl;
+      const fullUrl = url.startsWith('http') ? url : `${window.location.origin}${url}`;
+      navigator.clipboard.writeText(fullUrl);
       setCopiedInviteUrl(true);
-      showNotification('Invitation link copied to clipboard!');
+      showNotification('Sign-up link copied to clipboard!');
       setTimeout(() => setCopiedInviteUrl(false), 3000);
     }
   };
@@ -387,7 +396,7 @@ export default function CentreProfileModal({
               </button>
             )}
 
-            {centre.centreStatus !== 'Ready to Book' && centre.centreStatus !== 'Approved' && (
+            {isAdmin && centre.centreStatus !== 'Ready to Book' && centre.centreStatus !== 'Approved' && (
               <button
                 className="btn btn-sm btn-primary"
                 onClick={() => setShowApproveModal(true)}
@@ -397,7 +406,7 @@ export default function CentreProfileModal({
               </button>
             )}
 
-            {centre.centreStatus !== 'Rejected' && (
+            {isAdmin && centre.centreStatus !== 'Rejected' && (
               <button
                 className="btn btn-sm btn-secondary"
                 onClick={() => setShowRejectModal(true)}
@@ -411,18 +420,20 @@ export default function CentreProfileModal({
               className="btn btn-sm btn-secondary"
               onClick={() => handleOpenInvite(cs?.fullName ? cs : owner)}
               style={{ display: 'flex', alignItems: 'center', gap: 6 }}
-              title="Invite Centre Superintendent / Representative to Centre Portal"
+              title="Send 72-Hour Sign-Up Link to Centre Superintendent / Owner (FRD Sec. 4.1)"
             >
-              <Send size={14} /> Invite User
+              <Send size={14} /> Send Sign-Up Link
             </button>
 
-            <button
-              className="btn btn-sm btn-secondary"
-              onClick={() => setShowAuditorModal(true)}
-              style={{ display: 'flex', alignItems: 'center', gap: 6 }}
-            >
-              <UserCheck size={14} /> Assign Auditor
-            </button>
+            {isPrivileged && (
+              <button
+                className="btn btn-sm btn-secondary"
+                onClick={() => setShowAuditorModal(true)}
+                style={{ display: 'flex', alignItems: 'center', gap: 6 }}
+              >
+                <UserCheck size={14} /> Assign Auditor
+              </button>
+            )}
 
             <button
               className="btn-ghost"

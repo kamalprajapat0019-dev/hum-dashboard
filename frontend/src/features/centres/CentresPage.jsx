@@ -2,7 +2,7 @@ import { useState, useEffect, useCallback, useRef, useMemo } from 'react';
 import {
   Building2, Search, Filter, Eye, MapPin, RefreshCw, Download,
   CheckCircle2, Clock, AlertTriangle, ShieldCheck, X, Check,
-  AlertCircle, Loader2, ChevronLeft, ChevronRight, UserCheck, Ban, Edit
+  AlertCircle, Loader2, ChevronLeft, ChevronRight, UserCheck, Ban, Edit, Send
 } from 'lucide-react';
 import { apiClient } from '@/services/apiClient';
 import { ENDPOINTS } from '@/services/endpoints';
@@ -11,6 +11,8 @@ import { useClient } from '@/context/ClientContext';
 import { normalizeRole, ROLES } from '@/constants/roles';
 import { StatusBadge, ActionGroup, ViewAction, EditAction } from '@/components/common';
 import CentreProfileModal from './components/CentreProfileModal';
+import SendSignUpLinkModal from './components/profile-dialogs/SendSignUpLinkModal';
+import SignUpInvitesModal from './components/profile-dialogs/SignUpInvitesModal';
 
 const STATUS_OPTIONS = [
   'All',
@@ -70,6 +72,8 @@ export default function CentresPage() {
     card4: { rejected: 0, blacklisted: 0 },
   });
   const [loadingSummary, setLoadingSummary] = useState(false);
+  const [showSendSignUpModal, setShowSendSignUpModal] = useState(false);
+  const [showInvitesModal, setShowInvitesModal] = useState(false);
 
   // Centre Profile Modal
   const [selectedCentreProfile, setSelectedCentreProfile] = useState(null);
@@ -95,7 +99,10 @@ export default function CentresPage() {
   const loadSummary = useCallback(async () => {
     setLoadingSummary(true);
     try {
-      const res = await apiClient.get(ENDPOINTS.ADMIN.CENTRES_SUMMARY);
+      const summaryEndpoint = userRoleNormalized === ROLES.ADMIN
+        ? ENDPOINTS.ADMIN.CENTRES_SUMMARY
+        : (ENDPOINTS.CENTRE_PORTAL?.SUMMARY || '/centre/summary');
+      const res = await apiClient.get(summaryEndpoint);
       if (res && res.success && res.data) {
         setSummary(res.data);
       }
@@ -104,14 +111,17 @@ export default function CentresPage() {
     } finally {
       setLoadingSummary(false);
     }
-  }, []);
+  }, [userRoleNormalized]);
 
   // Load Centre Master Listing Table (Scoped exclusively to local table filters)
   const loadCentres = useCallback(async () => {
     setLoading(true);
     setError(null);
     try {
-      const res = await apiClient.get(ENDPOINTS.ADMIN.CENTRES, {
+      const listEndpoint = userRoleNormalized === ROLES.ADMIN
+        ? ENDPOINTS.ADMIN.CENTRES
+        : (ENDPOINTS.CENTRE_PORTAL?.LIST || '/centre/list');
+      const res = await apiClient.get(listEndpoint, {
         params: {
           page,
           limit,
@@ -140,7 +150,7 @@ export default function CentresPage() {
     } finally {
       setLoading(false);
     }
-  }, [page, limit, debouncedSearch, regionFilter, statusFilter, debouncedState, debouncedCity, clientFilter]);
+  }, [page, limit, debouncedSearch, regionFilter, statusFilter, debouncedState, debouncedCity, clientFilter, userRoleNormalized]);
 
   useEffect(() => {
     loadSummary();
@@ -155,7 +165,10 @@ export default function CentresPage() {
     setIsEditMode(isEdit);
     setLoadingProfile(true);
     try {
-      const res = await apiClient.get(ENDPOINTS.ADMIN.CENTRE_PROFILE(centreId));
+      const profileEndpoint = userRoleNormalized === ROLES.ADMIN
+        ? ENDPOINTS.ADMIN.CENTRE_PROFILE(centreId)
+        : (ENDPOINTS.CENTRE_PORTAL?.PROFILE?.(centreId) || `/centre/${centreId}/profile`);
+      const res = await apiClient.get(profileEndpoint);
       if (res && res.success && res.data) {
         setSelectedCentreProfile(res.data);
       } else {
@@ -239,6 +252,26 @@ export default function CentresPage() {
             >
               <Download size={13} /> Export
             </button>
+            {(canEdit || userRoleNormalized === ROLES.PM || user?.role === 'PM') && (
+              <>
+                <button
+                  className="btn btn-secondary btn-sm"
+                  onClick={() => setShowInvitesModal(true)}
+                  title="View 72-Hour Sign-Up Invites & Operations Follow-up (FRD Sec. 4.1)"
+                  style={{ display: 'flex', alignItems: 'center', gap: 6 }}
+                >
+                  <Clock size={13} /> Sign-Up Invites & Follow-Up
+                </button>
+                <button
+                  className="btn btn-primary btn-sm"
+                  onClick={() => setShowSendSignUpModal(true)}
+                  title="Dispatch 72-Hour Sign-Up Link to Centre (FRD Sec. 4.1)"
+                  style={{ display: 'flex', alignItems: 'center', gap: 6 }}
+                >
+                  <Send size={13} /> Send Sign-Up Link
+                </button>
+              </>
+            )}
           </div>
         </div>
       </div>
@@ -738,6 +771,22 @@ export default function CentresPage() {
           currentUserRole={userRoleNormalized === ROLES.ADMIN ? 'ADMIN' : (userRoleNormalized === ROLES.OPERATIONS ? 'OPERATIONS' : (user?.role || 'ADMIN'))}
         />
       )}
+
+      {/* ── FRD Sec. 4.1: Send Sign-Up Link Modal ── */}
+      <SendSignUpLinkModal
+        isOpen={showSendSignUpModal}
+        onClose={() => setShowSendSignUpModal(false)}
+        onSuccess={() => {
+          loadSummary();
+          loadCentres();
+        }}
+      />
+
+      {/* ── FRD Sec. 4.1: Sign-Up Links & Follow-Up Modal ── */}
+      <SignUpInvitesModal
+        isOpen={showInvitesModal}
+        onClose={() => setShowInvitesModal(false)}
+      />
     </div>
   );
 }

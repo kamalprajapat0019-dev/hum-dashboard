@@ -32,6 +32,7 @@ export const ROUTES = {
   PM: {
     DASHBOARD: '/pm',
     SETUP: '/pm/setup',
+    CENTRES: '/pm/centres',
     PIPELINE: '/pm/pipeline',
     ELIGIBILITY: '/pm/eligibility',
     CONSENT: '/pm/consent',
@@ -56,6 +57,7 @@ export const ROUTES = {
 
   OPS: {
     DASHBOARD: '/ops',
+    CENTRES: '/ops/centres',
     BOOKING: '/ops/booking',
     CONSENT: '/ops/consent',
     DOCUMENTS: '/ops/documents',

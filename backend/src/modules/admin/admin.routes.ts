@@ -40,115 +40,118 @@ import {
 
 const router = Router();
 
-// Protect ALL admin routes with Auth + Admin Role Check
+// Protect ALL admin routes with Authentication
 router.use(authMiddleware);
-router.use(requireRole(Role.ADMIN));
 
-// Executive Analytics
-router.get('/analytics', validateRequest({ query: analyticsQuerySchema }), AdminController.getAnalytics);
+// Executive Analytics (Admin only)
+router.get('/analytics', requireRole(Role.ADMIN), validateRequest({ query: analyticsQuerySchema }), AdminController.getAnalytics);
 
 // Client Management
-router.get('/clients/summary', AdminController.getClientsSummary);
-router.get('/clients', validateRequest({ query: clientQuerySchema }), AdminController.listClients);
-router.post('/clients', validateRequest({ body: createClientSchema }), AdminController.createClient);
-router.get('/clients/:id', AdminController.getClientById);
-router.put('/clients/:id', validateRequest({ body: updateClientSchema }), AdminController.updateClient);
-router.patch('/clients/:id/status', validateRequest({ body: updateClientStatusSchema }), AdminController.updateClientStatus);
+router.get('/clients/summary', requireRole(Role.ADMIN, Role.PM, Role.OPERATIONS), AdminController.getClientsSummary);
+router.get('/clients', requireRole(Role.ADMIN, Role.PM, Role.OPERATIONS), validateRequest({ query: clientQuerySchema }), AdminController.listClients);
+router.post('/clients', requireRole(Role.ADMIN), validateRequest({ body: createClientSchema }), AdminController.createClient);
+router.get('/clients/:id', requireRole(Role.ADMIN, Role.PM, Role.OPERATIONS), AdminController.getClientById);
+router.put('/clients/:id', requireRole(Role.ADMIN), validateRequest({ body: updateClientSchema }), AdminController.updateClient);
+router.patch('/clients/:id/status', requireRole(Role.ADMIN), validateRequest({ body: updateClientStatusSchema }), AdminController.updateClientStatus);
 
-// User Management
-router.get('/users/summary', AdminController.getUserSummary);
-router.get('/users', validateRequest({ query: userQuerySchema }), AdminController.listUsers);
-router.post('/users', validateRequest({ body: createUserSchema }), AdminController.createUser);
-router.get('/users/:id', AdminController.getUserById);
-router.put('/users/:id', validateRequest({ body: updateUserSchema }), AdminController.updateUser);
-router.patch('/users/:id', validateRequest({ body: updateUserSchema }), AdminController.updateUser);
-router.delete('/users/:id', AdminController.deleteUser);
-router.post('/users/:id/activate', AdminController.activateUser);
-router.post('/users/:id/deactivate', AdminController.deactivateUser);
-router.post('/users/:id/reset-password', AdminController.initiatePasswordReset);
-router.post('/users/invite', validateRequest({ body: inviteUserSchema }), AdminController.inviteUser);
-router.get('/allowed-domains', AdminController.getAllowedDomains);
-router.post('/allowed-domains', AdminController.addAllowedDomain);
+// User Management (Admin only)
+router.get('/users/summary', requireRole(Role.ADMIN), AdminController.getUserSummary);
+router.get('/users', requireRole(Role.ADMIN), validateRequest({ query: userQuerySchema }), AdminController.listUsers);
+router.post('/users', requireRole(Role.ADMIN), validateRequest({ body: createUserSchema }), AdminController.createUser);
+router.get('/users/:id', requireRole(Role.ADMIN), AdminController.getUserById);
+router.put('/users/:id', requireRole(Role.ADMIN), validateRequest({ body: updateUserSchema }), AdminController.updateUser);
+router.patch('/users/:id', requireRole(Role.ADMIN), validateRequest({ body: updateUserSchema }), AdminController.updateUser);
+router.delete('/users/:id', requireRole(Role.ADMIN), AdminController.deleteUser);
+router.post('/users/:id/activate', requireRole(Role.ADMIN), AdminController.activateUser);
+router.post('/users/:id/deactivate', requireRole(Role.ADMIN), AdminController.deactivateUser);
+router.post('/users/:id/reset-password', requireRole(Role.ADMIN), AdminController.initiatePasswordReset);
+router.post('/users/invite', requireRole(Role.ADMIN), validateRequest({ body: inviteUserSchema }), AdminController.inviteUser);
+router.get('/allowed-domains', requireRole(Role.ADMIN), AdminController.getAllowedDomains);
+router.post('/allowed-domains', requireRole(Role.ADMIN), AdminController.addAllowedDomain);
 
 // Project Management
-router.get('/projects/summary', AdminController.getProjectSummary);
-router.get('/projects/next-code', AdminController.getNextProjectCode);
-router.get('/projects', validateRequest({ query: projectQuerySchema }), AdminController.listProjects);
-router.post('/projects', validateRequest({ body: createProjectSchema }), AdminController.createProject);
-router.get('/projects/:id', AdminController.getProjectById);
-router.put('/projects/:id', validateRequest({ body: updateProjectSchema }), AdminController.updateProject);
-router.patch('/projects/:id/status', validateRequest({ body: updateProjectStatusSchema }), AdminController.updateProjectStatus);
+router.get('/projects/summary', requireRole(Role.ADMIN, Role.PM, Role.OPERATIONS), AdminController.getProjectSummary);
+router.get('/projects/next-code', requireRole(Role.ADMIN, Role.PM), AdminController.getNextProjectCode);
+router.get('/projects', requireRole(Role.ADMIN, Role.PM, Role.OPERATIONS), validateRequest({ query: projectQuerySchema }), AdminController.listProjects);
+router.post('/projects', requireRole(Role.ADMIN, Role.PM), validateRequest({ body: createProjectSchema }), AdminController.createProject);
+router.get('/projects/:id', requireRole(Role.ADMIN, Role.PM), AdminController.getProjectById);
+router.put('/projects/:id', requireRole(Role.ADMIN, Role.PM), validateRequest({ body: updateProjectSchema }), AdminController.updateProject);
+router.patch('/projects/:id/status', requireRole(Role.ADMIN, Role.PM), validateRequest({ body: updateProjectStatusSchema }), AdminController.updateProjectStatus);
 
 // Annual Examination Calendar Synchronization
-router.get('/calendar', validateRequest({ query: calendarQuerySchema }), AdminController.getCalendarExams);
-router.get('/calendar/exams', validateRequest({ query: calendarQuerySchema }), AdminController.getCalendarExams);
+router.get('/calendar', requireRole(Role.ADMIN, Role.PM, Role.OPERATIONS), validateRequest({ query: calendarQuerySchema }), AdminController.getCalendarExams);
+router.get('/calendar/exams', requireRole(Role.ADMIN, Role.PM, Role.OPERATIONS), validateRequest({ query: calendarQuerySchema }), AdminController.getCalendarExams);
 
 // Exam Types Management
-router.get('/exam-types', validateRequest({ query: examTypeQuerySchema }), AdminController.listExamTypes);
-router.post('/exam-types', validateRequest({ body: createExamTypeSchema }), AdminController.createExamType);
-router.get('/exam-types/:id', AdminController.getExamTypeById);
-router.put('/exam-types/:id', validateRequest({ body: updateExamTypeSchema }), AdminController.updateExamType);
-router.patch('/exam-types/:id/status', validateRequest({ body: updateExamTypeStatusSchema }), AdminController.updateExamTypeStatus);
-router.delete('/exam-types/:id', AdminController.deleteExamType);
+router.get('/exam-types', requireRole(Role.ADMIN, Role.PM, Role.OPERATIONS), validateRequest({ query: examTypeQuerySchema }), AdminController.listExamTypes);
+router.post('/exam-types', requireRole(Role.ADMIN), validateRequest({ body: createExamTypeSchema }), AdminController.createExamType);
+router.get('/exam-types/:id', requireRole(Role.ADMIN, Role.PM, Role.OPERATIONS), AdminController.getExamTypeById);
+router.put('/exam-types/:id', requireRole(Role.ADMIN), validateRequest({ body: updateExamTypeSchema }), AdminController.updateExamType);
+router.patch('/exam-types/:id/status', requireRole(Role.ADMIN), validateRequest({ body: updateExamTypeStatusSchema }), AdminController.updateExamTypeStatus);
+router.delete('/exam-types/:id', requireRole(Role.ADMIN), AdminController.deleteExamType);
 
 // Exam Instances Management
-router.get('/exams/summary', AdminController.getExamsSummary);
-router.get('/exams', validateRequest({ query: examQuerySchema }), AdminController.listExams);
-router.post('/exams', validateRequest({ body: createExamSchema }), AdminController.createExam);
-router.get('/exams/:id', AdminController.getExamById);
-router.put('/exams/:id', validateRequest({ body: updateExamSchema }), AdminController.updateExam);
-router.delete('/exams/:id', AdminController.deleteExam);
-router.post('/exams/:id/requirement-sheet', validateRequest({ body: importRequirementSheetSchema }), AdminController.importRequirementSheet);
-router.get('/exams/:id/requirement-sheet', AdminController.getExamRequirementSheet);
-router.get('/exams/:id/requirement-sheet/download', AdminController.downloadExamRequirementSheet);
-router.get('/exams/:id/summary', AdminController.getExamSummary);
-router.post('/exams/:id/summary/sync', AdminController.syncExamSummary);
+router.get('/exams/summary', requireRole(Role.ADMIN, Role.PM, Role.OPERATIONS), AdminController.getExamsSummary);
+router.get('/exams', requireRole(Role.ADMIN, Role.PM, Role.OPERATIONS), validateRequest({ query: examQuerySchema }), AdminController.listExams);
+router.post('/exams', requireRole(Role.ADMIN, Role.PM), validateRequest({ body: createExamSchema }), AdminController.createExam);
+router.get('/exams/:id', requireRole(Role.ADMIN, Role.PM, Role.OPERATIONS), AdminController.getExamById);
+router.put('/exams/:id', requireRole(Role.ADMIN, Role.PM), validateRequest({ body: updateExamSchema }), AdminController.updateExam);
+router.delete('/exams/:id', requireRole(Role.ADMIN), AdminController.deleteExam);
+router.post('/exams/:id/requirement-sheet', requireRole(Role.ADMIN, Role.PM), validateRequest({ body: importRequirementSheetSchema }), AdminController.importRequirementSheet);
+router.get('/exams/:id/requirement-sheet', requireRole(Role.ADMIN, Role.PM, Role.OPERATIONS), AdminController.getExamRequirementSheet);
+router.get('/exams/:id/requirement-sheet/download', requireRole(Role.ADMIN, Role.PM, Role.OPERATIONS), AdminController.downloadExamRequirementSheet);
+router.get('/exams/:id/summary', requireRole(Role.ADMIN, Role.PM, Role.OPERATIONS), AdminController.getExamSummary);
+router.post('/exams/:id/summary/sync', requireRole(Role.ADMIN, Role.PM), AdminController.syncExamSummary);
 
 // Exam Dates Management
-router.get('/exams/:examId/dates', AdminController.listExamDates);
-router.post('/exams/:examId/dates', validateRequest({ body: createExamDateSchema }), AdminController.createExamDate);
-router.delete('/exams/dates/:dateId', AdminController.deleteExamDate);
+router.get('/exams/:examId/dates', requireRole(Role.ADMIN, Role.PM, Role.OPERATIONS), AdminController.listExamDates);
+router.post('/exams/:examId/dates', requireRole(Role.ADMIN, Role.PM), validateRequest({ body: createExamDateSchema }), AdminController.createExamDate);
+router.delete('/exams/dates/:dateId', requireRole(Role.ADMIN), AdminController.deleteExamDate);
 
 // Exam Shifts Management
-router.get('/exams/dates/:dateId/shifts', AdminController.listExamShifts);
-router.post('/exams/dates/:dateId/shifts', validateRequest({ body: createExamShiftSchema }), AdminController.createExamShift);
-router.delete('/exams/shifts/:shiftId', AdminController.deleteExamShift);
+router.get('/exams/dates/:dateId/shifts', requireRole(Role.ADMIN, Role.PM, Role.OPERATIONS), AdminController.listExamShifts);
+router.post('/exams/dates/:dateId/shifts', requireRole(Role.ADMIN, Role.PM), validateRequest({ body: createExamShiftSchema }), AdminController.createExamShift);
+router.delete('/exams/shifts/:shiftId', requireRole(Role.ADMIN), AdminController.deleteExamShift);
 
 // Centre Management (Overview & Lifecycle per OEMP PDF)
-router.get('/centres/summary', AdminController.getCentresSummary);
-router.get('/centres', validateRequest({ query: centreQuerySchema }), AdminController.listCentres);
-router.post('/centres', validateRequest({ body: createCentreSchema }), AdminController.createCentre);
-router.get('/centres/:id', AdminController.getCentreById);
-router.get('/centres/:id/profile', AdminController.getCentreProfile);
-router.put('/centres/:id', validateRequest({ body: updateCentreSchema }), AdminController.updateCentre);
+router.get('/centres/summary', requireRole(Role.ADMIN, Role.PM, Role.OPERATIONS), AdminController.getCentresSummary);
+router.get('/centres', requireRole(Role.ADMIN, Role.PM, Role.OPERATIONS), validateRequest({ query: centreQuerySchema }), AdminController.listCentres);
+router.post('/centres', requireRole(Role.ADMIN, Role.OPERATIONS), validateRequest({ body: createCentreSchema }), AdminController.createCentre);
+router.get('/centres/:id', requireRole(Role.ADMIN, Role.PM, Role.OPERATIONS), AdminController.getCentreById);
+router.get('/centres/:id/profile', requireRole(Role.ADMIN, Role.PM, Role.OPERATIONS), AdminController.getCentreProfile);
+router.put('/centres/:id', requireRole(Role.ADMIN, Role.OPERATIONS), validateRequest({ body: updateCentreSchema }), AdminController.updateCentre);
 router.patch(
   '/centres/:id/status',
+  requireRole(Role.ADMIN, Role.OPERATIONS),
   validateRequest({ body: updateCentreStatusSchema }),
   AdminController.updateCentreStatus
 );
-router.post('/centres/:id/verify-document', AdminController.verifyDocument);
-router.post('/centres/:id/verify-bank', AdminController.verifyBank);
-router.post('/centres/:id/approve', AdminController.approveApplication);
-router.post('/centres/:id/reject', AdminController.rejectApplication);
-router.post('/centres/:id/assign-auditor', AdminController.assignAuditor);
+router.post('/centres/:id/verify-document', requireRole(Role.ADMIN, Role.OPERATIONS), AdminController.verifyDocument);
+router.post('/centres/:id/verify-bank', requireRole(Role.ADMIN, Role.OPERATIONS), AdminController.verifyBank);
+router.post('/centres/:id/approve', requireRole(Role.ADMIN), AdminController.approveApplication);
+router.post('/centres/:id/reject', requireRole(Role.ADMIN), AdminController.rejectApplication);
+router.post('/centres/:id/assign-auditor', requireRole(Role.ADMIN, Role.OPERATIONS), AdminController.assignAuditor);
 
-// Eligibility & Blacklist Oversight
+// Eligibility & Blacklist Oversight (Admin only)
 router.post(
   '/eligibility/blacklist',
+  requireRole(Role.ADMIN),
   validateRequest({ body: blacklistCentreSchema }),
   AdminController.blacklistCentre
 );
 router.post(
   '/eligibility/override',
+  requireRole(Role.ADMIN),
   validateRequest({ body: overrideEligibilitySchema }),
   AdminController.overrideEligibility
 );
 
-// Audit Trail & System Configuration
-router.get('/audit-logs', AdminController.getAuditLogs);
-router.get('/config', AdminController.getSystemConfigs);
+// Audit Trail & System Configuration (Admin only)
+router.get('/audit-logs', requireRole(Role.ADMIN), AdminController.getAuditLogs);
+router.get('/config', requireRole(Role.ADMIN), AdminController.getSystemConfigs);
 router.put(
   '/config/:key',
+  requireRole(Role.ADMIN),
   validateRequest({ body: updateConfigSchema }),
   AdminController.updateSystemConfig
 );

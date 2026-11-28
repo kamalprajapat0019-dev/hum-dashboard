@@ -7,6 +7,7 @@ import { Building2, Plus, RefreshCw, AlertCircle, Loader2 } from 'lucide-react';
 import { KpiCard, StatusBadge, LastUpdated } from '@/components/common';
 import { apiClient } from '@/services/apiClient';
 import { ENDPOINTS } from '@/services/endpoints';
+import { ROUTES } from '@/constants/routes';
 
 const CustomTooltip = ({ active, payload }) => {
   if (!active || !payload?.length) return null;
@@ -83,8 +84,8 @@ export default function OpsDashboard() {
               <RefreshCw size={13} className={loading ? 'animate-spin' : ''} />
             </button>
             <LastUpdated />
-            <button className="btn btn-primary btn-sm" onClick={() => navigate('/ops/booking')}>
-              <Building2 size={13} /> Manage Centres
+            <button className="btn btn-primary btn-sm" onClick={() => navigate(ROUTES.OPS.CENTRES || '/ops/centres')}>
+              <Building2 size={13} /> Centre Master
             </button>
           </div>
         </div>
