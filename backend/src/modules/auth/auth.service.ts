@@ -539,7 +539,7 @@ export class AuthService {
           whatsappDispatched: dispatchResult.whatsapp.sent,
           lastDispatchedAt: new Date(),
           dispatchStatus: dispatchResult as any,
-        },
+        } as any,
       });
     } catch (dispatchErr) {
       console.error('[REQUEST_NEW_INVITE:DISPATCH:ERROR]', dispatchErr);

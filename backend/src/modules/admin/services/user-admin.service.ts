@@ -804,7 +804,7 @@ export class UserAdminService {
           whatsappDispatched: dispatchResult.whatsapp.sent,
           lastDispatchedAt: new Date(),
           dispatchStatus: dispatchResult as any,
-        },
+        } as any,
       });
     } catch (dispatchErr) {
       console.error('[INVITE:DISPATCH:ERROR]', dispatchErr);
@@ -996,7 +996,7 @@ export class UserAdminService {
           whatsappDispatched: dispatchResult.whatsapp.sent,
           lastDispatchedAt: new Date(),
           dispatchStatus: dispatchResult as any,
-        },
+        } as any,
       });
     } catch (dispatchErr) {
       console.error('[RESEND:DISPATCH:ERROR]', dispatchErr);
