@@ -711,67 +711,77 @@ export class UserAdminService {
     const token = crypto.randomBytes(32).toString('hex');
     const expiresAt = new Date(Date.now() + 72 * 60 * 60 * 1000); // 72-hour window (FRD Sec. 4)
 
-    const invitation = await prisma.$transaction(async (tx: any) => {
-      // Invalidate any existing pending invitation for this email
-      await tx.userInvitation.updateMany({
-        where: { email: cleanEmail, status: 'Pending' },
-        data: { status: 'Revoked' },
-      });
+    // Pre-compute placeholder hash outside transaction
+    const tempHash = !existingUser
+      ? await hashPassword(`Invited@${crypto.randomBytes(4).toString('hex')}`)
+      : null;
 
-      const inv = await tx.userInvitation.create({
-        data: {
-          email: cleanEmail,
-          name: data.name.trim(),
-          role: Role.CENTRE,
-          phone: whatsappNum,
-          whatsappNumber: whatsappNum,
-          centreId: data.centreId || null,
-          clientId: data.clientId || null,
-          scope: data.scope ? (data.scope as Prisma.InputJsonValue) : Prisma.JsonNull,
-          token,
-          expiresAt,
-          status: 'Pending',
-          inviterId,
-        },
-      });
+    const invitation = await prisma.$transaction(
+      async (tx: any) => {
+        // Invalidate any existing pending invitation for this email
+        await tx.userInvitation.updateMany({
+          where: { email: cleanEmail, status: 'Pending' },
+          data: { status: 'Revoked' },
+        });
 
-      // If user doesn't exist, create an inactive placeholder
-      if (!existingUser) {
-        const tempHash = await hashPassword(`Invited@${crypto.randomBytes(4).toString('hex')}`);
-        await tx.user.create({
+        const inv = await tx.userInvitation.create({
           data: {
             email: cleanEmail,
             name: data.name.trim(),
-            phoneNumber: whatsappNum,
             role: Role.CENTRE,
-            passwordHash: tempHash,
-            status: 'Inactive',
+            phone: whatsappNum,
+            whatsappNumber: whatsappNum,
             centreId: data.centreId || null,
             clientId: data.clientId || null,
-            managerId: inviterRole === Role.PM ? inviterId : null,
+            scope: data.scope ? (data.scope as Prisma.InputJsonValue) : Prisma.JsonNull,
+            token,
+            expiresAt,
+            status: 'Pending',
+            inviterId,
           },
         });
-      }
 
-      await tx.auditLog.create({
-        data: {
-          userId: inviterId,
-          userEmail: inviterEmail,
-          action: 'CENTRE_USER_INVITED',
-          entity: 'UserInvitation',
-          entityId: inv.id,
-          details: {
-            email: cleanEmail,
-            name: data.name,
-            whatsappNumber: whatsappNum,
-            centreId: data.centreId,
-            clientId: data.clientId,
+        // If user doesn't exist, create an inactive placeholder
+        if (!existingUser && tempHash) {
+          await tx.user.create({
+            data: {
+              email: cleanEmail,
+              name: data.name.trim(),
+              phoneNumber: whatsappNum,
+              role: Role.CENTRE,
+              passwordHash: tempHash,
+              status: 'Inactive',
+              centreId: data.centreId || null,
+              clientId: data.clientId || null,
+              managerId: inviterRole === Role.PM ? inviterId : null,
+            },
+          });
+        }
+
+        await tx.auditLog.create({
+          data: {
+            userId: inviterId,
+            userEmail: inviterEmail,
+            action: 'CENTRE_USER_INVITED',
+            entity: 'UserInvitation',
+            entityId: inv.id,
+            details: {
+              email: cleanEmail,
+              name: data.name,
+              whatsappNumber: whatsappNum,
+              centreId: data.centreId,
+              clientId: data.clientId,
+            },
           },
-        },
-      });
+        });
 
-      return inv;
-    });
+        return inv;
+      },
+      {
+        maxWait: 15000,
+        timeout: 30000,
+      }
+    );
 
     const registrationUrl = `/invite/register?token=${token}`;
 

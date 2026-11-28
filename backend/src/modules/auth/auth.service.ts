@@ -229,122 +229,152 @@ export class AuthService {
       throw new Error('Registration email must match the invited official email address.');
     }
 
+    const cleanMobile = (input.mobile || (input as any).mobileNumber || (input as any).phone || '').trim();
+    const cleanName = input.name ? input.name.trim() : input.centreName.trim();
+
+    // 1. Resolve existing user outside transaction to minimize lock hold time
     const existingUser = await prisma.user.findUnique({
       where: { email: cleanEmail },
+      select: { id: true, centreId: true, status: true },
     });
 
     if (existingUser && existingUser.status === 'Active') {
       throw new Error('An active account already exists for this email address. Please log in directly.');
     }
 
+    // 2. Resolve existing centre outside transaction
+    let existingCentre: { id: string; centreCode: string } | null = null;
+    if (existingUser?.centreId) {
+      existingCentre = await prisma.centre.findUnique({
+        where: { id: existingUser.centreId },
+        select: { id: true, centreCode: true },
+      });
+    }
+    if (!existingCentre) {
+      existingCentre = await prisma.centre.findFirst({
+        where: { officialEmail: cleanEmail },
+        select: { id: true, centreCode: true },
+      });
+    }
+
+    // 3. Compute bcrypt password hash outside transaction
     const passwordHash = await hashPassword(input.password);
 
+    // 4. Run minimal DB mutation inside transaction with extended timeouts (maxWait: 15s, timeout: 30s)
     let attempts = 0;
     while (attempts < 5) {
       try {
-        return await prisma.$transaction(async (tx) => {
-          // 1. Resolve or create Centre
-          let centre: any = null;
-          if (existingUser?.centreId) {
-            centre = await tx.centre.findUnique({ where: { id: existingUser.centreId } });
-          }
+        return await prisma.$transaction(
+          async (tx) => {
+            let centreId: string;
+            let centreCode: string;
 
-          if (!centre) {
-            centre = await tx.centre.findFirst({ where: { officialEmail: cleanEmail } });
-          }
+            if (existingCentre) {
+              const updatedCentre = await tx.centre.update({
+                where: { id: existingCentre.id },
+                data: {
+                  centreName: input.centreName.trim(),
+                  officialMobile: cleanMobile,
+                },
+                select: { id: true, centreCode: true },
+              });
+              centreId = updatedCentre.id;
+              centreCode = updatedCentre.centreCode;
+            } else {
+              centreCode = await CentreService.generateCentreCode(tx);
+              const createdCentre = await tx.centre.create({
+                data: {
+                  centreCode,
+                  centreName: input.centreName.trim(),
+                  officialEmail: cleanEmail,
+                  officialMobile: cleanMobile,
+                  centreStatus: 'Draft',
+                  centreAddress: '',
+                  pincode: '',
+                },
+                select: { id: true, centreCode: true },
+              });
+              centreId = createdCentre.id;
+            }
 
-          if (centre) {
-            centre = await tx.centre.update({
-              where: { id: centre.id },
+            // Create or update User in Inactive status pending OTP verification
+            let userId: string;
+            if (existingUser) {
+              const updatedUser = await tx.user.update({
+                where: { id: existingUser.id },
+                data: {
+                  name: cleanName,
+                  phoneNumber: cleanMobile,
+                  passwordHash,
+                  status: 'Inactive',
+                  centreId,
+                },
+                select: { id: true },
+              });
+              userId = updatedUser.id;
+            } else {
+              const createdUser = await tx.user.create({
+                data: {
+                  email: cleanEmail,
+                  name: cleanName,
+                  phoneNumber: cleanMobile,
+                  passwordHash,
+                  role: Role.CENTRE,
+                  status: 'Inactive',
+                  centreId,
+                },
+                select: { id: true },
+              });
+              userId = createdUser.id;
+            }
+
+            // Link Centre -> userId
+            await tx.centre.update({
+              where: { id: centreId },
+              data: { userId },
+            });
+
+            // Mark Invitation used
+            await tx.userInvitation.update({
+              where: { id: val.invitation!.id },
               data: {
-                centreName: input.centreName.trim(),
-                officialMobile: input.mobile.trim(),
+                usedAt: new Date(),
+                status: 'Accepted',
+                centreId,
               },
             });
-          } else {
-            const centreCode = await CentreService.generateCentreCode(tx);
-            centre = await tx.centre.create({
+
+            // Audit Log
+            await tx.auditLog.create({
               data: {
-                centreCode,
-                centreName: input.centreName.trim(),
-                officialEmail: cleanEmail,
-                officialMobile: input.mobile.trim(),
-                centreStatus: 'Draft',
-                centreAddress: '',
-                pincode: '',
+                userId,
+                userEmail: cleanEmail,
+                action: 'CENTRE_USER_REGISTERED_FROM_INVITE',
+                entity: 'User',
+                entityId: userId,
+                details: {
+                  centreId,
+                  centreCode,
+                  centreName: input.centreName.trim(),
+                },
               },
             });
+
+            return {
+              success: true,
+              message: 'Account registered successfully. Please verify your email and WhatsApp mobile number.',
+              userId,
+              centreId,
+              centreCode,
+              requiresOtp: true,
+              token: input.token,
+            };
+          },
+          {
+            maxWait: 15000,
+            timeout: 30000,
           }
-
-          // 2. Create or update User in Inactive status pending OTP verification
-          let user: any;
-          if (existingUser) {
-            user = await tx.user.update({
-              where: { id: existingUser.id },
-              data: {
-                name: input.name ? input.name.trim() : input.centreName.trim(),
-                phoneNumber: input.mobile.trim(),
-                passwordHash,
-                status: 'Inactive',
-                centreId: centre.id,
-              },
-            });
-          } else {
-            user = await tx.user.create({
-              data: {
-                email: cleanEmail,
-                name: input.name ? input.name.trim() : input.centreName.trim(),
-                phoneNumber: input.mobile.trim(),
-                passwordHash,
-                role: Role.CENTRE,
-                status: 'Inactive',
-                centreId: centre.id,
-              },
-            });
-          }
-
-          // Link Centre -> userId
-          await tx.centre.update({
-            where: { id: centre.id },
-            data: { userId: user.id },
-          });
-
-          // 3. Mark Invitation used
-          await tx.userInvitation.update({
-            where: { id: val.invitation!.id },
-            data: {
-              usedAt: new Date(),
-              status: 'Accepted',
-              centreId: centre.id,
-            },
-          });
-
-          // 4. Audit Log
-          await tx.auditLog.create({
-            data: {
-              userId: user.id,
-              userEmail: cleanEmail,
-              action: 'CENTRE_USER_REGISTERED_FROM_INVITE',
-              entity: 'User',
-              entityId: user.id,
-              details: {
-                centreId: centre.id,
-                centreCode: centre.centreCode,
-                centreName: centre.centreName,
-              },
-            },
-          });
-
-          return {
-            success: true,
-            message: 'Account registered successfully. Please verify your email and WhatsApp mobile number.',
-            userId: user.id,
-            centreId: centre.id,
-            centreCode: centre.centreCode,
-            requiresOtp: true,
-            token: input.token,
-          };
-        });
+        );
       } catch (err: any) {
         if (err?.code === 'P2002' && attempts < 4) {
           attempts++;
@@ -375,48 +405,54 @@ export class AuthService {
 
     const now = new Date();
 
-    return prisma.$transaction(async (tx) => {
-      const updateData: any = {};
-      if (otpType === 'EMAIL') {
-        updateData.emailVerifiedAt = now;
-      } else {
-        updateData.mobileVerifiedAt = now;
-      }
+    return prisma.$transaction(
+      async (tx) => {
+        const updateData: any = {};
+        if (otpType === 'EMAIL') {
+          updateData.emailVerifiedAt = now;
+        } else {
+          updateData.mobileVerifiedAt = now;
+        }
 
-      await tx.userInvitation.update({
-        where: { id: inv.id },
-        data: updateData,
-      });
-
-      const user = await tx.user.findUnique({
-        where: { email: inv.email },
-      });
-
-      if (user && user.status === 'Inactive') {
-        await tx.user.update({
-          where: { id: user.id },
-          data: { status: 'Active' },
+        await tx.userInvitation.update({
+          where: { id: inv.id },
+          data: updateData,
         });
 
-        await tx.auditLog.create({
-          data: {
-            userId: user.id,
-            userEmail: user.email,
-            action: 'USER_ACTIVATED_VIA_OTP',
-            entity: 'User',
-            entityId: user.id,
-            details: { otpType, verifiedAt: now },
-          },
+        const user = await tx.user.findUnique({
+          where: { email: inv.email },
         });
-      }
 
-      return {
-        success: true,
-        verified: true,
-        isFullyActivated: true,
-        message: `${otpType === 'EMAIL' ? 'Email' : 'WhatsApp Mobile'} verified successfully. Account is now active.`,
-      };
-    });
+        if (user && user.status === 'Inactive') {
+          await tx.user.update({
+            where: { id: user.id },
+            data: { status: 'Active' },
+          });
+
+          await tx.auditLog.create({
+            data: {
+              userId: user.id,
+              userEmail: user.email,
+              action: 'USER_ACTIVATED_VIA_OTP',
+              entity: 'User',
+              entityId: user.id,
+              details: { otpType, verifiedAt: now },
+            },
+          });
+        }
+
+        return {
+          success: true,
+          verified: true,
+          isFullyActivated: true,
+          message: `${otpType === 'EMAIL' ? 'Email' : 'WhatsApp Mobile'} verified successfully. Account is now active.`,
+        };
+      },
+      {
+        maxWait: 15000,
+        timeout: 30000,
+      }
+    );
   }
 
   /**
