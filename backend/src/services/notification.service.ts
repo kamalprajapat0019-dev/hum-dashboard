@@ -24,6 +24,14 @@ export interface SignUpLinkPayload {
   expiresAt: Date;
 }
 
+export interface DispatchOtpPayload {
+  to: string;
+  centreName: string;
+  otpCode: string;
+  channel: 'WHATSAPP' | 'EMAIL';
+  expiresInMinutes?: number;
+}
+
 /**
  * Format mobile number to valid Indian E.164 without leading '+' (e.g., 91XXXXXXXXXX)
  */
@@ -87,6 +95,166 @@ export class NotificationService {
       email: emailRes,
       whatsapp: whatsappRes,
     };
+  }
+
+  /**
+   * Dispatch 6-digit verification OTP to WhatsApp or Email
+   */
+  static async dispatchOtp(params: DispatchOtpPayload): Promise<DispatchChannelResult> {
+    const { to, centreName, otpCode, channel, expiresInMinutes = 15 } = params;
+
+    if (channel === 'WHATSAPP') {
+      const formattedPhone = formatWhatsAppNumber(to);
+      const expiryText = `Valid for ${expiresInMinutes} minutes`;
+      const messageText = `*OECM Portal Verification OTP*\n\nDear *${centreName}*,\nYour 6-digit WhatsApp verification OTP to activate your account is: *${otpCode}*.\n\n⚠️ ${expiryText}. Single-use only. Do not share this code with anyone.`;
+
+      // 1. Meta WhatsApp Cloud API
+      if (env.WHATSAPP_TOKEN && env.WHATSAPP_PHONE_NUMBER_ID) {
+        try {
+          const apiVersion = env.WHATSAPP_API_VERSION || 'v25.0';
+          const metaUrl = `https://graph.facebook.com/${apiVersion}/${env.WHATSAPP_PHONE_NUMBER_ID}/messages`;
+
+          let payload: any;
+          if (env.WHATSAPP_TEMPLATE_NAME) {
+            payload = {
+              messaging_product: 'whatsapp',
+              to: formattedPhone,
+              type: 'template',
+              template: {
+                name: env.WHATSAPP_TEMPLATE_NAME,
+                language: { code: env.WHATSAPP_TEMPLATE_LANG || 'en_US' },
+                components: [
+                  {
+                    type: 'body',
+                    parameters: [
+                      { type: 'text', text: centreName.slice(0, 100) },
+                      { type: 'text', text: `Your WhatsApp OTP is: ${otpCode}` },
+                      { type: 'text', text: expiryText },
+                    ],
+                  },
+                ],
+              },
+            };
+          } else {
+            payload = {
+              messaging_product: 'whatsapp',
+              recipient_type: 'individual',
+              to: formattedPhone,
+              type: 'text',
+              text: { preview_url: false, body: messageText },
+            };
+          }
+
+          const res = await fetch(metaUrl, {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+              Authorization: `Bearer ${env.WHATSAPP_TOKEN}`,
+            },
+            body: JSON.stringify(payload),
+          });
+
+          const data: any = await res.json();
+          if (!res.ok) {
+            throw new Error(data?.error?.message || `Meta API HTTP ${res.status}`);
+          }
+
+          return {
+            sent: true,
+            recipient: formattedPhone,
+            status: 'sent',
+            messageId: data?.messages?.[0]?.id,
+            provider: 'meta_cloud_api',
+          };
+        } catch (err: unknown) {
+          const msg = err instanceof Error ? err.message : 'Meta WhatsApp Cloud API OTP delivery failed';
+          console.error(`[DISPATCH:ERROR:OTP:WHATSAPP] Failed to send to ${formattedPhone}:`, msg);
+          return {
+            sent: false,
+            recipient: formattedPhone,
+            status: 'failed',
+            error: msg,
+            provider: 'meta_cloud_api',
+          };
+        }
+      }
+
+      if (env.NODE_ENV !== 'production') {
+        console.log(`[DISPATCH:SIMULATED:OTP:WHATSAPP] Recipient: +${formattedPhone} | OTP: ${otpCode}`);
+      }
+
+      return {
+        sent: false,
+        recipient: formattedPhone,
+        status: 'not_configured',
+        error: 'WhatsApp provider not configured in environment',
+      };
+    } else {
+      // Channel === EMAIL
+      const cleanEmail = to.trim().toLowerCase();
+      if (!env.SMTP_HOST || !env.SMTP_USER) {
+        if (env.NODE_ENV !== 'production') {
+          console.log(`[DISPATCH:SIMULATED:OTP:EMAIL] Recipient: ${cleanEmail} | OTP: ${otpCode}`);
+        }
+        return {
+          sent: false,
+          recipient: cleanEmail,
+          status: 'not_configured',
+          error: 'SMTP credentials not configured in environment',
+        };
+      }
+
+      try {
+        const transporter = nodemailer.createTransport({
+          host: env.SMTP_HOST,
+          port: env.SMTP_PORT || (env.SMTP_SECURE ? 465 : 587),
+          secure: env.SMTP_SECURE || false,
+          auth: {
+            user: env.SMTP_USER,
+            pass: env.SMTP_PASS,
+          },
+        });
+
+        const subject = `Your OECM Account Verification OTP: ${otpCode}`;
+        const html = `
+          <div style="font-family: Arial, sans-serif; max-width: 520px; margin: auto; padding: 24px; border: 1px solid #e2e8f0; border-radius: 8px;">
+            <h2 style="color: #1e3a8a; margin-top: 0; font-size: 20px;">OECM Account Verification</h2>
+            <p style="font-size: 14px; color: #334155;">Dear <strong>${centreName}</strong>,</p>
+            <p style="font-size: 14px; color: #334155;">Your 6-digit one-time verification code (OTP) to activate your Centre User account is:</p>
+            <div style="font-size: 32px; font-weight: 700; letter-spacing: 6px; color: #2563eb; background: #eff6ff; padding: 16px; text-align: center; border-radius: 8px; margin: 20px 0;">
+              ${otpCode}
+            </div>
+            <p style="font-size: 13px; color: #64748b;">This OTP is valid for ${expiresInMinutes} minutes. Single-use only. Do not disclose this OTP to anyone.</p>
+          </div>
+        `;
+
+        const info = await transporter.sendMail({
+          from: env.SMTP_FROM || env.SMTP_USER,
+          to: cleanEmail,
+          subject,
+          text: `Your OECM verification OTP is: ${otpCode}. Valid for ${expiresInMinutes} minutes.`,
+          html,
+        });
+
+        return {
+          sent: true,
+          recipient: cleanEmail,
+          status: 'sent',
+          messageId: info.messageId,
+          provider: 'smtp',
+        };
+      } catch (err: unknown) {
+        const msg = err instanceof Error ? err.message : 'SMTP OTP delivery failed';
+        console.error(`[DISPATCH:ERROR:OTP:EMAIL] Failed to send to ${cleanEmail}:`, msg);
+        return {
+          sent: false,
+          recipient: cleanEmail,
+          status: 'failed',
+          error: msg,
+          provider: 'smtp',
+        };
+      }
+    }
   }
 
   /**
