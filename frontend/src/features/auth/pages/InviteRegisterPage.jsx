@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { useSearchParams, useNavigate, Link } from 'react-router-dom';
 import {
   Building2, Lock, Eye, EyeOff, CheckCircle2, AlertCircle, ArrowRight,
-  ShieldCheck, Loader2, Phone, Mail, CheckSquare, RefreshCw, KeyRound, Check, X
+  ShieldCheck, Loader2, Phone, Mail, CheckSquare, RefreshCw, KeyRound, Check, X, Send
 } from 'lucide-react';
 import { apiClient } from '@/services/apiClient';
 import { ENDPOINTS } from '@/services/endpoints';
@@ -330,15 +330,45 @@ export default function InviteRegisterPage() {
 
   // ── Render Token Invalid / Expired State ──
   if (!tokenValid) {
+    const isAlreadyUsed =
+      tokenError &&
+      (tokenError.toLowerCase().includes('already been used') ||
+        tokenError.toLowerCase().includes('revoked') ||
+        tokenError.toLowerCase().includes('already used'));
+
+    const isExpired =
+      tokenError &&
+      (tokenError.toLowerCase().includes('expired') ||
+        tokenError.toLowerCase().includes('72-hour'));
+
+    let title = 'Sign-Up Link Expired or Invalid (FRD Sec. 4.1)';
+    if (isAlreadyUsed) {
+      title = 'Invitation Link Already Used or Revoked';
+    } else if (isExpired) {
+      title = 'Sign-Up Link Expired (72-Hour Window Elapsed)';
+    }
+
     return (
       <div className="card" style={{ maxWidth: 540, margin: '60px auto', padding: 32, textAlign: 'center' }}>
         <AlertCircle size={48} color="var(--color-danger, #dc2626)" style={{ margin: '0 auto 16px' }} />
         <h2 style={{ fontSize: '1.25rem', fontWeight: 700, margin: '0 0 10px', color: 'var(--text-primary)' }}>
-          Sign-Up Link Expired or Invalid (FRD Sec. 4.1)
+          {title}
         </h2>
         <p style={{ fontSize: '0.875rem', color: 'var(--text-secondary)', lineHeight: 1.6, margin: '0 0 20px' }}>
           {tokenError}
         </p>
+
+        {isAlreadyUsed && (
+          <div style={{ marginBottom: 20 }}>
+            <Link
+              to={ROUTES.LOGIN}
+              className="btn btn-primary"
+              style={{ display: 'inline-flex', alignItems: 'center', gap: 6, padding: '9px 20px' }}
+            >
+              Go to Login <ArrowRight size={15} />
+            </Link>
+          </div>
+        )}
 
         {/* Request New Sign-Up Link Section */}
         <div
@@ -400,9 +430,11 @@ export default function InviteRegisterPage() {
           )}
         </div>
 
-        <Link to={ROUTES.LOGIN} className="btn btn-secondary" style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}>
-          Return to Login
-        </Link>
+        {!isAlreadyUsed && (
+          <Link to={ROUTES.LOGIN} className="btn btn-secondary" style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}>
+            Return to Login
+          </Link>
+        )}
       </div>
     );
   }
