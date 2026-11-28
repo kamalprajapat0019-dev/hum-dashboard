@@ -242,20 +242,48 @@ Complete your registration and OTP verification promptly.`;
     // 1. Meta WhatsApp Cloud API
     if (env.WHATSAPP_TOKEN && env.WHATSAPP_PHONE_NUMBER_ID) {
       try {
-        const metaUrl = `https://graph.facebook.com/v19.0/${env.WHATSAPP_PHONE_NUMBER_ID}/messages`;
+        const apiVersion = env.WHATSAPP_API_VERSION || 'v25.0';
+        const metaUrl = `https://graph.facebook.com/${apiVersion}/${env.WHATSAPP_PHONE_NUMBER_ID}/messages`;
+
+        // Format payload: Prefer approved template if configured
+        let payload: any;
+        if (env.WHATSAPP_TEMPLATE_NAME) {
+          payload = {
+            messaging_product: 'whatsapp',
+            to,
+            type: 'template',
+            template: {
+              name: env.WHATSAPP_TEMPLATE_NAME,
+              language: { code: env.WHATSAPP_TEMPLATE_LANG || 'en_US' },
+              components: [
+                {
+                  type: 'body',
+                  parameters: [
+                    { type: 'text', text: centreName },
+                    { type: 'text', text: fullUrl },
+                    { type: 'text', text: expiresAtStr },
+                  ],
+                },
+              ],
+            },
+          };
+        } else {
+          payload = {
+            messaging_product: 'whatsapp',
+            recipient_type: 'individual',
+            to,
+            type: 'text',
+            text: { preview_url: true, body: messageText },
+          };
+        }
+
         const res = await fetch(metaUrl, {
           method: 'POST',
           headers: {
             'Content-Type': 'application/json',
             Authorization: `Bearer ${env.WHATSAPP_TOKEN}`,
           },
-          body: JSON.stringify({
-            messaging_product: 'whatsapp',
-            recipient_type: 'individual',
-            to,
-            type: 'text',
-            text: { preview_url: true, body: messageText },
-          }),
+          body: JSON.stringify(payload),
         });
 
         const data: any = await res.json();

@@ -49,6 +49,9 @@ const envSchema = z
     WHATSAPP_TOKEN: z.string().optional(),
     WHATSAPP_PHONE_NUMBER_ID: z.string().optional(),
     WHATSAPP_SENDER: z.string().optional(),
+    WHATSAPP_TEMPLATE_NAME: z.string().optional().default('jaspers_market_order_confirmation_v1'),
+    WHATSAPP_TEMPLATE_LANG: z.string().optional().default('en_US'),
+    WHATSAPP_API_VERSION: z.string().optional().default('v25.0'),
 
     // Twilio WhatsApp (Optional alternative)
     TWILIO_ACCOUNT_SID: z.string().optional(),
